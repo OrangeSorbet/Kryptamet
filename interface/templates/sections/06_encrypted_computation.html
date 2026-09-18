@@ -1,0 +1,17 @@
+{% if result %}
+<section class="pipeline-step highlight" data-step="5">
+    <div class="step-badge">Step 5 &mdash; Computing on Encrypted Data (the core of HE)</div>
+    <p class="step-text">
+        The server now computes <code>dot(encrypted_x, weights) + bias</code> &mdash; the exact
+        same linear algebra a logistic regression model performs &mdash; but the server
+        <strong>never decrypts the input, the weights are applied homomorphically, and the
+        server never sees the result either</strong>. Every operation happens on ciphertext.
+    </p>
+    <div class="ciphertext-box" data-scramble>
+        Encrypted result: {{ result.trace.ciphertext_output_hex_preview }}...
+    </div>
+    <div class="data-preview">
+        <span class="data-label">Output ciphertext size:</span> {{ result.trace.ciphertext_output_size }} bytes
+    </div>
+</section>
+{% endif %}

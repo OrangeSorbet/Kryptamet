@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kryptamet — Live HE Pipeline</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/colors.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/live_pipeline.css') }}">
+</head>
+<body>
+    <div class="title">Kryptamet &mdash; Live Homomorphic Encryption Pipeline</div>
+
+    <div class="card">
+        <div class="select-group">
+            <select id="modelSelect" class="dropdown">
+                <option value="human_vs_ai_text">Human vs AI Text</option>
+                <option value="sms_spam">SMS Spam</option>
+            </select>
+        </div>
+        <textarea id="textInput" class="input-text" rows="3" placeholder="Type a real sentence here..."></textarea>
+        <div class="control-row">
+            <button id="runAnimatedBtn" class="btn">Run (Visualized)</button>
+            <button id="runInstantBtn" class="btn btn-secondary">Run (Instant)</button>
+            <div class="speed-control">
+                <label for="speedSlider">Speed</label>
+                <input type="range" id="speedSlider" min="1" max="100" value="50">
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="overview">Overview</button>
+        <button class="tab-btn" data-tab="encryption">Encryption</button>
+        <button class="tab-btn" data-tab="computation">Computation</button>
+        <button class="tab-btn" data-tab="transport">Transport</button>
+        <button class="tab-btn" data-tab="decryption">Decryption</button>
+        <button class="tab-btn" data-tab="benchmarks">Benchmarks</button>
+    </div>
+
+    <div id="tab-overview" class="tab-panel active">
+        <div class="card">
+            <div class="title" style="font-size: var(--font-size-lg);">What's happening</div>
+            <p class="step-text">
+                Type a sentence, pick a model, and run the pipeline. Every operation the
+                model performs on your <strong>encrypted</strong> data is logged in real time
+                on the Computation tab. Nothing shown is simulated &mdash; these are the actual
+                weight multiplications, ciphertext bytes, and timings from this run.
+            </p>
+            <div id="resultSummary"></div>
+        </div>
+    </div>
+
+    <div id="tab-encryption" class="tab-panel">
+        <div class="card">
+            <div class="title" style="font-size: var(--font-size-lg);">Encryption</div>
+            <div id="encryptionContent"></div>
+        </div>
+    </div>
+
+    <div id="tab-computation" class="tab-panel">
+        <div class="card">
+            <div class="title" style="font-size: var(--font-size-lg);">Computation on Encrypted Data</div>
+            <p class="step-text muted">Every line below is a real weight multiplication happening on your ciphertext.</p>
+            <div id="logFeed" class="log-feed"></div>
+        </div>
+    </div>
+
+    <div id="tab-transport" class="tab-panel">
+        <div class="card">
+            <div class="title" style="font-size: var(--font-size-lg);">Secure Transport</div>
+            <div id="transportContent"></div>
+        </div>
+    </div>
+
+    <div id="tab-decryption" class="tab-panel">
+        <div class="card">
+            <div class="title" style="font-size: var(--font-size-lg);">Decryption &amp; Validation</div>
+            <div id="decryptionContent"></div>
+        </div>
+    </div>
+
+    <div id="tab-benchmarks" class="tab-panel">
+        {% include 'components/benchmark_table.html' %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/live_pipeline.js') }}"></script>
+</body>
+</html>

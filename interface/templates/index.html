@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kryptamet</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/colors.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+</head>
+<body>
+    <div class="title">Kryptamet &mdash; How Homomorphic Encryption Works</div>
+    <div class="card">
+        {% include 'components/dataset_selector.html' %}
+    </div>
+
+    {% include 'sections/01_intro.html' %}
+    {% include 'sections/02_plaintext_input.html' %}
+    {% include 'sections/03_key_generation.html' %}
+    {% include 'sections/04_encryption.html' %}
+    {% include 'sections/05_transport.html' %}
+    {% include 'sections/06_encrypted_computation.html' %}
+    {% include 'sections/07_decryption.html' %}
+    {% include 'sections/08_validation.html' %}
+    {% include 'sections/09_benchmarks.html' %}
+
+    <script src="{{ url_for('static', filename='js/pipeline_animations.js') }}"></script>
+</body>
+</html>

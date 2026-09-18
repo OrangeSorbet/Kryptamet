@@ -1,0 +1,11 @@
+<div class="select-group">
+    <form method="POST" action="/infer" style="display:flex; gap:0.75rem; align-items:center;">
+        <select name="dataset" class="dropdown">
+            {% for key, label in datasets.items() %}
+            <option value="{{ key }}">{{ label }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" name="index" value="0" min="0" class="input-number">
+        <button type="submit" class="btn">Run Inference</button>
+    </form>
+</div>

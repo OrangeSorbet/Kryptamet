@@ -1,0 +1,52 @@
+[
+  {
+    "model": "sms_spam",
+    "n_samples": 5,
+    "plaintext_time_sec": 0.005376600005547516,
+    "he_time_sec": 0.29121219999797177,
+    "plaintext_peak_mem_bytes": 7539,
+    "he_peak_mem_bytes": 44421,
+    "slowdown_factor": 54.16289099012429,
+    "plain_vs_he_agreement": 1.0
+  },
+  {
+    "model": "german_credit",
+    "n_samples": 5,
+    "plaintext_time_sec": 0.000745099998312071,
+    "he_time_sec": 0.15025919998879544,
+    "plaintext_peak_mem_bytes": 2084,
+    "he_peak_mem_bytes": 6646,
+    "slowdown_factor": 201.66313290724534,
+    "plain_vs_he_agreement": 1.0
+  },
+  {
+    "model": "symptom_diagnosis",
+    "n_samples": 5,
+    "plaintext_time_sec": 0.004939600010402501,
+    "he_time_sec": 4.846600599994417,
+    "plaintext_peak_mem_bytes": 6924,
+    "he_peak_mem_bytes": 48015,
+    "slowdown_factor": 981.1726839800324,
+    "plain_vs_he_agreement": 1.0
+  },
+  {
+    "model": "price_data",
+    "n_samples": 5,
+    "plaintext_time_sec": 0.0007566999993287027,
+    "he_time_sec": 0.051207199998316355,
+    "plaintext_peak_mem_bytes": 2084,
+    "he_peak_mem_bytes": 3374,
+    "slowdown_factor": 67.67173258060554,
+    "plain_vs_he_agreement": 1.0
+  },
+  {
+    "model": "human_vs_ai_text",
+    "n_samples": 5,
+    "plaintext_time_sec": 0.004562200003420003,
+    "he_time_sec": 0.05284639999445062,
+    "plaintext_peak_mem_bytes": 2598,
+    "he_peak_mem_bytes": 3374,
+    "slowdown_factor": 11.583534249887094,
+    "plain_vs_he_agreement": 1.0
+  }
+]

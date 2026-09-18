@@ -1,0 +1,22 @@
+{% if result %}
+<section class="pipeline-step" data-step="4">
+    <div class="step-badge">Step 4 &mdash; Secure Transport (RSA + AES Hybrid)</div>
+    <p class="step-text">
+        CKKS ciphertexts are large ({{ result.trace.ciphertext_input_size }} bytes) &mdash;
+        too large to encrypt directly with RSA. Instead, a fresh random AES key encrypts the
+        ciphertext itself, and only that small AES key is wrapped with RSA. This is the standard
+        <strong>hybrid encryption</strong> pattern used across TLS, PGP, and most real-world systems.
+    </p>
+    <div class="ciphertext-box" data-scramble>
+        AES-wrapped payload: {{ result.trace.transport_input.aes_ciphertext_hex_preview }}...
+    </div>
+    <div class="data-preview">
+        <span class="data-label">AES payload size:</span> {{ result.trace.transport_input.aes_ciphertext_size }} bytes<br>
+        <span class="data-label">RSA-wrapped AES key size:</span> {{ result.trace.transport_input.encrypted_aes_key_size }} bytes<br>
+        <span class="data-label">Integrity after unwrap:</span>
+        <span class="{{ 'badge-match' if result.trace.transport_input.integrity_preserved else 'badge-mismatch' }}">
+            {{ result.trace.transport_input.integrity_preserved }}
+        </span>
+    </div>
+</section>
+{% endif %}

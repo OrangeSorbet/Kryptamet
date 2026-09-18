@@ -1,0 +1,26 @@
+{% if result %}
+<section class="pipeline-step" data-step="7">
+    <div class="step-badge">Step 7 &mdash; Validation: Does Encrypted Match Plaintext?</div>
+    <p class="step-text">
+        To prove HE computed the right answer, we compare it against the same model run
+        directly on plaintext (no encryption at all).
+    </p>
+    <div class="compare-grid">
+        <div class="compare-col">
+            <div class="compare-title">Plaintext Computation</div>
+            <div class="compare-value">{{ result.plain_pred }}</div>
+        </div>
+        <div class="compare-col">
+            <div class="compare-title">HE Computation (decrypted)</div>
+            <div class="compare-value">{{ result.he_pred }}</div>
+        </div>
+    </div>
+    <div class="result-row">
+        <span>Match</span>
+        <span class="{{ 'badge-match' if result.match else 'badge-mismatch' }}">{{ result.match }}</span>
+    </div>
+    <p class="step-text muted">
+        True label for this sample: {{ result.true_label }}
+    </p>
+</section>
+{% endif %}
