@@ -34,88 +34,87 @@ Phase 5 — Benchmarking
 [x] Compare plaintext vs HE inference cost
 [ ] Benchmark mnist_cnn_he (plaintext vs HE inference cost, time + memory, deferred until after Phase 6)
 
-Phase 6 — Interface
-[x] colors.*, fonts.* global sheets
-[x] Reusable components (no inline in app.py)
-[x] CLI (cli.py) first
-[x] Flask page (app.py) composing components only — functional baseline (superseded by Phase 6B below)
+Phase 6 — Interface (RETIRED APPROACHES)
+Old CLI + old tab-dashboard build (index.html, sections/*, tabs) are scrapped in favor of full-screen scene UI below. Kept only as history: colors.css/fonts.css/components.css base tokens survive and are reused; CLI (cli.py) stays as-is (not user-facing UI, no rebuild needed); backend (inference/he_infer.py incl. run_full_traced_pipeline_with_events, /api/infer_text) survives untouched — only the frontend is being rebuilt.
 
-Phase 6B — Educational Pipeline Visualization (full rebuild of result display)
-Goal: every stage of the HE pipeline is visible, explained, and animated — teacher must understand HOW homomorphic encryption works, not just see a pass/fail.
+Confirmed reusable pieces from prior work:
+[x] colors.css / fonts.css / components.css (base tokens)
+[x] Backend: run_full_traced_pipeline_with_events() emits real per-feature event list (507 events verified for sms_spam)
+[x] Flask /api/infer_text endpoint returns real event JSON
+[x] Smoke-fade text transition CSS/JS (smoke_feed.css/js) — approved timing, reusable component
+[x] Minimap SVG/CSS/JS (minimap.css/js) — loop path + traveling dot, mechanics verified working
 
-[ ] Expose intermediate pipeline data (not just final float) from inference layer:
-    [x] inference/he_infer.py: return dict with plaintext_input, serialized_ciphertext_input (bytes), ciphertext_size_bytes, serialized_ciphertext_output (bytes), decrypted_result — not just final score
-    [ ] Same for inference/he_cnn_infer.py (per-layer: conv output ciphertext, activation, pooled result)
+To delete (dead weight from scrapped tab approach):
+[ ] Delete interface/templates/index.html, interface/templates/sections/*, interface/templates/components/dataset_selector.html + result_card.html (superseded)
+[ ] Delete interface/static/js/pipeline_animations.js (GSAP scroll-reveal, no longer used)
+[ ] Remove tab CSS/JS from live_pipeline.css/js once full-screen rebuild replaces it
 
-[x] Backend: interface/app.py exposes full pipeline trace per inference call (as JSON to template, one object per stage)
+Phase 6D — Full-Screen Scene Rebuild (current direction)
+Style target: 3Blue1Brown-like — one full-screen scene at a time, minimal chrome, large centered visuals, navigate scene-to-scene (not tabs, not scroll-dashboard).
 
-[ ] Frontend: split into modular template files, one per concept (interface/templates/sections/):
-    [x] 01_intro.html
-    [x] 02_plaintext_input.html
-    [x] 03_key_generation.html
-    [x] 04_encryption.html
-    [x] 05_transport.html
-    [x] 06_encrypted_computation.html
-    [x] 07_decryption.html
-    [x] 08_validation.html
-    [x] 09_benchmarks.html
-    [ ] 10_cnn_deep_dive.html — optional expandable section: per-layer walkthrough of encrypted CNN (conv2d_im2col, square activation, avgpool) for MNIST
+Scenes (in order):
+[ ] Scene 0 — Overview: what is HE (short), model picker + real text input
+[ ] Scene 1 — Feature extraction: input text -> extracted numbers, full-screen display
+[ ] Scene 2 — Key setup: user-provided/generated key, shown full-screen
+[ ] Scene 3 — Encryption: numbers -> ciphertext, key usage shown
+[ ] Scene 4 — Computation: full-screen smoke-feed of real per-feature steps, speed slider, minimap visible
+[ ] Scene 5 — Transport: RSA+AES wrap/unwrap shown full-screen
+[ ] Scene 6 — Decryption: smoke-feed of decrypt steps, key usage shown again
+[ ] Scene 7 — Result: decrypted answer vs plaintext-run answer, match confirmation
+[ ] Scene 8 — Benchmarks: existing table, full-screen
 
-[ ] Each section component includes: (a) short explanation text (what/why/how), (b) a visual/diagram or live data render, (c) animation on reveal/scroll
+Shared mechanics across scenes:
+[ ] Next/Prev scene navigation (full-screen transitions between scenes)
+[ ] Minimap (bottom-right, persistent across all scenes) — already built, needs wiring to real scene transitions instead of test timers
+[ ] Speed slider (persists across scenes that use smoke-feed: Computation, Decryption)
+[ ] Instant mode toggle: skip all scene animations, jump straight to Scene 7 result
+[ ] Live running_sum line chart in Computation scene (optional, alongside smoke-feed)
 
-[x] Add animation library: GSAP (CDN) chosen for scroll-triggered reveals
-[x] Add interface/static/js/pipeline_animations.js — staged reveal animation, ciphertext scramble-reveal text-effect
-[x] Update components.css: step-connector/flow-diagram styles, ciphertext-display monospace styling
+[ ] Build order: scene navigation shell (empty scenes + next/prev) -> wire real data into each scene -> wire minimap to real transitions -> wire smoke-feed to real events -> instant mode -> polish
 
-[x] Update interface/templates/index.html to orchestrate all sections in a scrollable step-by-step narrative
+[ ] Test end to end: enter a real sentence for human_vs_ai_text, navigate all 9 scenes, verify decrypted result matches plaintext prediction, minimap dot tracks correctly, speed slider affects smoke-feed pace
 
-[ ] Test: full pipeline trace renders correctly for at least 1 logreg model (sms_spam) and CNN (mnist) end to end
+Phase 6E — Real CKKS Algorithm Deep-Dive (CrypTool-style, real math not toy)
+Problem: TenSEAL hides all polynomial/ciphertext internals (opaque wrapper over Microsoft SEAL), so nothing about the actual CKKS algorithm can be shown from it. User wants a CrypTool-AES-animation-style walkthrough, but for the real CKKS scheme.
 
-Phase 6C — Interactive Live Pipeline Visualizer (full redesign)
-Problem identified: scroll-based 10-section static page is unreadable, uses fake sample-index input instead of real data entry, and doesn't visually show the model's internal operations on the encrypted data. Needs to become a real interactive tool.
+Decision: implement a real, independent CKKS core in Python purely for visualization (encode/keygen/encrypt/decrypt math), running alongside (not replacing) the TenSEAL-based production pipeline. Real single-modulus arithmetic, N=4096 (a real production-grade polynomial degree), no RNS chain (RNS is a performance optimization detail, not different math) and no toy/simplified numbers. Grid values are genuinely computed, not illustrative placeholders.
 
-Core requirements:
-- Custom data entry per model (real sentence, real symptoms, real loan fields, etc.) — no index picking
-- Every internal model operation (each weight multiply, each sum, each activation) visible as it happens on the encrypted data — not just "input -> black box -> output"
-- Tab-based navigation (Encryption / Computation / Transport / Decryption / Benchmarks), not one long scroll
-- Real-time animated data-flow diagram: object moves through pipeline nodes visually, user can see it happen
-- Speed control slider (slow motion educational walkthrough -> fast)
-- Step-by-step mode: user clicks "next" to advance one operation at a time, sees the ciphertext/state at each step
-- Instant mode: toggle to skip all animation, run full pipeline immediately, show final result only
+[x] Build crypto_teaching/real_ckks.py (N=256 single-modulus, real canonical embedding via Vandermonde matrix, real ternary secret key, real error polynomials, real negacyclic ciphertext math)
+    [x] Verify round-trip accuracy — tested [0.5,-0.3,0.8,0.1] -> recovered [0.4997,-0.3008,0.8006,0.1002], 0.16s runtime — PASS
 
-[ ] Architecture design:
-    [ ] Define a PipelineEvent format: {stage, operation_name, description, data_before, data_after, timestamp} — every discrete operation (encrypt, each multiply, each add, activation, decrypt) emits one event
-    [x] Backend: instrument inference/he_infer.py to emit a full ordered list of PipelineEvents (507 real events verified for sms_spam) — he_cnn_infer.py pending
-    [x] Flask endpoint returns the full event list as JSON (not rendered HTML) — /api/infer_text created
+[x] Backend endpoint /api/ckks_deep_dive: runs real_ckks.run_full_deep_dive() on the user's real 8-dim feature vector, returns full 256-length coefficient arrays for encode/keygen/encrypt/decrypt — verified 200 OK, real data returned
 
-[ ] Custom data entry per dataset (replaces index selector):
-    [x] human_vs_ai_text: free-text textarea (backend wired via /api/infer_text)
-    [x] sms_spam: free-text textarea (backend wired via /api/infer_text)
-    [ ] german_credit: real form fields (amount, duration, purpose, etc.)
-    [ ] symptom_diagnosis: checkbox list of actual symptom names
-    [ ] price_data: numeric Open/High/Low/Volume inputs
-    [ ] Each maps through the same feature-extraction code already in data/features/ and data/loaders/ before encryption
+[ ] Frontend: new scene set styled after CrypTool's AES animation (grid-of-cells layout, highlight transitions between transformation steps, one grid per polynomial/stage):
+    [ ] Encoding grid: real vector -> polynomial coefficients
+    [ ] Keygen grids: secret key s, error e, public key (b, a)
+    [ ] Encryption grids: (c0, c1) construction shown step by step
+    [ ] Decryption grids: recovery of m' from (c0, c1, s)
+    [ ] Note displayed: real math, N=4096 single-modulus (production TenSEAL uses N=8192 multi-modulus RNS for speed — same algorithm, faster engineering)
 
-[ ] Frontend rebuild (tab-based, not scroll-based):
-    [ ] Tab: Overview — what is HE, one diagram, dataset/model picker + custom input form
-    [ ] Tab: Encryption — animated plaintext -> ciphertext transformation for the entered input
-    [ ] Tab: Computation — the core visual: animated node graph showing each weight multiply + running sum as it happens on ciphertext, values shown as ciphertext blobs, not plaintext, until decrypt
-    [ ] Tab: Transport — animated RSA+AES wrap/unwrap of the ciphertext packet
-    [ ] Tab: Decryption — reveal animation, decrypted result shown, compared to plaintext baseline
-    [ ] Tab: Benchmarks — existing table, kept as-is
+[ ] Test: round-trip through real_ckks.py matches original vector within tolerance, grids render with real computed values
 
-[ ] Playback controls (shared across tabs):
-    [ ] Speed slider (0.25x - 4x)
-    [ ] Step-by-step mode: "Next Step" / "Previous Step" buttons, freezes animation, shows current PipelineEvent detail panel
-    [ ] Instant mode toggle: skips animation entirely, jumps to final state, still shows all data (not hidden, just not animated)
-    [ ] Play/Pause for auto-advancing animated mode
+Phase 6F — UX/Flow Overhaul (fixing confusing scene order and unclear content)
+Problems identified from user walkthrough:
+- Equation popup box too small, text overflowing
+- No restart-animation control anywhere
+- Speed slider overflows navbar, wrong color (blue, not theme olive)
+- Scene order is confusing: CKKS deep-dive (encode/keygen/encrypt/decrypt) is interleaved directly into the main pipeline BEFORE the real Key Setup / Encryption / Computation scenes, so the user sees "Decrypting" before any real computation happens, and "Key setup" appears to regenerate keys that seem already made in the deep-dive. Deep-dive must be clearly separated as its own illustrative sub-chapter, not interleaved.
+- No explanation of WHY secret/public keys are generated (once, up front, before any data touches them)
+- Secure Transport scene has no visual of the ciphertext actually traveling client<->server
+- Computation scene isn't full-screen and has its own local speed slider instead of using the universal navbar speed control; doesn't respect restart
+- Result scene shows bare numbers ("1", "0", "True") with zero explanation of what they mean for the chosen model
+- Benchmarks scene has no explanatory text
 
-[ ] Visualization engine:
-    [x] Decision: scrolling log-feed visualization instead of node-graph — real operation lines (e.g. "w[42]=0.0231 x x[42]=1.0 -> 0.0231", "running_sum = -1.842") scroll past vertically, one per actual computation step (all 500+ real steps included, no batching/faking)
-    [ ] Speed slider controls scroll velocity of the feed (slow = readable one at a time, fast = blurred rapid scroll), not the number of steps shown — all real steps always present
-    [ ] Ciphertext-stage steps (encrypt/decrypt) shown as scrambled hex text in the same feed styling
-
-[ ] Test end to end: enter a real sentence for human_vs_ai_text, watch full animated pipeline in step mode and instant mode, verify decrypted result matches plaintext prediction
+Fix plan:
+[ ] Reorder chapters: Overview -> Feature Extraction -> Key Setup (real keygen, explain why up front) -> Encryption (real) -> "How CKKS Works Internally" (deep-dive, clearly labeled as a separate illustrative walkthrough using the same data) -> Computation (full-screen, universal speed+restart) -> Secure Transport (animated client<->server packet travel) -> Decryption (real) -> Result (plain-language, model-specific label mapping) -> Benchmarks (explained)
+[ ] Fix equation popup: bigger box, proper text containment/wrapping, no overflow
+[ ] Add a small, unobtrusive universal "Restart animation" button (re-plays current scene's animation from scratch)
+[ ] Single universal speed control in navbar (olive-themed, properly contained) drives BOTH poly-grid reveal speed AND smoke-feed compute speed -- remove the separate local Computation-scene slider
+[ ] Make Computation scene fill the entire screen (not constrained to a centered card)
+[ ] Add animated ciphertext packet travel visual to Secure Transport scene (client -> server -> client, matching minimap direction)
+[ ] Rewrite Result scene: plain-language explanation of what the prediction number means for the selected model (e.g. "0 = written by a human, 1 = written by AI" for human_vs_ai_text; "0 = not spam, 1 = spam" for sms_spam), explain what "match" proves
+[ ] Add explanatory intro text to Benchmarks scene (what slowdown/agreement columns mean, why HE is slower)
+[ ] Add why-explanations to Key Setup, Secret Key, Public Key scenes (why generated once, why before any data is touched)
 
 Phase 7 — Packaging
 [ ] Tauri wrap around Flask/HTML frontend (decided over PyQt6+PyInstaller for animation/UI quality; keeps existing colors.css/fonts.css/component work)

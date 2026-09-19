@@ -1,0 +1,13 @@
+.input-text {
+    width: 100%;
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-family: var(--font-base);
+    font-size: var(--font-size-base);
+    resize: vertical;
+    margin-top: 0.75rem;
+    box-sizing: border-box;
+}

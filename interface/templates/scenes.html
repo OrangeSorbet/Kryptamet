@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kryptamet</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/colors.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/smoke_feed.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimap.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/scenes.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/timeline.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/live_pipeline_input.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/poly_grid.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+    <style>
+        .navbar {
+            position: fixed; top: 0.5%; left: 1%; width: 98%;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.6rem 1.5rem; background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; z-index: 1001;
+        }
+        .navbar-brand { font-weight: 700; color: var(--color-text); letter-spacing: 0.5px; }
+        .navbar-speed { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-brand">Kryptamet</div>
+        <div class="navbar-speed">
+            <label for="gridSpeedSlider">Reveal speed</label>
+            <input type="range" id="gridSpeedSlider" min="1" max="10" value="5">
+        </div>
+    </div>
+    <div class="scene-container">
+        <div class="scene active" id="sceneContent"></div>
+        <div class="minimap" id="minimapContainer"></div>
+        <div class="timeline-base-glow"></div>
+        <div class="edge-nav left" id="prevEdge">&lsaquo;</div>
+        <div class="edge-nav right" id="nextEdge">&rsaquo;</div>
+        <div class="timeline" id="timelineContainer"></div>
+        <div id="benchmarkTableSource" style="display:none">{% include 'components/benchmark_table.html' %}</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+    <script src="{{ url_for('static', filename='js/poly_grid.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/smoke_feed.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/minimap.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/scene_registry.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/scene_renderers.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/timeline.js') }}"></script>
+    <script>
+        let minimapInstance = initMinimap(document.getElementById("minimapContainer"));
+        let pipelineResult = null;
+
+        async function runPipeline(passphrase) {
+            passphrase = passphrase || "";
+            const model = document.getElementById("modelSelect").value;
+            const text = document.getElementById("textInput").value;
+            if (!text.trim()) { alert("Type a sentence first."); return false; }
+            const resp = await fetch("/api/infer_text", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ model, text, passphrase }),
+            });
+            if (!resp.ok) { alert("Inference failed: " + resp.status); return false; }
+            pipelineResult = await resp.json();
+            return true;
+        }
+
+        window.gridRevealSpeed = 5;
+        document.getElementById("gridSpeedSlider").addEventListener("input", (e) => {
+            window.gridRevealSpeed = parseInt(e.target.value, 10);
+        });
+
+        document.getElementById("prevEdge").addEventListener("click", () => goToSceneIndex(currentSceneIndex - 1));
+        document.getElementById("nextEdge").addEventListener("click", () => goToSceneIndex(currentSceneIndex + 1));
+
+        SCENES = buildStaticScenes();
+        renderTimeline();
+        goToSceneIndex(0);
+    </script>
+</body>
+</html>

@@ -91,7 +91,7 @@ def run_full_traced_pipeline(context, x_plain, weights, bias):
     }
 
 
-def run_full_traced_pipeline_with_events(context, x_plain, weights, bias):
+def run_full_traced_pipeline_with_events(context, x_plain, weights, bias, passphrase=None):
     """Full HE pipeline that also emits a real, granular PipelineEvent log:
     one event per feature's weight-multiply/running-sum, plus encrypt/HE-compute/
     transport/decrypt events. All values are real, not simulated -- note that
@@ -138,15 +138,25 @@ def run_full_traced_pipeline_with_events(context, x_plain, weights, bias):
               data_after={"ciphertext_size": len(serialized_output_bytes),
                           "hex_preview": serialized_output_bytes[:48].hex()})
 
-    rsa_private_key, rsa_public_key = generate_rsa_keypair()
-    wrapped_output = wrap_payload_traced(rsa_public_key, serialized_output_bytes)
-    rec.emit("transport", "rsa_aes_wrap",
-              f"Wrapped {len(serialized_output_bytes)}-byte ciphertext with AES, then wrapped the AES key with RSA",
-              data_after={"aes_ciphertext_size": wrapped_output["aes_ciphertext_size"],
-                          "rsa_key_size": wrapped_output["encrypted_aes_key_size"],
-                          "hex_preview": wrapped_output["aes_ciphertext_hex_preview"]})
-
-    unwrapped_output = unwrap_payload(rsa_private_key, wrapped_output)
+    if passphrase:
+        from hecrypto.transport import wrap_with_passphrase, unwrap_with_passphrase, derive_key_from_passphrase
+        fingerprint = derive_key_from_passphrase(passphrase).hex()
+        wrapped = wrap_with_passphrase(passphrase, serialized_output_bytes)
+        rec.emit("transport", "passphrase_aes_wrap",
+                  f"Wrapped {len(serialized_output_bytes)}-byte ciphertext with AES-256, key derived from your passphrase via PBKDF2 (200000 iterations)",
+                  data_after={"aes_ciphertext_size": len(wrapped["ciphertext"]),
+                              "hex_preview": wrapped["ciphertext"][:48].hex(),
+                              "key_fingerprint": fingerprint[:32]})
+        unwrapped_output = unwrap_with_passphrase(passphrase, wrapped)
+    else:
+        rsa_private_key, rsa_public_key = generate_rsa_keypair()
+        wrapped_output = wrap_payload_traced(rsa_public_key, serialized_output_bytes)
+        rec.emit("transport", "rsa_aes_wrap",
+                  f"Wrapped {len(serialized_output_bytes)}-byte ciphertext with AES, then wrapped the AES key with RSA",
+                  data_after={"aes_ciphertext_size": wrapped_output["aes_ciphertext_size"],
+                              "rsa_key_size": wrapped_output["encrypted_aes_key_size"],
+                              "hex_preview": wrapped_output["aes_ciphertext_hex_preview"]})
+        unwrapped_output = unwrap_payload(rsa_private_key, wrapped_output)
     integrity_ok = unwrapped_output == serialized_output_bytes
     rec.emit("transport", "rsa_aes_unwrap",
               f"Unwrapped payload on client side, integrity preserved: {integrity_ok}",

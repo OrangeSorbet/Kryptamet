@@ -51,6 +51,35 @@ def _rsa_decrypt_key(private_key, encrypted_key):
     )
 
 
+def derive_key_from_passphrase(passphrase, salt=b"kryptamet-demo-salt"):
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=200000)
+    return kdf.derive(passphrase.encode("utf-8"))
+
+
+def wrap_with_passphrase(passphrase, payload_bytes):
+    aes_key = derive_key_from_passphrase(passphrase)
+    iv = os.urandom(16)
+
+    padder_len = 16 - (len(payload_bytes) % 16)
+    padded = payload_bytes + bytes([padder_len]) * padder_len
+
+    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(padded) + encryptor.finalize()
+
+    return {"iv": iv, "ciphertext": ciphertext}
+
+
+def unwrap_with_passphrase(passphrase, wrapped):
+    aes_key = derive_key_from_passphrase(passphrase)
+    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(wrapped["iv"]))
+    decryptor = cipher.decryptor()
+    padded = decryptor.update(wrapped["ciphertext"]) + decryptor.finalize()
+    padder_len = padded[-1]
+    return padded[:-padder_len]
+
+
 def wrap_payload_traced(public_key, payload_bytes):
     """Same as wrap_payload but also returns the raw AES key/iv/ciphertext for
     educational display (never do this in a real deployment)."""

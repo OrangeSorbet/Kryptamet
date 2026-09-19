@@ -1,0 +1,37 @@
+.smoke-feed {
+    position: relative;
+    background: #050608;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    height: 160px;
+    overflow: hidden;
+}
+
+.smoke-line {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    top: -20px;
+    color: var(--color-warning);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    opacity: 0;
+    filter: blur(8px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.smoke-line.decrypt { color: var(--color-success); }
+
+.smoke-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 0.75rem;
+}
+
+.smoke-controls label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}

@@ -59,6 +59,12 @@
 - Created tests/test_he_cnn_inference.py — validated 3 samples: plain_pred vs he_pred exact match, 3/3 correct — ALL PASS
 - Phase 4 complete
 
+## Phase 6E — Real CKKS Deep-Dive
+- Built crypto_teaching/real_ckks.py: real single-modulus CKKS (N=256) with canonical embedding encode/decode, real ternary keygen, real error polynomials, real negacyclic polynomial multiplication mod q, real encrypt/decrypt. TenSEAL hides all internals, so this is a parallel from-scratch implementation purely for transparency/visualization
+- Verified round-trip: [0.5,-0.3,0.8,0.1] -> [0.4997,-0.3008,0.8006,0.1002], runtime 0.16s — PASS
+- Added /api/ckks_deep_dive Flask endpoint, fixed float32->float JSON serialization bug
+- Verified via PowerShell: 200 OK, full 256-length real coefficient arrays for encode/keygen/encrypt/decrypt returned
+
 ## Phase 6C — Interactive Live Pipeline Visualizer
 - Created inference/pipeline_events.py (PipelineRecorder: emits ordered real event log, not simulated)
 - Added run_full_traced_pipeline_with_events() to inference/he_infer.py: emits one real event per weight-multiply (all features, no batching/faking), plus encrypt/vectorized-HE-compute/transport/decrypt events
