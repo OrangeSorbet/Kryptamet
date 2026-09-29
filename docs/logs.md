@@ -93,3 +93,65 @@
 - Verified: sms_spam sample 0 -> input_dim=500, ciphertext_input_size=331643 bytes, ciphertext_output_size=235127 bytes, raw_score=-4.195, sigmoid=0.0148 — PASS
 - Added run_full_traced_pipeline() to inference/he_infer.py: full chain CKKS encrypt -> RSA+AES wrap -> unwrap -> CKKS decrypt, with transport integrity checks and AES/RSA hex previews at each stage
 - Verified: raw_score == final_decrypted_score (-4.195054772758502 both), input/output transport integrity_preserved=True — PASS
+
+## Phase 6F — UX/Flow Overhaul
+- scene_registry.js: reordered chapters to Overview -> Feature -> Key Setup -> Encryption -> CKKS Deep-Dive -> Computation -> Transport -> Decryption -> Result -> Benchmarks (was: deep-dive before key/encrypt); split buildRestOfScenes() into buildKeyEncryptScenes()/buildComputeThroughBenchmarkScenes(); updated timeline.js's chapter->minimap-stage map to match new numbering
+- poly_grid.css: fixed .equation-phase clipping (min-width 180px, white-space normal, overflow visible) so KaTeX equations no longer get cut off
+- scenes.html: added navbar "Restart animation" button (reuses existing visitedScenes skip-replay mechanism via visitedScenes.delete + goToSceneIndex); added accent-color olive theming + flex-wrap/media query to navbar for responsive overflow
+- scene_renderers.js: renderComputeScene now reads window.gridRevealSpeed instead of its own local #speedSlider (single unified navbar speed control), and uses new .scene-body-full CSS class (scenes.css) for full-viewport width instead of a centered card
+- scene_renderers.js/components.css: renderTransportScene now shows an animated packet traveling client->server->client (CSS keyframes, matches minimap's L-path convention) instead of static text only
+- scene_renderers.js: renderResultScene now maps plain_pred/he_pred through a RESULT_LABELS table (sms_spam, human_vs_ai_text -- the only two models reachable from the live UI's model picker) to plain-language labels, plus a sentence explaining what "match" proves
+- benchmark_table.html: added explanatory intro paragraph (what slowdown/agreement mean, why HE is slower)
+- scene_renderers.js: added a second "why generated once, before data is touched" sentence to Key Setup, Secret Key, and Public Key scenes
+- Checklist Phase 6D scene/mechanics checkboxes retroactively ticked (already implemented in scene_registry.js/timeline.js, just never marked); left "instant mode toggle" and "live running_sum chart" unchecked -- genuinely not built, out of Phase 6F's actual problem list, not silently added
+- benchmarks/metrics.py: added _benchmark_mnist_cnn() (own CKKS context, poly_modulus_degree=32768, matching tests/test_he_cnn_inference.py's params -- the default linear-model context is too small for im2col-encoded convs), N_SAMPLES_CNN=3, appended to run_all()'s results list
+- Verified: tests/test_transport_roundtrip.py, tests/test_he_inference.py (all 5 logreg models, max_diff <= 0.000014), tests/test_he_cnn_inference.py (3/3 samples exact match) all PASS after changes
+- Ran benchmarks/metrics.py end-to-end: mnist_cnn_he plain=0.1286s he=466.2247s slowdown=3626.2x agreement=1.00 (3 samples) — results.json updated with 6 model entries total
+- Frontend scene changes verified by code-reading only (no headless browser in this environment) — flagged to user for manual browser walkthrough
+
+## Phase 6G — Snek-inspired chapter flowchart + scrubber redesign
+- Inspiration ported 1:1 from C:\Users\ashvi\Documents\VS_Codes\HTML\Snek (Preact compiler visualizer):
+  ZoomTransition.tsx (dolly-zoom), Scrubber.tsx/ExplanationGrid.tsx (play/pause/step + what/why/next strip,
+  minus glossary-term-linking and the 4th "formal notation" cell -- not applicable to most Kryptamet steps),
+  StepSlider.tsx (draggable track + chapter ticks), PhaseMinimap.tsx (chapter-dot pill). All re-authored in
+  vanilla JS (Kryptamet has no frontend framework) as interface/static/js/{zoom_transition,step_slider,
+  scrubber}.js + interface/static/css/scrubber.css
+- inference/pipeline_events.py: PipelineRecorder.emit() gained why/next_step params
+- inference/he_infer.py: every rec.emit() call in run_full_traced_pipeline_with_events() filled with real
+  why/next_step text (load_plaintext, ckks_encrypt, weight_multiply, add_bias, ckks_vectorized_compute,
+  passphrase_aes_wrap/rsa_aes_wrap, rsa_aes_unwrap, ckks_decrypt) -- new authored content, not ported
+- interface/static/js/minimap.js: rewritten as a 9-dot chapter pill (Feature/Key/Encryption/Deep-Dive/
+  Computation/Transport/Decryption/Result/Benchmarks), replacing the old L-path SVG + abstract stageMap
+- interface/static/js/scene_registry.js + timeline.js: deleted, replaced by chapter_registry.js (CHAPTERS
+  metadata array) + chapter_state.js (flowchart<->chapter zoom orchestration, step-index persistence,
+  chapter-unlock gating)
+- interface/static/js/scene_renderers.js: rewritten -- kept renderOverviewScene, replaced all per-scene
+  innerHTML builders with buildXSteps(result) functions returning {what, why, next, renderVisual} per step;
+  reused as-is: transport packet-travel CSS/animation, RESULT_LABELS plain-language mapping, benchmarks
+  intro paragraph, key-scene why-text (all from Phase 6F)
+- interface/static/js/smoke_feed.js + its CSS: deleted (Computation chapter now steps through real events
+  one at a time via the scrubber instead of an auto-scrolling feed -- nothing scrolls past unseen anymore)
+- interface/static/css/{minimap,timeline}.css: deleted (fully superseded, confirmed no remaining references)
+- interface/templates/scenes.html: rewritten -- dropped top tick-row + edge-nav prev/next arrows, added
+  #flowchartContainer + #scrubberDock + #backToFlowchartBtn
+- Verified: uv run python -m tests.test_transport_roundtrip, test_he_inference -- both PASS unchanged
+- Verified via a real running dev server (uv run python -m interface.app): all 8 new/changed JS files
+  syntax-checked clean (node --check); every referenced static JS/CSS asset returns 200; POST
+  /api/infer_text (sms_spam, real text) returns why + next_step populated on all 507 events, plain_pred/
+  he_pred/match correct (1/1/True); POST /api/ckks_deep_dive returns real 256-coefficient arrays matching
+  what buildDeepDiveSteps() expects; GET /live returns 200 with correct script/container markup present
+- NOT verified: actual browser interaction (clicking a chapter box, watching the zoom animation, dragging
+  the step slider, autoplay pacing) -- no browser available in this environment; flagged to user for a
+  manual walkthrough before considering Phase 6G fully done
+
+## Phase 6H — /live Snek-level polish (2026-09-29)
+- Full detail: docs/LIVE_UI_POLISH.md. New: flowchart.js/css, speed_dial.js/css, intro_card.js/css, chapter_intros.js, glossary.js, escape_html.js, pipeline_api.js, navbar.css, overview.css, chapter_visuals.css, minimap.css. Rewritten: scrubber.js/css, step_slider.js, poly_grid.js/css, zoom_transition.js, chapter_state.js, chapter_registry.js, scene_renderers.js, minimap.js, scenes.html. app.py: CKKS_PARAMS + ckks_params/plaintext_equivalent_score/scores_match in response. Deleted benchmark_table.html, duplicate components.css half.
+- Verified: headless Chrome walkthrough both models desktop+phone, 0 console errors; interaction assertions all pass; tests.test_transport_roundtrip PASS; test_he_inference not re-run (data/raw absent in worktree, he_infer.py unchanged)
+
+## Phase 6I-0 — Hard replace of main dir with live-polish worktree (2026-09-30)
+- User directive: no git by Claude (no commit/merge/PR); user commits "savepoint 3" as OrangeSorbet on top of "savepoint 2". Work continues directly in the main dir; plan in ~/.claude/plans/serene-dazzling-spindle.md, pending the user's go.
+- robocopy .claude/worktrees/live-polish -> repo root, /E, excluding .git, .venv, .claude, .omc and __pycache__: 96 files copied. Deleted interface/templates/components/benchmark_table.html (removed in 6H). Kept gitignored data/raw.
+- Verified: SHA-256 of all 96 files identical in both trees; no extra non-data files in main; tests.test_transport_roundtrip PASS from main.
+- User added .claude/settings.json {"worktree": {"bgIsolation": "none"}} so Claude can edit the main dir directly.
+- Session moved from the worktree back to the main dir. Deleted .claude/worktrees/live-polish (and the empty .claude/worktrees) with a plain file delete; it held only copies plus .venv/.git pointer/caches. Git's worktree entry and branch worktree-live-polish are left for the user (git worktree prune / git branch -D worktree-live-polish).
+- .gitignore: added .claude/worktrees/, .claude/settings.local.json, .omc/ (Claude Code/plugin local state).

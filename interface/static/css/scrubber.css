@@ -1,0 +1,296 @@
+/* Zoom transition units (interface/static/js/zoom_transition.js) -- always
+   the real, permanent DOM (flowchartUnit / chapterUnit), never a clone. */
+.zoom-unit {
+    position: absolute;
+    inset: 0;
+    transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease, filter 0.5s ease;
+}
+
+/* A chapter's visual area leaves room for the docked scrubber below it. */
+#sceneContent.chapter-scene {
+    justify-content: flex-start;
+    padding: 8.5rem 2rem 240px;
+}
+
+#sceneContent.chapter-scene > .scene-title { margin-top: auto; }
+#sceneContent.chapter-scene > :last-child { margin-bottom: auto; }
+
+/* Per-step fade (chapter_state.js re-adds the class on every step). */
+.step-fade-in { animation: step-fade-in 0.28s ease-out; }
+
+@keyframes step-fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Chapter chrome: back + "?" buttons, top-left under the navbar. */
+.chapter-chrome {
+    position: absolute;
+    top: 78px;
+    left: 16px;
+    z-index: 250;
+    display: flex;
+    gap: 8px;
+}
+
+.chrome-btn {
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    padding: 0 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text);
+    font-family: var(--font-base);
+    font-size: 12px;
+    cursor: pointer;
+    backdrop-filter: blur(14px);
+    animation: chrome-in 0.4s ease-out;
+    transition: border-color 0.2s ease;
+}
+
+.chrome-btn:hover { border-color: var(--color-primary-hover); }
+
+.chrome-icon-btn {
+    width: 30px;
+    padding: 0;
+    border-radius: 50%;
+    font-family: var(--font-mono);
+    font-weight: 700;
+}
+
+@keyframes chrome-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Scrubber (interface/static/js/scrubber.js) */
+.scrubber-dock {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 250;
+    padding: 12px 24px 14px;
+    background: rgba(16, 18, 8, 0.82);
+    border-top: 1px solid var(--color-border);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
+    animation: dock-in 0.45s ease-out;
+}
+
+@keyframes dock-in {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: none; }
+}
+
+.scrubber-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    margin-bottom: 8px;
+}
+
+.scrubber-btn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.scrubber-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.scrubber-btn:hover:not(:disabled) { border-color: var(--color-primary-hover); background: rgba(255, 255, 255, 0.04); }
+.scrubber-btn[data-act="play"] { border-color: var(--color-primary-hover); }
+
+.scrubber-counter {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-muted);
+    min-width: 90px;
+    text-align: center;
+}
+
+.scrubber-meta {
+    margin-left: auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-warning);
+}
+
+/* Explanation grid: fixed height, so the dock never jumps between steps.
+   3 clamped lines per cell; the full text is in the cell's title. */
+.explanation-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 6px 28px;
+    height: 128px;
+    margin-bottom: 8px;
+}
+
+.explanation-cell { min-width: 0; }
+
+.explanation-title {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    line-height: 12px;
+    margin-bottom: 2px;
+}
+
+.explanation-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 12.5px;
+    line-height: 16px;
+    color: var(--color-text);
+}
+
+.explanation-mono {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--color-warning);
+}
+
+.glossary-term {
+    text-decoration: underline dotted var(--color-text-muted);
+    text-underline-offset: 3px;
+    cursor: help;
+}
+
+/* Phone-only tab row (hidden on desktop). */
+.explanation-tabs { display: none; }
+
+/* Step slider (interface/static/js/step_slider.js) */
+.scrubber-slider-slot { position: relative; }
+
+.step-slider-hit {
+    position: relative;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    touch-action: none;
+}
+
+.step-slider-track {
+    position: relative;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-border);
+}
+
+.step-slider-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: var(--color-primary-hover);
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--color-primary);
+    transition: width 0.2s ease;
+}
+
+.step-slider-thumb {
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-primary-hover);
+    box-shadow: 0 0 10px var(--color-primary);
+    transform: translate(-50%, -50%);
+    transition: left 0.2s ease, transform 0.15s ease;
+}
+
+.step-slider-hit:hover .step-slider-thumb { transform: translate(-50%, -50%) scale(1.25); }
+
+.step-slider-tick {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 10px;
+    border-radius: 1px;
+    background: var(--color-warning);
+}
+
+.step-slider-tooltip {
+    position: absolute;
+    bottom: 100%;
+    transform: translateX(-50%);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text);
+    white-space: nowrap;
+    pointer-events: none;
+    margin-bottom: 4px;
+}
+
+@media (max-width: 640px) {
+    #sceneContent.chapter-scene { padding: 7.5rem 0.75rem 250px; }
+    .chapter-chrome { top: 62px; left: 8px; }
+    .scrubber-dock { padding: 10px 12px 12px; }
+    .scrubber-controls { gap: 6px; height: 34px; }
+    .scrubber-btn { width: 34px; height: 34px; }
+    .scrubber-counter { min-width: 70px; }
+    .scrubber-meta { display: none; }
+
+    .explanation-tabs {
+        display: flex;
+        gap: 4px;
+        height: 24px;
+        margin-bottom: 6px;
+    }
+    .explanation-tab {
+        flex: 1;
+        min-width: 0;
+        padding: 0;
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
+        background: transparent;
+        color: var(--color-text-muted);
+        font-family: var(--font-base);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        cursor: pointer;
+    }
+    .explanation-tab.active {
+        border-color: var(--color-primary-hover);
+        background: rgba(110, 127, 73, 0.25);
+        color: var(--color-text);
+    }
+    /* One cell at a time; text scrolls instead of clamping (no hover on touch). */
+    .explanation-grid { display: block; height: 104px; overflow-y: auto; }
+    .explanation-cell { display: none; }
+    .explanation-grid[data-tab="what"] .explanation-cell[data-key="what"],
+    .explanation-grid[data-tab="why"] .explanation-cell[data-key="why"],
+    .explanation-grid[data-tab="formal"] .explanation-cell[data-key="formal"],
+    .explanation-grid[data-tab="next"] .explanation-cell[data-key="next"] { display: block; }
+    .explanation-title { display: none; }
+    .explanation-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
+}

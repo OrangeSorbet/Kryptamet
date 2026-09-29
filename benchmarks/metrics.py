@@ -4,14 +4,18 @@ import pickle
 import json
 import os
 import numpy as np
+import torch
 from hecrypto.ckks_context import create_context
 from inference.he_infer import encrypted_linear_score
-from data.loaders import sms_spam, german_credit, symptom_diagnosis, price_data, human_vs_ai_text
+from inference.he_cnn_infer import run_encrypted_cnn
+from data.loaders import sms_spam, german_credit, symptom_diagnosis, price_data, human_vs_ai_text, mnist
 from data.features import text_stylometric
+from models.train.mnist_cnn_he import HECompatibleCNN
 
 SAVE_DIR = "models/saved"
 OUT_PATH = "benchmarks/results.json"
 N_SAMPLES = 5
+N_SAMPLES_CNN = 3
 
 
 def _load_pickle(name):
@@ -70,6 +74,46 @@ def _benchmark_model(name, X_encoded, model):
     }
 
 
+def _benchmark_mnist_cnn():
+    model = HECompatibleCNN()
+    model.load_state_dict(torch.load(f"{SAVE_DIR}/mnist_cnn_he.pt"))
+    model.eval()
+
+    X_test, y_test = mnist.load(split="test")
+    n = N_SAMPLES_CNN
+    images = X_test[:n].reshape(n, 28, 28).astype(np.float32) / 255.0
+
+    context = create_context(poly_modulus_degree=32768, coeff_mod_bit_sizes=[60, 40, 40, 40, 40, 40, 60], global_scale_bits=40)
+
+    def plain_predict():
+        with torch.no_grad():
+            logits = model(torch.tensor(images).view(n, 1, 28, 28))
+        return logits.argmax(dim=1).numpy()
+
+    def he_predict():
+        preds = []
+        for i in range(n):
+            he_logits = run_encrypted_cnn(context, images[i], model.state_dict())
+            preds.append(int(np.argmax(he_logits)))
+        return np.array(preds)
+
+    plain_preds, plain_time, plain_mem = _time_and_memory(plain_predict)
+    he_preds, he_time, he_mem = _time_and_memory(he_predict)
+
+    agreement = float(np.mean(plain_preds == he_preds))
+
+    return {
+        "model": "mnist_cnn_he",
+        "n_samples": n,
+        "plaintext_time_sec": plain_time,
+        "he_time_sec": he_time,
+        "plaintext_peak_mem_bytes": plain_mem,
+        "he_peak_mem_bytes": he_mem,
+        "slowdown_factor": he_time / plain_time if plain_time > 0 else None,
+        "plain_vs_he_agreement": agreement,
+    }
+
+
 def run_all():
     results = []
 
@@ -96,6 +140,8 @@ def run_all():
     X_text, y = human_vs_ai_text.load(nrows=N_SAMPLES)
     X = text_stylometric.extract(X_text)
     results.append(_benchmark_model("human_vs_ai_text", X, bundle["model"]))
+
+    results.append(_benchmark_mnist_cnn())
 
     os.makedirs("benchmarks", exist_ok=True)
     with open(OUT_PATH, "w") as f:

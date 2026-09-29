@@ -1,84 +1,75 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kryptamet</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='11' fill='%23030302' stroke='%236e7f49' stroke-width='2'/%3E%3Ccircle cx='13' cy='13' r='4' fill='%23e5b93e'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/colors.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/smoke_feed.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimap.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/scenes.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/timeline.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/live_pipeline_input.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/overview.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/flowchart.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chapter_visuals.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/poly_grid.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/scrubber.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/speed_dial.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/minimap.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/intro_card.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
-    <style>
-        .navbar {
-            position: fixed; top: 0.5%; left: 1%; width: 98%;
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 0.6rem 1.5rem; background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-            border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; z-index: 1001;
-        }
-        .navbar-brand { font-weight: 700; color: var(--color-text); letter-spacing: 0.5px; }
-        .navbar-speed { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 12px; }
-    </style>
 </head>
 <body>
-    <div class="navbar">
-        <div class="navbar-brand">Kryptamet</div>
-        <div class="navbar-speed">
-            <label for="gridSpeedSlider">Reveal speed</label>
-            <input type="range" id="gridSpeedSlider" min="1" max="10" value="5">
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <svg class="navbar-logo" width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+                <circle cx="13" cy="13" r="11" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+                <circle cx="13" cy="13" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="13" cy="13" r="2.2" class="navbar-logo-core"/>
+                <circle cx="24" cy="13" r="1.8" class="navbar-logo-core"/>
+            </svg>
+            <span>Kryptamet</span>
         </div>
-    </div>
+        <div class="navbar-run-info" id="navbarRunInfo"></div>
+        <div class="navbar-controls">
+            <button id="flowchartHelpBtn" class="navbar-btn navbar-icon-btn" type="button" title="How to use this walkthrough" style="display:none">?</button>
+            <button id="newInputBtn" class="navbar-btn" type="button" style="display:none">New input</button>
+        </div>
+    </nav>
     <div class="scene-container">
-        <div class="scene active" id="sceneContent"></div>
-        <div class="minimap" id="minimapContainer"></div>
-        <div class="timeline-base-glow"></div>
-        <div class="edge-nav left" id="prevEdge">&lsaquo;</div>
-        <div class="edge-nav right" id="nextEdge">&rsaquo;</div>
-        <div class="timeline" id="timelineContainer"></div>
-        <div id="benchmarkTableSource" style="display:none">{% include 'components/benchmark_table.html' %}</div>
+        <div class="zoom-unit" id="flowchartUnit" style="display:none">
+            <div class="scene active flowchart-scene" id="flowchartContainer"></div>
+        </div>
+        <div class="zoom-unit" id="chapterUnit">
+            <div class="scene active" id="sceneContent"></div>
+        </div>
+        <div class="chapter-chrome">
+            <button id="backToFlowchartBtn" class="chrome-btn" type="button" title="Back to chapters (Esc)" style="display:none">&larr; Chapters</button>
+            <button id="chapterHelpBtn" class="chrome-btn chrome-icon-btn" type="button" title="What is this chapter? (theory primer)" style="display:none">?</button>
+        </div>
+        <div id="minimapContainer" style="display:none"></div>
+        <div id="scrubberDock" class="scrubber-dock" style="display:none"></div>
     </div>
 
+    <script>window.BENCHMARKS = {{ benchmarks|tojson }};</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+    <script src="{{ url_for('static', filename='js/escape_html.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/glossary.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pipeline_api.js') }}"></script>
     <script src="{{ url_for('static', filename='js/poly_grid.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/smoke_feed.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/zoom_transition.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/step_slider.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/speed_dial.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/scrubber.js') }}"></script>
     <script src="{{ url_for('static', filename='js/minimap.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/scene_registry.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chapter_intros.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/intro_card.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/flowchart.js') }}"></script>
     <script src="{{ url_for('static', filename='js/scene_renderers.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/timeline.js') }}"></script>
-    <script>
-        let minimapInstance = initMinimap(document.getElementById("minimapContainer"));
-        let pipelineResult = null;
-
-        async function runPipeline(passphrase) {
-            passphrase = passphrase || "";
-            const model = document.getElementById("modelSelect").value;
-            const text = document.getElementById("textInput").value;
-            if (!text.trim()) { alert("Type a sentence first."); return false; }
-            const resp = await fetch("/api/infer_text", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ model, text, passphrase }),
-            });
-            if (!resp.ok) { alert("Inference failed: " + resp.status); return false; }
-            pipelineResult = await resp.json();
-            return true;
-        }
-
-        window.gridRevealSpeed = 5;
-        document.getElementById("gridSpeedSlider").addEventListener("input", (e) => {
-            window.gridRevealSpeed = parseInt(e.target.value, 10);
-        });
-
-        document.getElementById("prevEdge").addEventListener("click", () => goToSceneIndex(currentSceneIndex - 1));
-        document.getElementById("nextEdge").addEventListener("click", () => goToSceneIndex(currentSceneIndex + 1));
-
-        SCENES = buildStaticScenes();
-        renderTimeline();
-        goToSceneIndex(0);
-    </script>
+    <script src="{{ url_for('static', filename='js/chapter_registry.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chapter_state.js') }}"></script>
+    <script>initChapterState();</script>
 </body>
 </html>

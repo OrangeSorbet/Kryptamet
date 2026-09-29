@@ -1,0 +1,242 @@
+/* Per-chapter visual building blocks rendered by scene_renderers.js
+   (feature vectors, TF-IDF bars, CKKS parameter cards, compute ledger,
+   sigmoid plot, recovery table, verdict banner, benchmarks table). */
+
+.vector-caption {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    margin: 1.25rem 0 0.5rem;
+}
+
+.vector-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 6px;
+}
+
+.vector-cell {
+    min-width: 0;
+    padding: 8px 10px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    transition: border-color 0.25s ease, background 0.25s ease;
+}
+
+.vector-cell.active { border-color: var(--color-warning); background: #1a1706; }
+.vector-cell.pending { opacity: 0.45; }
+.vector-cell.more { display: flex; align-items: center; justify-content: center; color: var(--color-text-muted); font-size: 12px; }
+
+.vector-name {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vector-value { font-size: 14px; color: var(--color-text); }
+.vector-cell.active .vector-value { color: var(--color-warning); }
+
+.flow-down {
+    text-align: center;
+    font-family: var(--font-mono);
+    color: var(--color-warning);
+    margin: 0.75rem 0 -0.25rem;
+}
+
+/* TF-IDF bars */
+.tfidf-bars { display: flex; flex-direction: column; gap: 4px; }
+
+.tfidf-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 64px;
+    align-items: center;
+    gap: 10px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    transition: background 0.2s ease;
+}
+
+.tfidf-row.active { background: #1a1706; }
+.tfidf-word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); }
+.tfidf-bar { height: 8px; background: var(--color-bg); border-radius: 4px; overflow: hidden; }
+.tfidf-bar > span { display: block; height: 100%; background: var(--color-primary-hover); border-radius: 4px; }
+.tfidf-row.active .tfidf-bar > span { background: var(--color-warning); }
+.tfidf-value { text-align: right; color: var(--color-text-muted); }
+
+/* CKKS parameter cards + modulus chain + key chips */
+.param-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+}
+
+.param-card {
+    padding: 14px 16px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+}
+
+.param-name { font-size: 11px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.param-value { font-family: var(--font-mono); font-size: 26px; color: var(--color-warning); margin: 4px 0; }
+.param-note { font-size: 12px; color: var(--color-text-muted); }
+
+.modulus-chain {
+    display: flex;
+    gap: 3px;
+    height: 34px;
+}
+
+.modulus-prime {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-primary);
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: white;
+}
+
+.key-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 1.25rem;
+}
+
+.key-chip {
+    flex: 1 1 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--color-text);
+}
+
+.key-chip span { font-family: var(--font-base); font-size: 11.5px; color: var(--color-text-muted); }
+.key-chip.secret { border-color: var(--color-warning); }
+
+/* Computation ledger */
+.compute-ledger {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+.compute-term {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.compute-term.past { opacity: 0.55; }
+
+.compute-term.current {
+    border-color: var(--color-warning);
+    background: #1a1706;
+    color: var(--color-text);
+    font-size: 15px;
+    padding: 12px 16px;
+}
+
+.compute-term strong { color: var(--color-warning); font-weight: 600; }
+.term-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.compute-sum {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-top: 1.25rem;
+    font-family: var(--font-mono);
+}
+
+.compute-sum span { font-size: 11px; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.compute-sum strong { font-size: 30px; color: var(--color-text); font-weight: 600; }
+
+.compute-current-line {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-lg);
+    color: var(--color-warning);
+    text-align: center;
+    padding: 1rem;
+    word-break: break-word;
+}
+
+/* Sigmoid plot */
+.sigmoid-wrap { display: flex; flex-direction: column; align-items: center; }
+.sigmoid-plot { width: min(440px, 100%); height: auto; }
+.sig-curve { fill: none; stroke: var(--color-primary-hover); stroke-width: 2.5; }
+.sig-mid { stroke: var(--color-border); stroke-width: 1; stroke-dasharray: 4 4; }
+.sig-point { fill: var(--color-warning); filter: drop-shadow(0 0 6px var(--color-warning)); }
+.sig-tick { fill: var(--color-text-muted); font-family: var(--font-mono); font-size: 11px; }
+
+/* Deep-dive recovery table */
+.poly-note {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+}
+
+.recover-table {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    max-width: 960px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.recover-row {
+    display: grid;
+    grid-template-columns: 80px repeat(8, minmax(72px, 1fr));
+    gap: 2px;
+}
+
+.recover-row > span { padding: 4px 6px; background: var(--color-bg); text-align: right; color: var(--color-text); }
+.recover-row > span:first-child { text-align: left; color: var(--color-text-muted); }
+.recover-row.head > span { color: var(--color-text-muted); background: transparent; }
+
+/* Result verdict */
+.verdict {
+    text-align: center;
+    font-size: 1.35rem;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+}
+
+.verdict strong { color: var(--color-warning); }
+.verdict.ok { border-color: var(--color-success); background: #0c1a10; }
+.verdict.bad { border-color: var(--color-error); background: #1f0c0b; }
+
+/* Benchmarks */
+.table-scroll { overflow-x: auto; }
+table.benchmark-table tr.active td { background: #1a1706; color: var(--color-warning); }
+table.benchmark-table th { color: var(--color-text-muted); font-weight: 600; }
+
+@media (max-width: 640px) {
+    .tfidf-row { grid-template-columns: 100px 1fr 56px; }
+    .compute-term { flex-direction: column; gap: 2px; }
+    .compute-sum strong { font-size: 24px; }
+}

@@ -1,0 +1,80 @@
+/* Collapsible speed dial (interface/static/js/speed_dial.js): the drawer
+   opens on hover and stays open while pinned (button clicked). */
+.speed-dial {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.speed-dial-drawer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: width 0.25s ease, opacity 0.2s ease;
+}
+
+.speed-dial:hover .speed-dial-drawer,
+.speed-dial:focus-within .speed-dial-drawer,
+.speed-dial.pinned .speed-dial-drawer {
+    width: 136px;
+    opacity: 1;
+}
+
+.speed-dial.pinned .speed-dial-btn {
+    background: var(--color-primary);
+    border-color: var(--color-primary-hover);
+}
+
+.speed-dial-track {
+    position: relative;
+    flex-shrink: 0;
+    width: 90px;
+    height: 16px;
+    cursor: pointer;
+    touch-action: none;
+    outline: none;
+}
+
+.speed-dial-track::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 6px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-border);
+}
+
+.speed-dial-fill {
+    position: absolute;
+    left: 0;
+    top: 6px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-warning);
+    box-shadow: 0 0 6px rgba(229, 185, 62, 0.5);
+}
+
+.speed-dial-thumb {
+    position: absolute;
+    top: 3px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-warning);
+    box-shadow: 0 0 8px rgba(229, 185, 62, 0.6);
+    transform: translateX(-50%);
+}
+
+.speed-dial-track:focus-visible .speed-dial-thumb { outline: 2px solid var(--color-text); outline-offset: 1px; }
+
+.speed-dial-value {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}

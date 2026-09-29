@@ -32,7 +32,7 @@ Phase 4 — HE Inference
 Phase 5 — Benchmarking
 [x] metrics.py — time, memory (tracemalloc), accuracy per model/dataset (5 logreg models done)
 [x] Compare plaintext vs HE inference cost
-[ ] Benchmark mnist_cnn_he (plaintext vs HE inference cost, time + memory, deferred until after Phase 6)
+[x] Benchmark mnist_cnn_he (plaintext vs HE inference cost, time + memory, deferred until after Phase 6)
 
 Phase 6 — Interface (RETIRED APPROACHES)
 Old CLI + old tab-dashboard build (index.html, sections/*, tabs) are scrapped in favor of full-screen scene UI below. Kept only as history: colors.css/fonts.css/components.css base tokens survive and are reused; CLI (cli.py) stays as-is (not user-facing UI, no rebuild needed); backend (inference/he_infer.py incl. run_full_traced_pipeline_with_events, /api/infer_text) survives untouched — only the frontend is being rebuilt.
@@ -53,22 +53,22 @@ Phase 6D — Full-Screen Scene Rebuild (current direction)
 Style target: 3Blue1Brown-like — one full-screen scene at a time, minimal chrome, large centered visuals, navigate scene-to-scene (not tabs, not scroll-dashboard).
 
 Scenes (in order):
-[ ] Scene 0 — Overview: what is HE (short), model picker + real text input
-[ ] Scene 1 — Feature extraction: input text -> extracted numbers, full-screen display
-[ ] Scene 2 — Key setup: user-provided/generated key, shown full-screen
-[ ] Scene 3 — Encryption: numbers -> ciphertext, key usage shown
-[ ] Scene 4 — Computation: full-screen smoke-feed of real per-feature steps, speed slider, minimap visible
-[ ] Scene 5 — Transport: RSA+AES wrap/unwrap shown full-screen
-[ ] Scene 6 — Decryption: smoke-feed of decrypt steps, key usage shown again
-[ ] Scene 7 — Result: decrypted answer vs plaintext-run answer, match confirmation
-[ ] Scene 8 — Benchmarks: existing table, full-screen
+[x] Scene 0 — Overview: what is HE (short), model picker + real text input
+[x] Scene 1 — Feature extraction: input text -> extracted numbers, full-screen display
+[x] Scene 2 — Key setup: user-provided/generated key, shown full-screen
+[x] Scene 3 — Encryption: numbers -> ciphertext, key usage shown
+[x] Scene 4 — Computation: full-screen smoke-feed of real per-feature steps, speed slider, minimap visible
+[x] Scene 5 — Transport: RSA+AES wrap/unwrap shown full-screen
+[x] Scene 6 — Decryption: smoke-feed of decrypt steps, key usage shown again
+[x] Scene 7 — Result: decrypted answer vs plaintext-run answer, match confirmation
+[x] Scene 8 — Benchmarks: existing table, full-screen
 
 Shared mechanics across scenes:
-[ ] Next/Prev scene navigation (full-screen transitions between scenes)
-[ ] Minimap (bottom-right, persistent across all scenes) — already built, needs wiring to real scene transitions instead of test timers
-[ ] Speed slider (persists across scenes that use smoke-feed: Computation, Decryption)
-[ ] Instant mode toggle: skip all scene animations, jump straight to Scene 7 result
-[ ] Live running_sum line chart in Computation scene (optional, alongside smoke-feed)
+[x] Next/Prev scene navigation (full-screen transitions between scenes)
+[x] Minimap (bottom-right, persistent across all scenes) — already built, needs wiring to real scene transitions instead of test timers
+[x] Speed slider (persists across scenes that use smoke-feed: Computation, Decryption)
+[ ] Instant mode toggle: skip all scene animations, jump straight to Scene 7 result -- NOT built (out of Phase 6F's problem list, flagged not silently added)
+[ ] Live running_sum line chart in Computation scene (optional, alongside smoke-feed) -- optional, not built
 
 [ ] Build order: scene navigation shell (empty scenes + next/prev) -> wire real data into each scene -> wire minimap to real transitions -> wire smoke-feed to real events -> instant mode -> polish
 
@@ -106,15 +106,48 @@ Problems identified from user walkthrough:
 - Benchmarks scene has no explanatory text
 
 Fix plan:
-[ ] Reorder chapters: Overview -> Feature Extraction -> Key Setup (real keygen, explain why up front) -> Encryption (real) -> "How CKKS Works Internally" (deep-dive, clearly labeled as a separate illustrative walkthrough using the same data) -> Computation (full-screen, universal speed+restart) -> Secure Transport (animated client<->server packet travel) -> Decryption (real) -> Result (plain-language, model-specific label mapping) -> Benchmarks (explained)
-[ ] Fix equation popup: bigger box, proper text containment/wrapping, no overflow
-[ ] Add a small, unobtrusive universal "Restart animation" button (re-plays current scene's animation from scratch)
-[ ] Single universal speed control in navbar (olive-themed, properly contained) drives BOTH poly-grid reveal speed AND smoke-feed compute speed -- remove the separate local Computation-scene slider
-[ ] Make Computation scene fill the entire screen (not constrained to a centered card)
-[ ] Add animated ciphertext packet travel visual to Secure Transport scene (client -> server -> client, matching minimap direction)
-[ ] Rewrite Result scene: plain-language explanation of what the prediction number means for the selected model (e.g. "0 = written by a human, 1 = written by AI" for human_vs_ai_text; "0 = not spam, 1 = spam" for sms_spam), explain what "match" proves
-[ ] Add explanatory intro text to Benchmarks scene (what slowdown/agreement columns mean, why HE is slower)
-[ ] Add why-explanations to Key Setup, Secret Key, Public Key scenes (why generated once, why before any data is touched)
+[x] Reorder chapters: Overview -> Feature Extraction -> Key Setup (real keygen, explain why up front) -> Encryption (real) -> "How CKKS Works Internally" (deep-dive, clearly labeled as a separate illustrative walkthrough using the same data) -> Computation (full-screen, universal speed+restart) -> Secure Transport (animated client<->server packet travel) -> Decryption (real) -> Result (plain-language, model-specific label mapping) -> Benchmarks (explained)
+[x] Fix equation popup: bigger box, proper text containment/wrapping, no overflow
+[x] Add a small, unobtrusive universal "Restart animation" button (re-plays current scene's animation from scratch)
+[x] Single universal speed control in navbar (olive-themed, properly contained) drives BOTH poly-grid reveal speed AND smoke-feed compute speed -- remove the separate local Computation-scene slider
+[x] Make Computation scene fill the entire screen (not constrained to a centered card)
+[x] Add animated ciphertext packet travel visual to Secure Transport scene (client -> server -> client, matching minimap direction)
+[x] Rewrite Result scene: plain-language explanation of what the prediction number means for the selected model (e.g. "0 = written by a human, 1 = written by AI" for human_vs_ai_text; "0 = not spam, 1 = spam" for sms_spam), explain what "match" proves
+[x] Add explanatory intro text to Benchmarks scene (what slowdown/agreement columns mean, why HE is slower)
+[x] Add why-explanations to Key Setup, Secret Key, Public Key scenes (why generated once, why before any data is touched)
+
+Phase 6G — Snek-inspired chapter flowchart + scrubber redesign
+Inspiration: C:\Users\ashvi\Documents\VS_Codes\HTML\Snek (Preact compiler visualizer) -- overview flowchart of
+phase boxes, dolly-zoom into a clicked phase, per-phase Scrubber (play/pause/step/step-counter/speed +
+fixed-height what/why/next explanation strip + draggable step-slider with chapter ticks). Always dark, no
+light/dark toggle. Every explanation must be real, driven by actual pipeline data.
+
+[x] Part A: backend real per-step explanations -- PipelineRecorder.emit() gains why/next_step params;
+    run_full_traced_pipeline_with_events()'s emit() calls filled with real why/next text per operation type
+[x] Part B: shared components -- zoom_transition.js, step_slider.js, scrubber.js, scrubber.css
+[x] Part C: chapter-dot minimap (rewrite minimap.js, replaces L-path SVG)
+[x] Part D: chapter data model -- chapter_registry.js (replaces scene_registry.js), renderVisual adapters
+    per chapter (Feature/Key/Encryption/Deep-Dive/Computation/Transport/Decryption/Result/Benchmarks)
+[x] Part E: navigation/state -- chapter_state.js (replaces timeline.js), enterChapter/exitToFlowchart zoom
+    orchestration, chapter-unlock gating
+[x] Part F: shell rework -- scenes.html flowchart container + scrubber dock, drop top-tick-row/edge-nav,
+    drop smoke_feed.js (Computation moves to scrubber step-through)
+[x] Verify: existing tests still pass; manual /live walkthrough (flowchart, zoom, scrubber, minimap, both
+    human_vs_ai_text and sms_spam paths) -- verified via real HTTP calls to a running dev server (all
+    static assets 200, /api/infer_text returns why/next_step on all 507 events for a real sms_spam sample,
+    /api/ckks_deep_dive returns real 256-coeff arrays) plus full code read-through; actual browser
+    click-through (drag the step slider, watch the zoom animation, etc.) not done -- no browser in this
+    environment, flagged to user
 
 Phase 7 — Packaging
 [ ] Tauri wrap around Flask/HTML frontend (decided over PyQt6+PyInstaller for animation/UI quality; keeps existing colors.css/fonts.css/component work)
+Phase 6H — /live polish (docs/LIVE_UI_POLISH.md)
+[x] Fix navbar overflow, poly-grid column blowup/phone, minimap placement
+[x] Snake flowchart + connectors + box states + real summaries
+[x] Speed dial in scrubber; restart replay
+[x] Intro cards; glossary tooltips; 4-cell explanation grid
+[x] Transition polish; Run spinner + inline errors; example chips; New input
+[x] Split 1-step chapters using real data
+[x] Phone layout (column flowchart, tabbed explanations)
+[x] Verified in headless Chrome
+[ ] Update ARCHITECTURE.md /live file list to match (LIVE_UI_POLISH.md authoritative meanwhile)

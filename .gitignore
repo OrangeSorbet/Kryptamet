@@ -12,3 +12,8 @@ wheels/
 data/raw/
 hecrypto/keys/*.pem
 hecrypto/keys/*.ctx
+
+# Claude Code / plugin local state
+.claude/worktrees/
+.claude/
+.omc/

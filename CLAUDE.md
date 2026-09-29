@@ -7,15 +7,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Homomorphic encryption (CKKS via TenSEAL) pipeline for privacy-preserving ML inference. Encrypted vectors are
 transported using an RSA+AES hybrid scheme. Models (logistic regression, small CNN) are trained on plaintext
 data, then benchmarked for encrypted-inference cost across datasets (MNIST, SMS spam, symptom-diagnosis,
-German Credit, price data, human-vs-AI text). A Flask app (`interface/app.py`) drives a full-screen scene-based
-teaching UI that walks through the entire pipeline (feature extraction → keygen → encrypt → compute →
+German Credit, price data, human-vs-AI text). A Flask app (`interface/app.py`) drives a teaching UI at `/live`
+that walks through the entire pipeline with real data (feature extraction → keygen → encrypt → compute →
 transport → decrypt → result → benchmarks), including a second, independent educational CKKS implementation
 (`crypto_teaching/real_ckks.py`) that exposes real polynomial/ciphertext internals TenSEAL hides.
 
-Read `docs/checklist.md` before starting work — it is the authoritative roadmap/phase tracker (Phase 0–7) and
-shows exactly what's done vs. pending, including the current UX rework (Phase 6F) with the intended scene
-order. `docs/rules.md` holds hard project rules (see below). `docs/logs.md` is an append-only log of
-setup/build steps — log actions there per the rules.
+**Read `docs/ARCHITECTURE.md` first** — full reference doc covering every module, the `/live` UI's structure,
+and how they fit together. Don't re-derive this from scratch by reading files one at a time; the doc is
+current and detailed. `docs/checklist.md` is the roadmap/phase tracker (what's done vs. pending). `docs/rules.md`
+holds hard project rules (see below). `docs/logs.md` is an append-only log of setup/build steps — log actions
+there per the rules.
+
+The `/live` UI's interaction model (flowchart of chapter boxes → dolly-zoom into a chapter → a Scrubber with
+play/pause/step controls and a 4-cell what/why/formal/next explanation grid → draggable step slider) is
+deliberately inspired by a separate reference project, `C:\Users\ashvi\Documents\VS_Codes\HTML\Snek` (a Preact
+compiler visualizer) — read `Snek/src/components/{Scrubber,ZoomTransition,StepSlider,ExplanationGrid,
+PhaseMinimap}.tsx` for the reference behavior if working on this area. Kryptamet is **vanilla JS, no build
+step, no npm** (Snek is Preact+Vite — don't confuse the two, don't try to introduce a build pipeline into
+Kryptamet). Every explanation string shown in the Scrubber must be real (backend-emitted per real event data,
+or computed from the real request) — never decorative/example placeholder text. Always dark theme, no
+light/dark toggle.
 
 ## Commands
 
@@ -24,22 +35,27 @@ uv sync                          # install deps from pyproject.toml + uv.lock (P
 uv run scripts/download.py       # fetch MNIST/SMS-spam/German-Credit/symptom-diagnosis/price data into data/raw/
                                   # human_vs_ai_text must be manually placed at data/raw/human_vs_ai_text/AI_Human.csv (Kaggle)
 
-uv run python tests/test_transport_roundtrip.py    # run a single test file directly
-uv run python tests/test_he_inference.py
-uv run python tests/test_he_cnn_inference.py
+uv run python -m tests.test_transport_roundtrip    # run a single test file (module invocation required)
+uv run python -m tests.test_he_inference
+uv run python -m tests.test_he_cnn_inference
 
 uv run python models/train/<dataset>_logreg.py     # train/re-save a given logreg model to models/saved/
 uv run python models/train/mnist_cnn.py            # train plaintext-baseline CNN
 uv run python models/train/mnist_cnn_he.py         # train HE-compatible CNN (poly activations, avgpool)
 
-uv run python benchmarks/metrics.py                # writes benchmarks/results.json (time/memory/accuracy, plain vs HE)
+uv run python -m benchmarks.metrics                # writes benchmarks/results.json (time/memory/accuracy, plain vs HE)
 
-uv run python interface/cli.py                     # CLI: run inference or show benchmarks for a dataset
-uv run python interface/app.py                     # Flask dev server (index at "/", scene UI at "/live")
+uv run python -m interface.cli                     # CLI: run inference or show benchmarks for a dataset
+uv run python -m interface.app                     # Flask dev server; "/" redirects to "/live" (the teaching UI)
 ```
 
-Tests are plain `assert`-based scripts with a `run_*()` entry point guarded by `if __name__ == "__main__"`
-(see `tests/test_transport_roundtrip.py`) — not pytest suites; run each file directly with `uv run python`.
+Every entry point that imports across top-level packages (`tests/`, `benchmarks/metrics.py`, `interface/app.py`,
+`interface/cli.py`) must be run with `python -m <dotted.path>` from the repo root, not `python path/to/file.py`
+directly — plain script invocation fails with `ModuleNotFoundError` since these packages import each other via
+absolute imports (e.g. `from interface.cli import ...`) with no `sys.path` hack.
+
+Tests are plain `assert`-based scripts with a `run_*()`/`main()` entry point guarded by
+`if __name__ == "__main__"` (see `tests/test_transport_roundtrip.py`) — not pytest suites.
 
 ## Project rules (docs/rules.md — enforced, not optional)
 
@@ -56,49 +72,13 @@ Tests are plain `assert`-based scripts with a `run_*()` entry point guarded by `
 
 ## Architecture
 
-**`hecrypto/`** — all CKKS + transport crypto, isolated per rule above:
-- `ckks_context.py` — builds/saves/loads the TenSEAL CKKS context (poly_modulus_degree=8192 by default).
-- `keygen.py`, `encrypt.py`, `decrypt.py` — vector encrypt/decrypt + serialize/deserialize helpers.
-- `transport.py` — RSA+AES hybrid wrap/unwrap of serialized ciphertext bytes (AES-CBC + RSA-OAEP for the
-  session key; also has a passphrase-derived variant and a `_traced` variant that exposes intermediate
-  hex/size values for the teaching UI — never do that in a real deployment).
-
-**`data/loaders/` + `data/features/`** — per-dataset raw-data loading and feature extraction (e.g.
-`text_stylometric` for human_vs_ai_text/sms_spam). Raw files under `data/raw/<dataset>/`, processed under
-`data/processed/`.
-
-**`models/train/<dataset>_<modeltype>.py`** — one training script per (dataset, model) pair, saving to
-`models/saved/*.pkl` (sklearn logreg) or `*.pt` (PyTorch CNN). `mnist_cnn_he.py` is the HE-compatible variant:
-polynomial/square activation instead of ReLU, avgpool instead of maxpool, needed because HE can't evaluate
-non-polynomial functions on ciphertexts.
-
-**`inference/`** — runs trained models against encrypted input:
-- `he_infer.py` — core encrypted-inference math (`encrypted_linear_score`: dot(x, weights)+bias homomorphically)
-  plus `run_traced_inference`/`run_full_traced_pipeline(_with_events)`, which capture every intermediate
-  artifact (ciphertext bytes/hex previews, transport wrap/unwrap results, decrypted score) for UI display.
-  Multiclass models run one encrypted pass per class and take argmax over decrypted scores.
-- `he_cnn_infer.py` — encrypted inference for the CNN path.
-- `pipeline_events.py` — `PipelineRecorder`, emits a per-feature event stream consumed by the frontend's
-  "smoke-feed" animation (real events, not simulated — see checklist Phase 6).
-
-**`crypto_teaching/real_ckks.py`** — a from-scratch, non-TenSEAL CKKS implementation (real canonical
-embedding via Vandermonde matrix, real ternary secret key, real negacyclic ciphertext polynomial math,
-N=256/4096 single-modulus, no RNS) built purely so the UI can show real encode/keygen/encrypt/decrypt
-internals that TenSEAL's opaque wrapper (over Microsoft SEAL) hides. This runs *alongside* the production
-TenSEAL pipeline, never replaces it. `run_full_deep_dive()` is the entry point, wired to
-`/api/ckks_deep_dive` in `interface/app.py`.
-
-**`interface/`**:
-- `cli.py` — terminal entry point (`_get_sample`, `_run_inference`, `_show_benchmarks`); considered
-  historical/stable, not user-facing UI, no rebuild planned.
-- `app.py` — Flask app. `/` serves the older tab-based `index.html`; `/live` serves the current full-screen
-  scene UI (`scenes.html`) that is under active rework — see Phase 6D/6E/6F in `docs/checklist.md` for the
-  intended scene order and in-flight fixes before touching this file. `/api/infer_text` returns real event
-  JSON from `run_full_traced_pipeline_with_events`; `/api/ckks_deep_dive` returns real_ckks output.
-
-**`benchmarks/metrics.py`** — times + tracemalloc-profiles plaintext vs. encrypted inference per
-model/dataset, plus prediction agreement; writes `benchmarks/results.json`, which both `docs/checklist.md`
-Phase 5 and `interface/app.py`'s benchmarks scene read from.
+Full module-by-module reference lives in **`docs/ARCHITECTURE.md`** — read it instead of re-deriving structure
+from scratch. Quick orientation: `hecrypto/` (all crypto, isolated per rule above), `data/loaders/` +
+`data/features/` (per-dataset loading + feature extraction), `models/train/` (one script per dataset+model
+pair), `inference/` (runs models against encrypted input, records real event traces with why/formal/next
+explanation text), `crypto_teaching/real_ckks.py` (from-scratch CKKS implementation for showing real algorithm
+internals TenSEAL hides), `interface/` (Flask app + the `/live` teaching UI, see ARCHITECTURE.md's UI
+architecture section for every JS file's role), `benchmarks/metrics.py` (plaintext vs. HE cost per model).
 
 ## Notes
 

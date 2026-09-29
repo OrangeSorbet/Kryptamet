@@ -1,0 +1,147 @@
+/* Chapter flowchart (interface/static/js/flowchart.js): snake layout of
+   absolutely-positioned boxes + connectors inside a fixed-size chart that
+   flowchart.js scales down to fit .fc-stage. */
+.flowchart-scene {
+    justify-content: flex-start;
+    padding: 5.5rem 1.5rem 1.5rem;
+}
+
+.fc-header {
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.fc-header .scene-title { margin-bottom: 0.35rem; }
+
+.fc-subtitle {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.fc-stage {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+}
+
+.fc-chart {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Boxes */
+.fc-box {
+    position: absolute;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: var(--color-surface);
+    border: 2px solid var(--color-border);
+    border-radius: 14px;
+    color: var(--color-text);
+    font-family: var(--font-mono);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, background 0.25s ease;
+}
+
+.fc-box:hover,
+.fc-box:focus-visible {
+    outline: none;
+    border-color: var(--color-primary-hover);
+    background: #151809;
+    box-shadow: 0 0 22px rgba(110, 127, 73, 0.35);
+    transform: translateY(-3px);
+}
+
+.fc-box.done {
+    border-color: var(--color-success);
+    background: #0c1a10;
+}
+
+.fc-box.done:hover { box-shadow: 0 0 22px rgba(62, 201, 114, 0.3); }
+
+.fc-box.last {
+    border-color: var(--color-warning);
+    box-shadow: 0 0 24px rgba(229, 185, 62, 0.28);
+}
+
+.fc-box.disabled,
+.fc-box:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.fc-index { font-size: 10px; color: var(--color-text-muted); }
+.fc-check { color: var(--color-success); font-size: 12px; }
+.fc-label { font-size: 14px; font-weight: 700; line-height: 1.2; font-family: var(--font-base); }
+.fc-summary { font-size: 10.5px; color: var(--color-warning); line-height: 1.3; }
+.fc-steps { font-size: 10px; color: var(--color-text-muted); }
+
+/* Entrance stagger, only right after a run (flowchart.js adds the class). */
+.fc-animate-in .fc-box { animation: fc-box-in 0.45s ease-out backwards; animation-delay: calc(var(--i) * 55ms + 250ms); }
+.fc-animate-in .fc-connector { animation: fc-fade-in 0.4s ease-out backwards; animation-delay: 700ms; }
+
+@keyframes fc-box-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.96); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes fc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Connectors: a 2px line + arrowhead, lit (with a travelling dot) once the
+   chapter they leave is done. */
+.fc-connector { position: absolute; pointer-events: none; }
+
+.fc-line {
+    position: absolute;
+    background: var(--color-border);
+    transition: background 0.3s ease;
+}
+
+.fc-right .fc-line, .fc-left .fc-line { top: 11px; left: 0; width: 100%; height: 2px; }
+.fc-down .fc-line { left: 11px; top: 0; width: 2px; height: 100%; }
+
+.fc-arrow { position: absolute; fill: var(--color-border); transition: fill 0.3s ease; }
+.fc-right .fc-arrow { right: -3px; top: 7.5px; }
+.fc-left .fc-arrow { left: -3px; top: 7.5px; transform: rotate(180deg); }
+.fc-down .fc-arrow { bottom: -3px; left: 7.5px; transform: rotate(90deg); }
+
+.fc-connector.done .fc-line { background: var(--color-success); }
+.fc-connector.done .fc-arrow { fill: var(--color-success); }
+
+.fc-travel-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-success);
+    box-shadow: 0 0 8px var(--color-success);
+}
+
+.fc-right .fc-travel-dot { top: 8px; animation: fc-travel-x 1.8s ease-in-out infinite; }
+.fc-left .fc-travel-dot { top: 8px; animation: fc-travel-x-rev 1.8s ease-in-out infinite; }
+.fc-down .fc-travel-dot { left: 8px; animation: fc-travel-y 1.8s ease-in-out infinite; }
+
+@keyframes fc-travel-x { from { left: 0; opacity: 1; } to { left: 100%; opacity: 0; } }
+@keyframes fc-travel-x-rev { from { left: 100%; opacity: 1; } to { left: 0; opacity: 0; } }
+@keyframes fc-travel-y { from { top: 0; opacity: 1; } to { top: 100%; opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .fc-travel-dot { animation: none; display: none; }
+    .fc-animate-in .fc-box, .fc-animate-in .fc-connector { animation: none; }
+}
+
+@media (max-width: 640px) {
+    .flowchart-scene { padding: 4.25rem 0.75rem 0.75rem; }
+    .fc-header .scene-title { font-size: 1.35rem; }
+}
