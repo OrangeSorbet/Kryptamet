@@ -7,7 +7,9 @@
 //
 // onStepChange(index, step) may return a Promise (e.g. a poly-grid reveal);
 // autoplay waits for it to settle before starting the next step's timer, so
-// a step's animation is never cut off mid-way.
+// a step's animation is never cut off mid-way. onEnd (optional) is what Next
+// does on the last step: chapter_state.js zooms out and into the next chapter
+// (`nextLabel` names it in the button's tooltip).
 const SCRUBBER_ICONS = {
     play: '<path d="M8 5v14l11-7z"/>',
     pause: '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>',
@@ -24,11 +26,12 @@ const EXPLANATION_CELLS = [
     { key: "next", title: "What's next", short: "Next" },
 ];
 
-function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRestart }) {
+function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRestart, onEnd, nextLabel }) {
     let index = 0;
     let playing = false;
     let timer = null;
     let playToken = 0; // bumped on every stop, so a stale awaited step can't reschedule
+    let settledNow;    // what the current step's onStepChange returned (its animation)
 
     containerEl.innerHTML = `
         <div class="scrubber-controls">
@@ -88,7 +91,7 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
 
     // Autoplay interval: speed 1 -> 4.0s per step, speed 10 -> 0.4s.
     function intervalMs() {
-        return (11 - (window.gridRevealSpeed || 5)) * 400;
+        return (11 - (window.stepSpeed || 5)) * 400;
     }
 
     function scheduleNext(settled) {
@@ -116,8 +119,11 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
         grid.classList.remove("step-fade-in");
         void grid.offsetWidth; // restart the fade animation
         grid.classList.add("step-fade-in");
+        const atEnd = index >= steps.length - 1;
         prevBtn.disabled = index <= 0;
-        nextBtn.disabled = index >= steps.length - 1;
+        nextBtn.disabled = atEnd && !onEnd;
+        nextBtn.classList.toggle("scrubber-next-chapter", atEnd && !!onEnd);
+        nextBtn.title = atEnd && onEnd ? `Next chapter${nextLabel ? `: ${nextLabel}` : ""} (→)` : "Next step (→)";
         slider.update(index);
     }
 
@@ -125,7 +131,8 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
     function seek(i) {
         index = Math.max(0, Math.min(steps.length - 1, i));
         render();
-        return onStepChange ? onStepChange(index, steps[index]) : undefined;
+        settledNow = onStepChange ? onStepChange(index, steps[index]) : undefined;
+        return settledNow;
     }
 
     function togglePlay() {
@@ -135,7 +142,7 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
         playToken++;
         playBtn.innerHTML = scrubberIcon("pause");
         if (index >= steps.length - 1) scheduleNext(seek(0));
-        else scheduleNext(undefined);
+        else scheduleNext(settledNow); // let a running step animation finish first
     }
 
     function restart() {
@@ -146,15 +153,22 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
 
     playBtn.addEventListener("click", togglePlay);
     prevBtn.addEventListener("click", () => { stop(); seek(index - 1); });
-    nextBtn.addEventListener("click", () => { stop(); seek(index + 1); });
+    // Next on the last step leaves for the next chapter (if the host gave onEnd).
+    function forward() {
+        stop();
+        if (index >= steps.length - 1 && onEnd) onEnd();
+        else seek(index + 1);
+    }
+    nextBtn.addEventListener("click", forward);
     q('[data-act="restart"]').addEventListener("click", restart);
 
     function onKey(e) {
         if (window.introCardOpen) return;
         const t = e.target;
+        if (e.key === " " && t && t.closest && t.closest(".grid-ctl")) return; // Space presses the focused grid button
         if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
         if (e.key === " ") { togglePlay(); e.preventDefault(); }
-        else if (e.key === "ArrowRight") { stop(); seek(index + 1); e.preventDefault(); }
+        else if (e.key === "ArrowRight") { forward(); e.preventDefault(); }
         else if (e.key === "ArrowLeft") { stop(); seek(index - 1); e.preventDefault(); }
         else if (e.key === "Home") { stop(); seek(0); e.preventDefault(); }
         else if (e.key === "End") { stop(); seek(steps.length - 1); e.preventDefault(); }

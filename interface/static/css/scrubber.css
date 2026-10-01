@@ -34,6 +34,7 @@
 }
 
 .chrome-btn {
+    display: flex;
     align-items: center;
     justify-content: center;
     height: 30px;
@@ -294,4 +295,11 @@
     .explanation-grid[data-tab="next"] .explanation-cell[data-key="next"] { display: block; }
     .explanation-title { display: none; }
     .explanation-text { display: block; -webkit-line-clamp: unset; overflow: visible; }
+}
+
+/* Next on a chapter's last step goes to the next chapter: highlighted so it reads as a way on. */
+.scrubber-btn.scrubber-next-chapter {
+    color: var(--color-bg);
+    background: var(--color-warning);
+    border-color: var(--color-warning);
 }

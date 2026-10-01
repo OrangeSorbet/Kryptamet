@@ -15,7 +15,7 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function pbkdf2EdgeMs() {
-    return Math.max(120, 700 * Math.pow(0.8, (window.gridRevealSpeed || 5) - 1));
+    return Math.max(120, 700 * Math.pow(0.8, (window.stepSpeed || 5) - 1));
 }
 
 function renderPbkdf2Graph(containerEl, graph, options) {

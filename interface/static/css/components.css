@@ -1,3 +1,6 @@
+/* The hidden attribute always wins over component display rules. */
+[hidden] { display: none !important; }
+
 body {
     background: var(--color-bg);
     color: var(--color-text);
@@ -226,3 +229,5 @@ table.benchmark-table th, table.benchmark-table td {
     font-family: var(--font-mono);
 }
 
+
+.step-text.centered { text-align: center; }

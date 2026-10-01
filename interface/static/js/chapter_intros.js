@@ -14,10 +14,10 @@ const CHAPTER_INTROS = {
     },
     feature: {
         title: "Feature Extraction",
-        io: "your text → a vector of numbers",
+        io: "your input → a vector of numbers",
         sections: [
-            ["What this stage does", "Turns your sentence into a fixed-length list of numbers the model was trained on: 8 stylometric statistics (word counts, average lengths, punctuation ratio, ...) for Human vs AI, or a TF-IDF vector over the training vocabulary for SMS Spam."],
-            ["Why it comes first", "A model can only multiply and add numbers. Encryption also works on numbers, so the text has to become a vector before anything can be encrypted."],
+            ["What this stage does", "Turns your input into the fixed-length list of numbers the model was trained on: 8 stylometric statistics for Human vs AI, a TF-IDF vector over a 500-word vocabulary for SMS Spam, standardized columns (categories one-hot first) for German Credit and price data, one 0/1 flag per symptom for diagnosis, and 784 pixels scaled to 0..1 for MNIST."],
+            ["Why it comes first", "A model can only multiply and add numbers. Encryption also works on numbers, so the input has to become a vector before anything can be encrypted."],
         ],
     },
     key: {
@@ -40,10 +40,11 @@ const CHAPTER_INTROS = {
     },
     deepdive: {
         title: "CKKS Deep-Dive",
-        io: "your first 8 features → real polynomials → recovered values",
+        io: "your features → polynomials → encrypted w·x + b → score",
         sections: [
-            ["What this chapter is", "TenSEAL hides CKKS's internals, so this chapter re-runs the same scheme with a small from-scratch implementation (N=256, one modulus) on your real feature values and shows every polynomial it creates: encoding, secret key, public key, both ciphertext halves, and decryption."],
-            ["How it relates to the real pipeline", "It's the same math at toy size. The production path uses N=8192 and an RNS modulus chain for speed, and the steps are identical."],
+            ["What this chapter is", "TenSEAL hides CKKS's internals, so this chapter re-runs the whole encrypted score with a small from-scratch implementation (N=256, q=2^60) on your real features and the real model weights: encoding, keys, encryption, the evaluation (multiply by the weights, add, 7 rotate-and-add rounds, add the bias), decryption and decoding."],
+            ["What you will see", "Every polynomial as a 256-cell grid with its own play/pause, step and speed controls (step to any cell to read its exact value). Your browser recomputes each relation (b = −a·s + e, c0, c1, every product) exactly with BigInt, and decrypts after every step to compare the slots with sums it computes from x and w itself."],
+            ["How it relates to the real pipeline", "Same scheme at toy size. The production path uses N=8192 and three RNS primes, and its rotations use the same Galois-key trick. The last step compares this score with TenSEAL's."],
         ],
     },
     compute: {

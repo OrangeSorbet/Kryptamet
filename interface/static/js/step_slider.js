@@ -7,7 +7,7 @@ function createStepSlider(containerEl, { total, current, chapters, onSeek }) {
     chapters = chapters || [];
     let shown = current;
     containerEl.innerHTML = `
-        <div class="step-slider-tooltip" style="display:none"></div>
+        <div class="step-slider-tooltip" hidden></div>
         <div class="step-slider-hit">
             <div class="step-slider-track">
                 <div class="step-slider-fill"></div>
@@ -57,12 +57,12 @@ function createStepSlider(containerEl, { total, current, chapters, onSeek }) {
     hit.addEventListener("pointermove", (e) => {
         const idx = indexFromClientX(e.clientX);
         const chap = chapterAt(idx);
-        tooltip.style.display = "block";
+        tooltip.hidden = false;
         tooltip.textContent = `Step ${idx + 1}` + (chap ? ` · ${chap.label}` : "");
         tooltip.style.left = `${e.clientX - track.getBoundingClientRect().left}px`;
         if (e.buttons === 1) seekTo(idx);
     });
-    hit.addEventListener("pointerleave", () => { tooltip.style.display = "none"; });
+    hit.addEventListener("pointerleave", () => { tooltip.hidden = true; });
 
     render(current);
     return { update: render };

@@ -190,7 +190,7 @@ def trace_ckks_encryption(context, x, enc_vector=None):
         "delta": scale, "delta_expr": f"2**{params['scale_bits']}",
         "values": [{"index": int(i), "x": float(x[i]), "x_times_delta": float(x[i] * scale),
                     "rounded": str(round(x[i] * scale))} for i in nz],
-        "note": "Per-slot rounding is shown for intuition. Real CKKS rounds only AFTER the inverse embedding "
+        "note": "Per-slot rounding is shown for intuition. CKKS itself rounds only AFTER the inverse embedding "
                 "(next step): the integer polynomial m(X) has coefficients round(delta * sigma^-1(z)).",
     }
 

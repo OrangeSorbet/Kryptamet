@@ -21,7 +21,7 @@
 const bytesOfHex = (hex) => String(hex).match(/../g) || [];
 
 function byteMatrixDelay(unit, cols, byRow) {
-    const base = 300 * Math.pow(0.6, (window.gridRevealSpeed || 5) - 1);
+    const base = 300 * Math.pow(0.6, (window.stepSpeed || 5) - 1);
     if (byRow) return Math.max(8, unit === 0 ? base * 8 : base * 2);
     return Math.max(4, unit < cols ? base * 4 : base);
 }

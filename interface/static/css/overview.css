@@ -152,3 +152,7 @@
     .example-chip { max-width: 100%; }
     .overview-hint { display: none; }
 }
+
+/* Model help line and the input panel host (overview_form.js) */
+.overview-help { margin: 0.35rem 0 0; }
+.overview-panel { min-height: 4rem; }

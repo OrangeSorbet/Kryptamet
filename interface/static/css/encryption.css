@@ -1,12 +1,17 @@
 /* Encryption chapter (interface/static/js/encryption_steps.js). */
 
-/* Step 3: 4096 slots as a 64-wide grid of squares */
+/* Step 3: 4096 slots as a 64-wide grid of squares. The grid is square, so
+   capping its width by the viewport height keeps it above the dock on phones. */
 .enc-slots {
     display: grid;
     grid-template-columns: repeat(64, minmax(0, 1fr));
     gap: 1px;
-    max-width: 448px;
+    max-width: min(448px, 38vh);
     margin: 0.75rem auto 0;
+}
+
+@media (max-width: 600px) {
+    .enc-slots { max-width: 28vh; }
 }
 
 .enc-slot {

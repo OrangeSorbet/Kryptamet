@@ -35,16 +35,24 @@ function flowchartConnectorHtml(i, g, done) {
         ? { left: a.x + g.boxW / 2 - 12, top: a.y + g.boxH, width: 24, height: g.gapY }
         : { left: Math.min(a.x, b.x) + g.boxW, top: a.y + g.boxH / 2 - 12, width: g.gapX, height: 24 };
     return `
-        <div class="fc-connector fc-${dir}${done ? " done" : ""}"
-             style="left:${box.left}px;top:${box.top}px;width:${box.width}px;height:${box.height}px">
+        <div class="fc-connector fc-${dir}${done ? " done" : ""}" data-geo="${box.left},${box.top},${box.width},${box.height}">
             <div class="fc-line"></div>
             <svg class="fc-arrow" width="9" height="9" viewBox="0 0 10 10"><path d="M0 0 L10 5 L0 10 Z"/></svg>
             ${done ? '<span class="fc-travel-dot"></span>' : ""}
         </div>`;
 }
 
-// opts: { chapters, enabled(i), stepCount(i), summary(i), done:Set, lastVisited,
+// opts: { chapters, enabled(i), stepCount(i), summary(i), done:Set, proof(i) -> {ok, bad}|null, lastVisited,
 //         animateIn, onSelect(i, boxEl) }
+// "✓ 23 browser checks" / "✕ 1 of 24 failed": checks your browser ran in that chapter.
+function proofBadge(p) {
+    if (!p || !(p.ok + p.bad)) return "";
+    const n = p.ok + p.bad;
+    return p.bad
+        ? ` · <span class="fc-proof bad" title="Browser checks that failed while you watched this chapter">✕ ${p.bad} of ${n} failed</span>`
+        : ` · <span class="fc-proof ok" title="Checks your browser recomputed while you watched this chapter">✓ ${n} browser check${n === 1 ? "" : "s"}</span>`;
+}
+
 function renderFlowchartInto(el, opts) {
     const n = opts.chapters.length;
     const doneCount = opts.chapters.filter((_, i) => opts.done.has(i)).length;
@@ -70,15 +78,20 @@ function renderFlowchartInto(el, opts) {
             const cls = ["fc-box", done ? "done" : "", i === opts.lastVisited ? "last" : "", enabled ? "" : "disabled"].join(" ");
             const steps = opts.stepCount(i);
             html += `
-                <button type="button" class="${cls}" data-index="${i}" ${enabled ? "" : "disabled"}
-                        style="left:${x}px;top:${y}px;width:${g.boxW}px;height:${g.boxH}px;--i:${i}">
+                <button type="button" class="${cls}" data-index="${i}" ${enabled ? "" : "disabled"} data-geo="${x},${y},${g.boxW},${g.boxH}">
                     <span class="fc-index">${i + 1}${done ? ' <span class="fc-check">&#10003;</span>' : ""}</span>
                     <span class="fc-label">${escapeHtml(c.label)}</span>
                     <span class="fc-summary">${enabled ? escapeHtml(opts.summary(i) || "") : "run inference first"}</span>
-                    ${enabled && steps != null ? `<span class="fc-steps">${steps} step${steps === 1 ? "" : "s"}</span>` : ""}
+                    ${enabled && steps != null ? `<span class="fc-steps">${steps} step${steps === 1 ? "" : "s"}${proofBadge(opts.proof && opts.proof(i))}</span>` : ""}
                 </button>`;
         });
         chart.innerHTML = html;
+        // Geometry is computed per layout, so it is applied here rather than as style attributes.
+        chart.querySelectorAll("[data-geo]").forEach((node) => {
+            const [l, t, w, h] = node.dataset.geo.split(",");
+            Object.assign(node.style, { left: `${l}px`, top: `${t}px`, width: `${w}px`, height: `${h}px` });
+            if (node.dataset.index) node.style.setProperty("--i", node.dataset.index);
+        });
         chart.style.width = g.width + "px";
         chart.style.height = g.height + "px";
         chart.querySelectorAll(".fc-box:not([disabled])").forEach((box) => {

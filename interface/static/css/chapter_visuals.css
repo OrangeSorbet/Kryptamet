@@ -198,6 +198,7 @@
 
 .recover-table {
     display: flex;
+    flex-shrink: 0; /* overflow-x makes its min-height 0: don't let the scene's flex column squash it */
     flex-direction: column;
     gap: 2px;
     width: 100%;
@@ -216,6 +217,7 @@
 .recover-row > span { padding: 4px 6px; background: var(--color-bg); text-align: right; color: var(--color-text); }
 .recover-row > span:first-child { text-align: left; color: var(--color-text-muted); }
 .recover-row.head > span { color: var(--color-text-muted); background: transparent; }
+.recover-row > span.recover-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Result verdict */
 .verdict {

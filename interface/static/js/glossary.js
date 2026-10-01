@@ -49,6 +49,8 @@ const GLOSSARY = [
     { term: "Miller–Rabin", aliases: ["Miller-Rabin"], def: "A fast primality test. With the fixed bases used here it is exact for every number below 3.3·10²⁴." },
     { term: "zstd", def: "Zstandard, the compression SEAL applies when serializing. It recovers the unused high bits of each 64-bit residue." },
     { term: "AAD", def: "Additional authenticated data: bytes sent readable but covered by the GCM tag, so they cannot be changed unnoticed." },
+    { term: "rotation", aliases: ["rotate", "rotations"], def: "Shifting the slots of a ciphertext cyclically, done with the Galois automorphism X → X^(5^k) followed by key switching." },
+    { term: "key switching", aliases: ["key-switching"], def: "Turning a ciphertext that decrypts under one key (e.g. σ(s)) into one that decrypts under s, using public key-switching (Galois) keys." },
     { term: "decision boundary", def: "The surface where the model's score is exactly 0, separating the two predicted classes." },
 ];
 

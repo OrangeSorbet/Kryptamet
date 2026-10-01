@@ -3,7 +3,7 @@
 Roadmap, in order (rules.md #1). Each phase ends with a working, testable checkpoint (rules.md #8).
 Detail for each step lives in `docs/logs.md`, which is phase-tagged.
 
-**Status:** Phases 0–6 done. **Phase 7 in progress** (7.1–7.3 done; next milestone: 7.4, waiting for user go).
+**Status:** Phases 0–7 done. Next: Phase 8, gated on the user sending the second PC's config.
 
 ---
 
@@ -49,7 +49,7 @@ Current design: `docs/LIVE_UI_POLISH.md`.
 - [x] 6.6 Dead code from earlier builds removed (index.html, sections/, pipeline_animations.js, smoke_feed, timeline)
 - [x] 6.7 Verified in headless Chrome: both models, desktop and phone, no console errors
 
-## Phase 7 — Truthful `/live`: real, verifiable content + two-party flow ⏳
+## Phase 7 — Truthful `/live`: real, verifiable content + two-party flow ✅
 Plan: `~/.claude/plans/serene-dazzling-spindle.md`. Doc on completion: `docs/LIVE_UI_TRUTH.md`.
 Flow: server features → keys → CKKS encrypt → wrap (client RSA pub) → transport → client unwrap →
 HE compute → wrap (server RSA pub) → transport → server unwrap → CKKS decrypt → result.
@@ -73,15 +73,21 @@ HE compute → wrap (server RSA pub) → transport → server unwrap → CKKS de
     - [x] Key Setup: 17 steps (browser re-checks RSA, ipad/opad, SHA-256 schedule + rounds, PBKDF2 via WebCrypto), "Use random passphrase" next to "Lock with my passphrase", PBKDF2 node graph, nested dolly zoom into the SHA-256 round matrix
     - [x] Transport split into "Transport → client" and "Transport ← server": 14 steps each, including a nested zoom into AES_K, all 14 rounds as 4×4 matrices, the S-box, GHASH/tag, the opened RSA-OAEP envelope and the tamper test. The browser recomputes all of it (`aes_check.js`) and WebCrypto-decrypts the full wire payload. The flowchart has 10 chapters.
     - [x] README rewritten: features, end-to-end flow, real use case (no folder structure); describes the Phase 7 target, re-verified in 7.8
-- [ ] 7.4 Encryption chapter (~9 algorithm steps to the full ciphertext). Note: TenSEAL replicates x cyclically across all 4096 slots (not zero-padded); m(X) matches SEAL's encoder exactly
-- [ ] 7.5 CKKS deep-dive: evaluation before decrypt, per-matrix grid controls, "Real CKKS" → "CKKS"; send Q=2⁶⁰ coefficients as strings (they exceed JS safe-int 2⁵³) and display with BigInt
-- [ ] 7.6 Computation: general form first, non-zero terms with faded value captions, zero terms collapsed
-- [ ] 7.7 Remove the remaining inline `style=""` attributes in scenes.html and older chapter builders (rules.md #2); Next → next phase (zoom out/in), 10-line scrollable full ciphertext boxes, in-browser proof badges, new model inputs
-- [ ] 7.8 Docs: `LIVE_UI_TRUTH.md`, `ARCHITECTURE.md` refresh (incl. the old 6.5 file-list item), `CLAUDE.md` pointer; re-check every README feature claim against the finished app
-- [ ] 7.9 Verify: all tests + headless Chrome for every model, desktop + phone, every proof badge ✓
+- [x] 7.4 Encryption chapter: 10 steps (plaintext, pipeline graph, 4096-slot packing grid, Δ-scaling, σ⁻¹ to all 8192 coefficients of m(X), RNS primes + residues, the encryption equation with c0/c1, serialization header, full ciphertext + SHA-256, decryption round trip). TenSEAL replicates x cyclically across all 4096 slots (not zero-padded). The browser re-checks every stage (`encrypt_check.js`): packing rule, Δ-rounding, m(X) evaluated at all 4096 slot roots gives x back, Miller–Rabin + q ≡ 1 mod 2N, BigInt residues, the TenSEAL/SEAL/zstd header bytes, WebCrypto SHA-256 == the leg-1 payload, round-trip noise
+- [x] 7.5 CKKS deep-dive: 18 steps (17 when x fits one chunk) in pipeline order: encode x, s, (a, b), c0, c1, encode w, × ŵ, chunk sum, 7 rotate-and-add rounds (one step each), + bias, decrypt, decode vs plaintext and TenSEAL. Coefficients are sent as decimal strings; the browser (`deep_dive_check.js`) re-checks every relation exactly with BigInt mod 2⁶⁰ and decrypts after every evaluation step, comparing the slots with sums it computes from x and w. The chunk shown is the one with the most non-zero inputs. Per-grid controls (`grid_controls.js`: ▶/❚❚, ‹ › cell, ↺, own speed `kryptamet.gridSpeed`, exact-value readout); the Scrubber's speed is `window.stepSpeed`. "Real CKKS" → "CKKS"
+- [x] 7.6 Computation: overview (what the client has / never has), the real Enc(x)·Wᵀ + b first, then the non-zero terms largest first (top 20 one step each with faded value captions under w, x and w·x; the rest summed in one `smaller_terms` step), zero terms collapsed, bias. A waterfall SVG shows how every term moves the score. The browser re-checks each term against the encrypted x, the running sums, the zero count, the bias sum, plaintext and decrypted scores, and SHA-256 of the full output ciphertext = the leg-2 payload (`computation_steps.js`)
+- [x] 7.7 Inline styles, Next → next chapter, proof badges, all six models
+    - [x] No `style=""` attributes left in scenes.html or JS templates (rules.md #2): `hidden` attribute + `[hidden]` rule, classes, geometry applied by JS after render
+    - [x] Next on a chapter's last step (button or →) zooms out and into the next available chapter; autoplay waits for a running step animation before advancing
+    - [x] 10-line scrollable full ciphertext boxes (done in 7.2)
+    - [x] Proof badges: each flowchart box shows "✓ N browser checks" (or "✕ k of N failed"), counted from the checks that ran while you watched
+    - [x] Input panels for every registry model (`/api/models`): text, tabular (real test rows, editable fields), symptoms (filterable chips, real test cases), MNIST (28×28 drawing canvas, real test images); Feature chapter covers tabular, symptom and pixel inputs
+- [x] 7.8 Docs: new `LIVE_UI_TRUTH.md` (flow, data sources, per-chapter browser checks, limits); `ARCHITECTURE.md` rewritten for the current code (incl. the old 6.5 file-list item); `CLAUDE.md` pointer + flow order; README claims re-checked: Benchmarks now really shows peak memory, proof badges added. Dead code removed (`run_traced_inference`, `run_full_traced_pipeline`)
+- [x] 7.9 Verify: all 9 test files pass (incl. the encrypted CNN, 3/3); headless Chrome for all 6 models at 1440×900 and 390×844, every chapter's every step, chapters chained by Next, every proof badge ✓ (792 browser checks per viewport, 0 failed), no console errors
 
 ## Phase 8 — GPU-accelerated encrypted CNN (after Phase 7)
 Target machine: the user's second PC with an RTX 5060 Ti (CUDA). TenSEAL/SEAL is CPU-only, so this needs a CUDA CKKS library.
+**Gate:** do not start any Phase 8 step on a bare "go". It starts only after the user sends that PC's actual config (GPU, driver/CUDA version, OS, Python, RAM).
 - [ ] 8.1 Evaluate CUDA CKKS libraries (e.g. Phantom, HEonGPU) for Python bindings, CKKS conv/matmul support, and Windows/RTX 50-series support
 - [ ] 8.2 GPU backend for the HE-CNN only, in `hecrypto/`, alongside TenSEAL (the logreg models stay on TenSEAL)
 - [ ] 8.3 Verify the GPU CNN matches plaintext predictions; benchmark against the CPU path (~767 s for 3 images today)

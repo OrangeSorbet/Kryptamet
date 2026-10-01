@@ -1,0 +1,13 @@
+/* Tabular input panel (interface/static/js/tabular_input.js). */
+.tab-pick { display: flex; flex-direction: column; gap: 4px; margin-bottom: 0.75rem; }
+.tab-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px 12px;
+    max-height: 340px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.tab-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tab-name { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab-field .input-text, .tab-field .dropdown { margin-top: 0; padding: 0.4rem 0.55rem; font-size: 13px; }

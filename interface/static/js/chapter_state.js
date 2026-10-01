@@ -13,6 +13,25 @@ let scrubberInstance = null;
 let chapterMinimap = null;
 let ckksDeepDiveResult = null;
 let forceReplay = false;      // set by the Scrubber's restart: replay animations once
+// Proof badges: per chapter, per step, how many browser checks (.ks-check chips)
+// ended ✓ or ✕ while that step was on screen. Pending checks are not counted.
+let proofs = {};
+let shownStep = null;         // { index, i } of the step currently rendered
+
+function tallyShown() {
+    if (!shownStep) return;
+    const el = $("sceneContent");
+    (proofs[shownStep.index] ||= {})[shownStep.i] = {
+        ok: el.querySelectorAll(".ks-check.ok").length,
+        bad: el.querySelectorAll(".ks-check.bad").length,
+    };
+}
+
+function proofOf(index) {
+    const steps = Object.values(proofs[index] || {});
+    if (!steps.length) return null;
+    return steps.reduce((a, s) => ({ ok: a.ok + s.ok, bad: a.bad + s.bad }), { ok: 0, bad: 0 });
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -40,6 +59,7 @@ function renderFlowchart(el, animateIn) {
         stepCount: (i) => (chapterSteps[i] ? chapterSteps[i].steps.length : null),
         summary: (i) => CHAPTERS[i].summary(pipelineResult, ckksDeepDiveResult),
         done: doneChapters,
+        proof: proofOf,
         lastVisited,
         animateIn,
         onSelect: (i, box) => enterChapter(i, box),
@@ -47,10 +67,7 @@ function renderFlowchart(el, animateIn) {
 }
 
 function setChapterChrome(visible) {
-    $("backToFlowchartBtn").style.display = visible ? "flex" : "none";
-    $("chapterHelpBtn").style.display = visible ? "flex" : "none";
-    $("minimapContainer").style.display = visible ? "flex" : "none";
-    $("scrubberDock").style.display = visible ? "block" : "none";
+    ["backToFlowchartBtn", "chapterHelpBtn", "minimapContainer", "scrubberDock"].forEach((id) => { $(id).hidden = !visible; });
 }
 
 function hideChapterChrome() {
@@ -63,6 +80,8 @@ function hideChapterChrome() {
 // previews the exact final content) and also for in-place rebuilds
 // (passphrase re-lock) that don't need any zoom at all.
 function buildChapterVisual(index) {
+    tallyShown(); // the step on screen before a minimap jump or re-lock
+    shownStep = null;
     setChapterChrome(true);
     const el = $("sceneContent");
     el.classList.add("chapter-scene");
@@ -75,11 +94,17 @@ function buildChapterVisual(index) {
         chapters: entry.bands,
         meta: `Chapter ${index + 1} · ${CHAPTERS[index].label}`,
         onRestart: () => { forceReplay = true; },
+        onEnd: () => goToNextChapter(index),
+        nextLabel: nextChapterIndex(index) >= 0 ? CHAPTERS[nextChapterIndex(index)].label : "back to the chapters",
         onStepChange: (i, step) => {
+            tallyShown();
             stepIndices[index] = i;
             window.sceneAlreadyVisited = doneChapters.has(index) && !forceReplay;
             forceReplay = false;
             const settled = step.renderVisual(el);
+            const here = { index, i };
+            shownStep = here;
+            Promise.resolve(settled).then(() => { if (shownStep === here) tallyShown(); });
             el.classList.remove("step-fade-in");
             void el.offsetWidth; // restart the fade animation
             el.classList.add("step-fade-in");
@@ -112,8 +137,24 @@ function enterChapter(index, originEl) {
     updateNavbar();
 }
 
-function exitToFlowchart(originEl) {
+function nextChapterIndex(index) {
+    for (let j = index + 1; j < CHAPTERS.length; j++) if (chapterEnabled(j)) return j;
+    return -1;
+}
+
+// Next on a chapter's last step: zoom out to the flowchart, then into the
+// next available chapter's box (or stay on the flowchart after the last one).
+function goToNextChapter(index) {
+    const j = nextChapterIndex(index);
+    exitToFlowchart($("backToFlowchartBtn"), j < 0 ? null : () => {
+        enterChapter(j, $("flowchartContainer").querySelector(`.fc-box[data-index="${j}"]`) || $("flowchartContainer"));
+    });
+}
+
+function exitToFlowchart(originEl, then) {
     if (zoomInFlight) return;
+    tallyShown();
+    shownStep = null;
     currentView = "flowchart";
     if (scrubberInstance) { scrubberInstance.destroy(); scrubberInstance = null; }
     zoomUnits({
@@ -122,23 +163,22 @@ function exitToFlowchart(originEl) {
         origin: originOf(originEl),
         direction: "out",
         buildTo: () => renderFlowchart($("flowchartContainer"), false),
-        onDone: () => { hideChapterChrome(); updateNavbar(); },
+        onDone: () => { hideChapterChrome(); updateNavbar(); if (then) then(); },
     });
 }
+
+let overviewForm = null;
 
 function showOverview() {
     const el = $("sceneContent");
     el.classList.remove("chapter-scene", "step-fade-in");
-    renderOverviewScene(el);
-    if (pipelineResult) {
-        $("modelSelect").value = pipelineResult.model;
-        $("modelSelect").dispatchEvent(new Event("change"));
-        $("textInput").value = pipelineResult.input_text;
-    }
+    overviewForm = renderOverviewScene(el, pipelineResult && { model: pipelineResult.model, input: pipelineResult.input });
 }
 
 function returnToOverview() {
     if (zoomInFlight || currentView === "overview") return;
+    tallyShown();
+    shownStep = null;
     const fromEl = currentView === "flowchart" ? $("flowchartUnit") : $("chapterUnit");
     currentView = "overview";
     if (fromEl === $("chapterUnit")) {
@@ -154,19 +194,18 @@ function returnToOverview() {
         origin: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
         direction: "out",
         buildTo: () => { hideChapterChrome(); showOverview(); },
-        onDone: () => { updateNavbar(); $("textInput").focus(); },
+        onDone: () => { updateNavbar(); if (overviewForm) overviewForm.focus(); },
     });
 }
 
 function updateNavbar() {
     const info = $("navbarRunInfo");
     const onOverview = currentView === "overview";
-    $("newInputBtn").style.display = pipelineResult && !onOverview ? "inline-flex" : "none";
-    $("flowchartHelpBtn").style.display = currentView === "flowchart" ? "inline-flex" : "none";
+    $("newInputBtn").hidden = !(pipelineResult && !onOverview);
+    $("flowchartHelpBtn").hidden = currentView !== "flowchart";
     if (pipelineResult && !onOverview) {
-        const t = pipelineResult.input_text;
-        info.textContent = `${pipelineResult.model} · "${t.length > 48 ? t.slice(0, 48) + "…" : t}"`;
-        info.title = t;
+        info.textContent = `${pipelineResult.model} · ${inputSummary(pipelineResult)}`;
+        info.title = info.textContent;
     } else {
         info.textContent = "";
         info.title = "";
@@ -188,12 +227,13 @@ function startAfterInference() {
 
 // Called by the overview form. Runs the real pipeline + deep-dive, resets
 // per-run progress, then zooms to the flowchart. Resolves to { ok, error }.
-window.onRunRequested = async (model, text) => {
-    const r = await runPipeline(model, text, "");
+window.onRunRequested = async (model, input) => {
+    const r = await runPipeline(model, input, "");
     if (!r.ok) return r;
-    ckksDeepDiveResult = await fetchCkksDeepDive(model, text);
+    ckksDeepDiveResult = await fetchCkksDeepDive(model, input);
     doneChapters = new Set();
     stepIndices = {};
+    proofs = {};
     lastVisited = -1;
     startAfterInference();
     return r;

@@ -140,15 +140,22 @@ def rotate(ct, steps, galois_keys):
     return c0 & _MASK, out1 & _MASK
 
 
+def _str(poly):
+    """Centered coefficients as decimal strings: they reach 2**59, past JS's 2**53 safe-int range."""
+    return [str(v) for v in centered(poly).tolist()]
+
+
 def _ct_json(ct):
-    return {"c0": centered(ct[0]).tolist(), "c1": centered(ct[1]).tolist()}
+    return {"c0": _str(ct[0]), "c1": _str(ct[1])}
 
 
 def run_full_deep_dive(x, w, b):
     """Encrypted linear score w.x + b: encode -> keygen -> encrypt -> evaluate -> decrypt -> decode.
-    Returns every intermediate polynomial (full N-length, centered) for visualisation."""
+    Returns every intermediate polynomial (full N-length, centered, as strings) for visualisation.
+    Encode/encrypt/multiply are shown for one chunk: the one holding the most non-zero x values."""
     x, w, b = np.asarray(x, dtype=float), np.asarray(w, dtype=float), float(b)
     n_chunks = max(1, -(-len(x) // SLOTS))
+    shown = int(np.argmax([np.count_nonzero(x[c * SLOTS:(c + 1) * SLOTS]) for c in range(n_chunks)]))
     s, pk, e = keygen()
     galois_keys = gen_galois_keys(s)
 
@@ -157,41 +164,40 @@ def run_full_deep_dive(x, w, b):
         m, w_pt = encode(x[chunk]), encode(w[chunk])
         ct, u, e1, e2 = encrypt(m, pk)
         prod = mul_plain(ct, w_pt)                      # scale Delta^2, slot i = x_i * w_i
-        if c == 0:
+        if c == shown:
             first = {"m": m, "w": w_pt, "ct": ct, "u": u, "e1": e1, "e2": e2, "prod": prod}
-            acc = prod
-        else:
-            acc = add(acc, prod)
+        acc = prod if c == 0 else add(acc, prod)
     chunk_sum = acc
 
     rotations = []
     for step in ROTATION_STEPS:                         # after all 7 rounds every slot holds the full sum
         acc = add(acc, rotate(acc, step, galois_keys))
-        rotations.append({"step": step, **_ct_json(acc)})
+        rotations.append({"step": step, "galois": pow(5, step, 2 * N), **_ct_json(acc)})
 
     # Bias goes into every slot (a constant polynomial b*Delta^2), matching the Delta^2 scale.
-    result_ct = add_plain(acc, encode(np.full(SLOTS, b), SCALE ** 2))
+    bias_pt = encode(np.full(SLOTS, b), SCALE ** 2)
+    result_ct = add_plain(acc, bias_pt)
     m_prime = decrypt(result_ct, s)
     slots = decode(m_prime, SCALE ** 2)
     score = float(slots[0])
     plaintext_score = float(np.dot(w, x) + b)
 
     return {
-        "params": {"N": N, "Q": Q, "scale": SCALE, "slots": SLOTS, "n_chunks": n_chunks,
-                   "decomposition_base": 2 ** BASE_BITS},
+        "params": {"N": N, "Q": str(Q), "scale": SCALE, "slots": SLOTS, "n_chunks": n_chunks,
+                   "shown_chunk": shown, "decomposition_base": 2 ** BASE_BITS, "digits": DIGITS},
         "original_vector": x.tolist(),
         "weights": w.tolist(),
         "bias": b,
-        "encode": {"m_coeffs": centered(first["m"]).tolist(), "w_coeffs": centered(first["w"]).tolist()},
-        "keygen": {"secret_key_s": centered(s).tolist(), "error_e": centered(e).tolist(),
-                   "public_key_b": centered(pk[0]).tolist(), "public_key_a": centered(pk[1]).tolist()},
-        "encrypt": {"ephemeral_u": centered(first["u"]).tolist(), "error_e1": centered(first["e1"]).tolist(),
-                    "error_e2": centered(first["e2"]).tolist(), **_ct_json(first["ct"])},
+        "encode": {"m_coeffs": _str(first["m"]), "w_coeffs": _str(first["w"])},
+        "keygen": {"secret_key_s": _str(s), "error_e": _str(e),
+                   "public_key_b": _str(pk[0]), "public_key_a": _str(pk[1])},
+        "encrypt": {"ephemeral_u": _str(first["u"]), "error_e1": _str(first["e1"]),
+                    "error_e2": _str(first["e2"]), **_ct_json(first["ct"])},
         "evaluate": {"mul_plain": _ct_json(first["prod"]), "chunk_sum": _ct_json(chunk_sum),
-                     "rotations": rotations, "add_bias": _ct_json(result_ct)},
-        "decrypt": {"m_prime": centered(m_prime).tolist(),
-                    # fresh decrypt of chunk 0's original ciphertext (pre-evaluation), first 8 slots
-                    "recovered_vector": decode(decrypt(first["ct"], s))[:8].tolist()},
+                     "rotations": rotations, "bias_pt": _str(bias_pt), "add_bias": _ct_json(result_ct)},
+        "decrypt": {"m_prime": _str(m_prime),
+                    # fresh decrypt of the shown chunk's ciphertext (before evaluation), all slots
+                    "recovered_vector": decode(decrypt(first["ct"], s)).tolist()},
         "decode": {"slots": slots[:8].tolist(), "score": score, "plaintext_score": plaintext_score,
                    "abs_error": abs(score - plaintext_score)},
     }

@@ -1,0 +1,28 @@
+/* Symptom input panel (interface/static/js/symptom_input.js) and the
+   Feature chapter's symptom flags (scene_renderers.js). */
+.sym-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 0.5rem; }
+.sym-bar .input-text { margin-top: 0; flex: 1; padding: 0.45rem 0.6rem; }
+.sym-count { font-family: var(--font-mono); font-size: 12px; color: var(--color-warning); white-space: nowrap; }
+.sym-chips { display: flex; flex-wrap: wrap; gap: 5px; max-height: 260px; overflow-y: auto; }
+.sym-chip {
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-family: var(--font-base);
+    cursor: pointer;
+}
+.sym-chip[aria-pressed="true"] { color: var(--color-bg); background: var(--color-warning); border-color: var(--color-warning); }
+
+.sym-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0.5rem; }
+.sym-flag {
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    font-size: 11px;
+    color: var(--color-text-muted);
+    opacity: 0.55;
+}
+.sym-flag.on { opacity: 1; color: var(--color-bg); background: var(--color-warning); border-color: var(--color-warning); }

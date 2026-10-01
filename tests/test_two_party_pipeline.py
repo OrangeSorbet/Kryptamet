@@ -8,7 +8,7 @@ import pandas as pd
 from data.features import text_stylometric
 from data.loaders import symptom_diagnosis
 from hecrypto.ckks_context import create_context
-from inference.he_infer import run_two_party_pipeline
+from inference.he_infer import TERM_STEPS, run_two_party_pipeline
 
 HUMAN_FEATURES = ["word_count", "char_count", "avg_word_length", "sentence_count", "avg_sentence_length",
                   "lexical_diversity", "punctuation_ratio", "uppercase_ratio"]
@@ -19,7 +19,7 @@ TAIL_ORDER = ["zero_terms", "add_bias", "leg2_session_key", "leg2_wrap", "leg2_u
 PARTY = {"ckks_keygen": "server", "rsa_keygen_server": "server", "rsa_keygen_client": "client",
          "passphrase": "server", "pbkdf2": "server", "load_plaintext": "server", "ckks_encrypt": "server",
          "leg1_wrap": "server", "leg1_unwrap": "client", "compute_overview": "client",
-         "compute_general_form": "client", "weight_multiply": "client", "zero_terms": "client",
+         "compute_general_form": "client", "weight_multiply": "client", "smaller_terms": "client", "zero_terms": "client",
          "add_bias": "client", "leg2_session_key": "client", "leg2_wrap": "client", "leg2_unwrap": "server",
          "ckks_decrypt": "server"}
 
@@ -38,7 +38,15 @@ def _check(label, model, x, feature_names, class_names, passphrase=None):
     ev = r["events"]
     ops = [e["operation_name"] for e in ev]
     n_terms = int(np.count_nonzero(x))
-    assert ops == KEYS_ORDER + ["weight_multiply"] * n_terms + TAIL_ORDER, ops
+    shown = min(n_terms, TERM_STEPS)
+    assert ops == KEYS_ORDER + ["weight_multiply"] * shown + ["smaller_terms"] * (n_terms > shown) + TAIL_ORDER, ops
+    terms = [e for e in ev if e["operation_name"] == "weight_multiply"]
+    sizes = [abs(e["data_after"]["product"]) for e in terms]
+    assert sizes == sorted(sizes, reverse=True), "terms must come largest first"
+    rest = [e for e in ev if e["operation_name"] == "smaller_terms"]
+    if rest:
+        t = rest[0]["data_after"]
+        assert t["count"] == n_terms - shown == len(t["terms"]) and max(abs(u["product"]) for u in t["terms"]) <= sizes[-1]
     assert all(e["party"] == PARTY[e["operation_name"]] for e in ev)
     assert all(e["description"] and e["why"] and e["next_step"] and e["formal"] for e in ev)
     by = {e["operation_name"]: e for e in ev}
@@ -108,6 +116,10 @@ def main():
     x = X_test[0].astype(float)
     assert len(feature_names) == len(x) and len(class_names) == sd["model"].coef_.shape[0]
     _check("symptom_diagnosis", sd["model"], x, feature_names, class_names)
+
+    # More than TERM_STEPS non-zero inputs: the rest collapse into one smaller_terms event.
+    x = np.where(X_test[1] > 0, 1.0, 0.0) if np.count_nonzero(X_test[1]) > TERM_STEPS else np.ones(len(feature_names))
+    _check("symptom_diagnosis (dense)", sd["model"], x, feature_names, class_names)
     print("ALL PASS")
 
 

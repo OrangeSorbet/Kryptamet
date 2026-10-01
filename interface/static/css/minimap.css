@@ -1,6 +1,7 @@
 /* Chapter-dot minimap pill (interface/static/js/minimap.js), top-center
    under the navbar. Only the active chapter shows its label. */
 #minimapContainer.chapter-minimap {
+    display: flex; /* shown/hidden with the hidden attribute (chapter_state.js) */
     position: absolute;
     top: 78px;
     left: 50%;

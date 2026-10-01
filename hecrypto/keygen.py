@@ -18,4 +18,4 @@ def generate_keys(secret_key_path, public_key_path, poly_modulus_degree=8192, co
 
 
 if __name__ == "__main__":
-    generate_keys("crypto/keys/secret.ctx", "crypto/keys/public.ctx")
+    generate_keys("hecrypto/keys/secret.ctx", "hecrypto/keys/public.ctx")

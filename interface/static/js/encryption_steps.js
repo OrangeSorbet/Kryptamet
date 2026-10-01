@@ -91,19 +91,22 @@ function buildEncryptionSteps(result) {
             next: "Next: every slot is scaled up to a large integer range.",
             renderVisual: (el) => {
                 const nz = new Set(x.map((v, i) => (v !== 0 ? i : -1)).filter((i) => i >= 0));
+                // Dense x (every value non-zero): marking non-zeros would light every slot, so mark copy 1 instead.
+                const dense = nz.size === d;
+                const hot = (i, copy) => (dense ? copy === 0 : nz.has(i));
                 const cells = [];
                 for (let j = 0; j < sp.slots; j++) {
                     const i = j % d, copy = Math.floor(j / d);
-                    cells.push(`<span class="enc-slot${copy % 2 ? " odd" : ""}${nz.has(i) ? " nz" : ""}" data-copy="${copy}" title="slot ${j} = x[${i}] (${escapeHtml(featName(i))}) = ${fmt(x[i])}, copy ${copy + 1}"></span>`);
+                    cells.push(`<span class="enc-slot${copy % 2 ? " odd" : ""}${hot(i, copy) ? " nz" : ""}" data-copy="${copy}" title="slot ${j} = x[${i}] (${escapeHtml(featName(i))}) = ${fmt(x[i])}, copy ${copy + 1}"></span>`);
                 }
                 el.innerHTML = `${title(`Slot packing: ${sp.slots} slots`)}
                     <div class="scene-body">
-                        <div class="vector-caption">One square per slot, 64 per row. Shades alternate per copy of x; bright squares hold a non-zero value (hover for which). ${renderChecks([
+                        <div class="vector-caption">One square per slot, 64 per row. Shades alternate per copy of x; ${dense ? `all ${d} values are non-zero, so the bright squares mark copy 1, x itself` : `bright squares hold one of the ${nz.size} non-zero values`} (hover any square for its value). ${renderChecks([
                             { label: `${sp.replication.full_copies} full copies + ${sp.replication.partial_copy_len} = ${sp.slots}`, ok: packing.copiesOk },
                             { label: "first 16 slots = x[0..15]", ok: packing.first16Ok },
                         ])}</div>
                         <div class="enc-slots">${cells.join("")}</div>
-                        <div class="ks-legend"><span class="enc-key-even">copy 1, 3, …</span><span class="enc-key-odd">copy 2, 4, …</span><span class="enc-key-nz">non-zero x_i</span></div>
+                        <div class="ks-legend"><span class="enc-key-even">copy 1, 3, …</span><span class="enc-key-odd">copy 2, 4, …</span><span class="enc-key-nz">${dense ? "copy 1 (= x)" : "non-zero x_i"}</span></div>
                     </div>`;
                 const slotEls = [...el.querySelectorAll(".enc-slot")];
                 if (ksSkip()) { slotEls.forEach((s) => s.classList.add("on")); return undefined; }

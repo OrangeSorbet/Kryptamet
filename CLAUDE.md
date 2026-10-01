@@ -8,15 +8,16 @@ Homomorphic encryption (CKKS via TenSEAL) pipeline for privacy-preserving ML inf
 transported using an RSA+AES hybrid scheme. Models (logistic regression, small CNN) are trained on plaintext
 data, then benchmarked for encrypted-inference cost across datasets (MNIST, SMS spam, symptom-diagnosis,
 German Credit, price data, human-vs-AI text). A Flask app (`interface/app.py`) drives a teaching UI at `/live`
-that walks through the entire pipeline with real data (feature extraction → keygen → encrypt → compute →
-transport → decrypt → result → benchmarks), including a second, independent educational CKKS implementation
-(`crypto_teaching/real_ckks.py`) that exposes real polynomial/ciphertext internals TenSEAL hides.
+that walks through the entire pipeline with real data (feature extraction → keygen → encrypt → transport to
+the compute node → compute → transport back → decrypt → result → benchmarks), including a second, independent educational CKKS implementation
+(`hecrypto/ckks_math.py`) that exposes real polynomial/ciphertext internals TenSEAL hides.
 
 **Read `docs/ARCHITECTURE.md` first** — full reference doc covering every module, the `/live` UI's structure,
 and how they fit together. Don't re-derive this from scratch by reading files one at a time; the doc is
 current and detailed. `docs/checklist.md` is the roadmap/phase tracker (what's done vs. pending). `docs/rules.md`
 holds hard project rules (see below). `docs/logs.md` is an append-only log of setup/build steps — log actions
-there per the rules.
+there per the rules. `docs/LIVE_UI_TRUTH.md` lists, per `/live` chapter, where every value comes from and
+what the browser re-checks (and the honest limits) — keep it in sync when a chapter changes.
 
 The `/live` UI's interaction model (flowchart of chapter boxes → dolly-zoom into a chapter → a Scrubber with
 play/pause/step controls and a 4-cell what/why/formal/next explanation grid → draggable step slider) is
@@ -76,7 +77,7 @@ Full module-by-module reference lives in **`docs/ARCHITECTURE.md`** — read it 
 from scratch. Quick orientation: `hecrypto/` (all crypto, isolated per rule above), `data/loaders/` +
 `data/features/` (per-dataset loading + feature extraction), `models/train/` (one script per dataset+model
 pair), `inference/` (runs models against encrypted input, records real event traces with why/formal/next
-explanation text), `crypto_teaching/real_ckks.py` (from-scratch CKKS implementation for showing real algorithm
+explanation text), `hecrypto/ckks_math.py` (from-scratch CKKS implementation for showing real algorithm
 internals TenSEAL hides), `interface/` (Flask app + the `/live` teaching UI, see ARCHITECTURE.md's UI
 architecture section for every JS file's role), `benchmarks/metrics.py` (plaintext vs. HE cost per model).
 

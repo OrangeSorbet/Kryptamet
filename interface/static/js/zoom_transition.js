@@ -15,7 +15,7 @@ function zoomUnits({ fromEl, toEl, origin, direction, buildTo, onDone }) {
     zoomInFlight = true;
     toEl.style.transition = "none";
     toEl.style.opacity = "0";
-    toEl.style.display = "block";
+    toEl.hidden = false;
     if (buildTo) buildTo(toEl);
 
     const originStr = `${origin.x}px ${origin.y}px`;
@@ -44,7 +44,7 @@ function zoomUnits({ fromEl, toEl, origin, direction, buildTo, onDone }) {
     });
 
     setTimeout(() => {
-        fromEl.style.display = "none";
+        fromEl.hidden = true;
         fromEl.style.zIndex = "";
         toEl.style.zIndex = "";
         // A lingering filter/transform would make this layer the containing

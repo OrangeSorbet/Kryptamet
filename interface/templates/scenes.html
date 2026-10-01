@@ -12,15 +12,20 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/live_pipeline_input.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/overview.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tabular_input.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/symptom_input.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/digit_canvas.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/flowchart.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/chapter_visuals.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/poly_grid.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/grid_controls.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/byte_matrix.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pbkdf2_graph.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/sub_zoom.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/key_setup.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/transport.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/encryption.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/computation.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/scrubber.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/speed_dial.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/minimap.css') }}">
@@ -40,23 +45,23 @@
         </div>
         <div class="navbar-run-info" id="navbarRunInfo"></div>
         <div class="navbar-controls">
-            <button id="flowchartHelpBtn" class="navbar-btn navbar-icon-btn" type="button" title="How to use this walkthrough" style="display:none">?</button>
-            <button id="newInputBtn" class="navbar-btn" type="button" style="display:none">New input</button>
+            <button id="flowchartHelpBtn" class="navbar-btn navbar-icon-btn" type="button" title="How to use this walkthrough" hidden>?</button>
+            <button id="newInputBtn" class="navbar-btn" type="button" hidden>New input</button>
         </div>
     </nav>
     <div class="scene-container">
-        <div class="zoom-unit" id="flowchartUnit" style="display:none">
+        <div class="zoom-unit" id="flowchartUnit" hidden>
             <div class="scene active flowchart-scene" id="flowchartContainer"></div>
         </div>
         <div class="zoom-unit" id="chapterUnit">
             <div class="scene active" id="sceneContent"></div>
         </div>
         <div class="chapter-chrome">
-            <button id="backToFlowchartBtn" class="chrome-btn" type="button" title="Back to chapters (Esc)" style="display:none">&larr; Chapters</button>
-            <button id="chapterHelpBtn" class="chrome-btn chrome-icon-btn" type="button" title="What is this chapter? (theory primer)" style="display:none">?</button>
+            <button id="backToFlowchartBtn" class="chrome-btn" type="button" title="Back to chapters (Esc)" hidden>&larr; Chapters</button>
+            <button id="chapterHelpBtn" class="chrome-btn chrome-icon-btn" type="button" title="What is this chapter? (theory primer)" hidden>?</button>
         </div>
-        <div id="minimapContainer" style="display:none"></div>
-        <div id="scrubberDock" class="scrubber-dock" style="display:none"></div>
+        <div id="minimapContainer" hidden></div>
+        <div id="scrubberDock" class="scrubber-dock" hidden></div>
     </div>
 
     <script>window.BENCHMARKS = {{ benchmarks|tojson }};</script>
@@ -65,6 +70,7 @@
     <script src="{{ url_for('static', filename='js/glossary.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pipeline_api.js') }}"></script>
     <script src="{{ url_for('static', filename='js/poly_grid.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/grid_controls.js') }}"></script>
     <script src="{{ url_for('static', filename='js/zoom_transition.js') }}"></script>
     <script src="{{ url_for('static', filename='js/step_slider.js') }}"></script>
     <script src="{{ url_for('static', filename='js/speed_dial.js') }}"></script>
@@ -72,6 +78,11 @@
     <script src="{{ url_for('static', filename='js/minimap.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chapter_intros.js') }}"></script>
     <script src="{{ url_for('static', filename='js/intro_card.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/text_input.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tabular_input.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/symptom_input.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/digit_canvas.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/overview_form.js') }}"></script>
     <script src="{{ url_for('static', filename='js/flowchart.js') }}"></script>
     <script src="{{ url_for('static', filename='js/scene_renderers.js') }}"></script>
     <script src="{{ url_for('static', filename='js/byte_matrix.js') }}"></script>
@@ -83,6 +94,9 @@
     <script src="{{ url_for('static', filename='js/transport_steps.js') }}"></script>
     <script src="{{ url_for('static', filename='js/encrypt_check.js') }}"></script>
     <script src="{{ url_for('static', filename='js/encryption_steps.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/deep_dive_check.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/deep_dive_steps.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/computation_steps.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chapter_registry.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chapter_state.js') }}"></script>
     <script>initChapterState();</script>

@@ -25,7 +25,9 @@ const CHAPTERS = [
       buildSteps: (result) => buildFeatureSteps(result),
       summary: (result) => (result.model === "sms_spam"
           ? `${result.feature_dim.toLocaleString()}-dim TF-IDF vector`
-          : `${result.feature_dim.toLocaleString()} ${result.model === "human_vs_ai_text" ? "stylometric " : ""}features`) },
+          : result.input_kind === "image" ? "784 pixels, scaled to 0..1"
+          : result.input_kind === "symptoms" ? `${result.x.filter((v) => v === 1).length} of ${result.feature_dim} symptom flags set`
+          : `${result.feature_dim.toLocaleString()} ${result.model === "human_vs_ai_text" ? "stylometric " : result.input_kind === "tabular" ? "standardized " : ""}features`) },
     { id: "key", label: "Key Setup", requiresResult: true,
       buildSteps: (result) => buildKeySteps(result),
       summary: (result) => `CKKS N=${result.ckks_params.poly_modulus_degree} · 2× RSA-${findEvent(result, "rsa_keygen_server").data_after.key_size} · PBKDF2 ${findEvent(result, "pbkdf2").data_after.iterations.toLocaleString()}×` },
@@ -33,15 +35,15 @@ const CHAPTERS = [
       buildSteps: (result) => buildEncryptionSteps(result),
       summary: (result) => `→ ${formatBytes(findEvent(result, "ckks_encrypt").data_after.serialization.size_bytes)} ciphertext` },
     { id: "deepdive", label: "CKKS Deep-Dive", requiresResult: true, requiresDeepDive: true,
-      buildSteps: (result, deepDive) => buildDeepDiveSteps(deepDive),
-      summary: (result, deepDive) => `${deepDive.original_vector.length} values · N=${deepDive.encode.m_coeffs.length} ring` },
+      buildSteps: (result, deepDive) => buildDeepDiveSteps(deepDive, result),
+      summary: (result, deepDive) => `N=${deepDive.params.N} · encrypted w·x+b · off by ${Math.abs(deepDive.decode.score - deepDive.decode.plaintext_score).toExponential(1)}` },
     { id: "transport_out", label: "Transport → client", requiresResult: true,
       buildSteps: (result) => buildTransportSteps(result, "leg1"),
       summary: (result) => transportSummary(result, "leg1") },
     { id: "compute", label: "Computation", requiresResult: true,
       buildSteps: (result) => buildComputationSteps(result),
       stepBands: (result) => buildComputationBands(result),
-      summary: (result) => `Enc(x)·Wᵀ + b · ${result.events.filter((e) => e.operation_name === "weight_multiply").length} non-zero terms` },
+      summary: (result) => `Enc(x)·Wᵀ + b · ${findEvent(result, "load_plaintext").data_after.nonzero_count} non-zero terms` },
     { id: "transport_back", label: "Transport ← server", requiresResult: true,
       buildSteps: (result) => buildTransportSteps(result, "leg2"),
       summary: (result) => transportSummary(result, "leg2") },

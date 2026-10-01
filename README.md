@@ -78,7 +78,9 @@ SERVER (data owner)                                   CLIENT (compute node)
   - **Benchmarks:** plaintext vs encrypted time, memory and agreement per model.
 - **Proof, not decoration.** Every tracer is checked against a real library (hashlib, `cryptography`, SEAL)
   and fails loudly on a mismatch. The browser independently re-checks key values: WebCrypto re-derives the
-  PBKDF2 key, SHA-256 hashes are recomputed, and RSA's n = p·q and e·d ≡ 1 are checked with BigInt.
+  PBKDF2 key, SHA-256 hashes are recomputed, and RSA's n = p·q and e·d ≡ 1 are checked with BigInt. AES-GCM,
+  the RSA-OAEP envelope, the CKKS encoding and every deep-dive polynomial are recomputed too. Each check shows as
+  ✓/✕, and every chapter box on the flowchart counts the checks that ran (see `docs/LIVE_UI_TRUTH.md`).
 - **Your passphrase or a random one.** Lock the transport key with your own passphrase, or let Kryptamet
   generate one; either way you see exactly how the key was derived.
 

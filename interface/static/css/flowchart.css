@@ -145,3 +145,7 @@
     .flowchart-scene { padding: 4.25rem 0.75rem 0.75rem; }
     .fc-header .scene-title { font-size: 1.35rem; }
 }
+
+/* Proof badge: browser checks run in this chapter (flowchart.js proofBadge) */
+.fc-proof.ok { color: var(--color-success); }
+.fc-proof.bad { color: var(--color-error); font-weight: var(--font-weight-bold); }

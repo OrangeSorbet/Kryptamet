@@ -8,13 +8,15 @@ from hecrypto.ckks_context import serialize_context, context_from_bytes, ckks_pa
 from hecrypto.encrypt import encrypt_vector
 from hecrypto.decrypt import decrypt_vector, deserialize_and_decrypt, deserialize_encrypted
 from hecrypto.evaluate import encrypted_linear_scores
-from hecrypto.transport import (generate_rsa_keypair, wrap_payload_traced, unwrap_payload, unwrap_payload_traced,
+from hecrypto.transport import (generate_rsa_keypair, wrap_payload_traced, unwrap_payload_traced,
                                 derive_key_from_passphrase, new_aes_key, new_salt, new_passphrase, tamper_test)
 from hecrypto.pbkdf2_trace import trace_pbkdf2
 from hecrypto.rsa_trace import trace_rsa_keypair
 from hecrypto.aes_trace import trace_aes_gcm
 from hecrypto.ckks_encode_trace import trace_ckks_encryption
 from inference.pipeline_events import PipelineRecorder
+
+TERM_STEPS = 20  # non-zero terms shown one per step in the Computation chapter; the rest are summed in one
 
 
 def encrypted_linear_score(context, x_plain, weights, bias):
@@ -29,75 +31,6 @@ def encrypted_linear_score(context, x_plain, weights, bias):
 
 def sigmoid(z):
     return 1.0 / (1.0 + np.exp(-z))
-
-
-def run_traced_inference(context, x_plain, weights, bias):
-    """Runs the full HE pipeline for a single linear-model prediction, returning
-    every intermediate artifact so the UI can display and explain each stage.
-    """
-    plaintext_input = list(np.asarray(x_plain, dtype=float))
-
-    encrypted_x = encrypt_vector(context, plaintext_input)
-    serialized_input_bytes = encrypted_x.serialize()
-
-    encrypted_weighted = encrypted_x * list(weights)
-    encrypted_sum = encrypted_weighted.sum()
-    encrypted_result = encrypted_sum + float(bias)
-    serialized_output_bytes = encrypted_result.serialize()
-
-    decrypted = decrypt_vector(encrypted_result)
-    raw_score = float(decrypted[0])
-
-    return {
-        "plaintext_input": plaintext_input,
-        "plaintext_input_dim": len(plaintext_input),
-        "ciphertext_input_bytes": serialized_input_bytes,
-        "ciphertext_input_hex_preview": serialized_input_bytes[:64].hex(),
-        "ciphertext_input_size": len(serialized_input_bytes),
-        "weights": list(weights),
-        "bias": float(bias),
-        "ciphertext_output_bytes": serialized_output_bytes,
-        "ciphertext_output_hex_preview": serialized_output_bytes[:64].hex(),
-        "ciphertext_output_size": len(serialized_output_bytes),
-        "raw_score": raw_score,
-        "sigmoid_score": sigmoid(raw_score),
-    }
-
-
-def run_full_traced_pipeline(context, x_plain, weights, bias):
-    """Full end-to-end trace: CKKS encrypt -> RSA+AES transport wrap -> unwrap ->
-    CKKS decrypt. Every stage's artifacts are returned for UI display.
-    """
-    he_trace = run_traced_inference(context, x_plain, weights, bias)
-
-    rsa_private_key, rsa_public_key = generate_rsa_keypair()
-
-    wrapped_input = wrap_payload_traced(rsa_public_key, he_trace["ciphertext_input_bytes"])
-    unwrapped_input = unwrap_payload(rsa_private_key, wrapped_input)
-    input_transport_intact = unwrapped_input == he_trace["ciphertext_input_bytes"]
-
-    wrapped_output = wrap_payload_traced(rsa_public_key, he_trace["ciphertext_output_bytes"])
-    unwrapped_output = unwrap_payload(rsa_private_key, wrapped_output)
-    output_transport_intact = unwrapped_output == he_trace["ciphertext_output_bytes"]
-
-    final_decrypted = deserialize_and_decrypt(context, unwrapped_output)
-
-    return {
-        **he_trace,
-        "transport_input": {
-            "aes_ciphertext_size": wrapped_input["aes_ciphertext_size"],
-            "tag_hex": wrapped_input["tag_hex"],
-            "encrypted_aes_key_size": wrapped_input["encrypted_aes_key_size"],
-            "integrity_preserved": input_transport_intact,
-        },
-        "transport_output": {
-            "aes_ciphertext_size": wrapped_output["aes_ciphertext_size"],
-            "tag_hex": wrapped_output["tag_hex"],
-            "encrypted_aes_key_size": wrapped_output["encrypted_aes_key_size"],
-            "integrity_preserved": output_transport_intact,
-        },
-        "final_decrypted_score": float(final_decrypted[0]),
-    }
 
 
 def _sha256(data):
@@ -376,18 +309,22 @@ def run_two_party_pipeline(context, x, W, b, *, feature_names, x_captions, class
     which = (f"the model's single row (positive pushes toward '{class_names[1]}', negative toward "
              f"'{class_names[0]}')" if binary else
              f"the '{toward}' row, the highest score in the plaintext mirror x·Wᵀ+b")
+    # Largest contributions first. The top TERM_STEPS get one event each; the rest are summed in one
+    # event that still carries every (index, weight, input), so the browser can re-add them.
+    order = sorted((int(i) for i in nz), key=lambda i: -abs(w_row[i] * x[i]))
+    shown, rest = order[:TERM_STEPS], order[TERM_STEPS:]
+    zero_note = f"The other {d - len(nz)} features are 0 and add nothing."
     running = 0.0
-    for pos, i in enumerate(nz):
-        i = int(i)
+    for pos, i in enumerate(shown):
         w, xi = float(w_row[i]), float(x[i])
         product = w * xi
         running += product
         name = feature_names[i]
-        nxt = (f"Next term: '{feature_names[int(nz[pos + 1])]}'." if pos + 1 < len(nz)
-               else f"The other {d - len(nz)} features are 0 and add nothing.")
+        nxt = (f"Next term: '{feature_names[shown[pos + 1]]}' (the next-largest contribution)." if pos + 1 < len(shown)
+               else f"Next: the other {len(rest)} smaller non-zero terms, summed in one step." if rest else zero_note)
         rec.emit("compute", "weight_multiply",
-                 f"[plaintext mirror] W[{row},{i}] ('{name}') {w:+.4f} x {xi:.4g} = {product:+.4f}; "
-                 f"running sum {running:+.4f}",
+                 f"[plaintext mirror] term {pos + 1} of {len(nz)} by size: W[{row},{i}] ('{name}') {w:+.4f} x "
+                 f"{xi:.4g} = {product:+.4f}; running sum {running:+.4f}",
                  data_before={"index": i, "name": name, "weight": w, "input": xi},
                  data_after={"product": product, "running_sum": running},
                  why=f"Teaching mirror of {which}; the client never sees x. '{name}' has weight {w:+.4f} "
@@ -402,6 +339,22 @@ def run_two_party_pipeline(context, x, W, b, *, feature_names, x_captions, class
             "input": x_captions[i],
             "product": f"adds {product:+.4f} {direction(product)}",
         }
+
+    if rest:
+        terms = [{"index": i, "name": feature_names[i], "weight": float(w_row[i]), "input": float(x[i]),
+                  "product": float(w_row[i] * x[i])} for i in rest]
+        rest_sum = float(sum(t["product"] for t in terms))
+        running += rest_sum
+        big = terms[0]
+        rec.emit("compute", "smaller_terms",
+                 f"[plaintext mirror] the other {len(rest)} non-zero terms add {rest_sum:+.4f} together; "
+                 f"running sum {running:+.4f}",
+                 data_after={"count": len(rest), "terms": terms, "sum": rest_sum, "running_sum": running},
+                 why=f"Each of these is smaller than the {TERM_STEPS} terms above: the largest, '{big['name']}', "
+                     f"adds {big['product']:+.4f}. Together they shift the score {direction(rest_sum)}.",
+                 next_step=zero_note,
+                 formal=f"s_{row} += Σ_(the other {len(rest)} non-zero i) W[{row},i]·x_i = {rest_sum:+.4f}",
+                 party="client")
 
     zero_idx = np.flatnonzero(x == 0)
     top_zero = sorted(zero_idx.tolist(), key=lambda i: -abs(w_row[i]))[:5]

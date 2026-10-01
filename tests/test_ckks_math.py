@@ -73,7 +73,8 @@ def _check_deep_dive(label, x, w, b, expected, tol=5e-3):
     assert abs(d["plaintext_score"] - expected) < 1e-6
     assert len(r["evaluate"]["rotations"]) == 7
     assert all(len(p) == C.N for p in (r["encrypt"]["c0"], r["keygen"]["secret_key_s"], r["decrypt"]["m_prime"]))
-    assert len(r["decrypt"]["recovered_vector"]) == 8
+    assert len(r["decrypt"]["recovered_vector"]) == C.SLOTS
+    assert all(isinstance(v, str) for v in r["encrypt"]["c0"])  # exact past 2**53
     print(f"PASS: {label}: score {d['score']:.6f} vs plaintext {expected:.6f}, "
           f"abs err {abs(d['score'] - expected):.2e}, {dt * 1000:.0f} ms, {r['params']['n_chunks']} chunk(s)")
 

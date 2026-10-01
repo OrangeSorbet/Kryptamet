@@ -1,0 +1,52 @@
+/* Computation chapter (interface/static/js/computation_steps.js). */
+
+/* Overview: what the client has and never has */
+.cmp-parties { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 0.75rem 0; }
+.cmp-party {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    font-size: 13px;
+    color: var(--color-text);
+}
+.cmp-party-name { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--color-text-muted); }
+
+/* One term: w × x = w·x, each value with its meaning faded underneath */
+.cmp-term {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 0.5rem 0 0.75rem;
+}
+.cmp-val { display: flex; flex-direction: column; align-items: center; max-width: 220px; text-align: center; }
+.cmp-val > span:first-child { font-family: var(--font-mono); font-size: 26px; color: var(--color-text); }
+.cmp-val.cmp-strong > span:first-child { color: var(--color-warning); }
+.value-caption { margin-top: 4px; font-size: 11.5px; line-height: 1.35; color: var(--color-text-muted); opacity: 0.75; }
+.cmp-op { font-family: var(--font-mono); font-size: 22px; color: var(--color-text-muted); padding-top: 4px; }
+
+/* Smaller terms table: scrolls after ~10 rows */
+.cmp-rest { max-height: 250px; overflow-y: auto; }
+
+/* Waterfall of the running score */
+.cmp-waterfall { width: 100%; max-width: 640px; display: block; margin: 0.25rem auto 0; }
+.cmp-label { fill: var(--color-text-muted); font-family: var(--font-mono); font-size: 10.5px; }
+.cmp-value { fill: var(--color-text-muted); font-family: var(--font-mono); font-size: 10.5px; }
+.cmp-pos { fill: var(--color-primary); }
+.cmp-neg { fill: var(--color-error); }
+.cmp-bias { fill: var(--color-text-muted); }
+.cmp-zero { stroke: var(--color-border); stroke-dasharray: 3 3; }
+.cmp-row.cmp-future { opacity: 0.25; }
+.cmp-row.cmp-cur .cmp-label, .cmp-row.cmp-cur .cmp-value { fill: var(--color-warning); }
+.cmp-row.cmp-cur rect { stroke: var(--color-warning); stroke-width: 1.5; }
+
+@media (max-width: 640px) {
+    .cmp-val > span:first-child { font-size: 20px; }
+    .cmp-term { flex-direction: column; align-items: center; gap: 2px; }
+    .cmp-op { padding-top: 0; font-size: 18px; }
+}

@@ -5,7 +5,7 @@
 // (sha256_check.js), and the final key is re-derived with WebCrypto.
 // Components: byte_matrix.js, pbkdf2_graph.js, sub_zoom.js.
 const ksShort = (hex, n = 8) => (String(hex).length > n * 2 + 2 ? `${String(hex).slice(0, n * 2)}…` : String(hex));
-const ksSpeedMs = (ms) => ms * Math.pow(0.8, (window.gridRevealSpeed || 5) - 1);
+const ksSpeedMs = (ms) => ms * Math.pow(0.8, (window.stepSpeed || 5) - 1);
 const ksPause = (ms) => new Promise((r) => setTimeout(r, ksSpeedMs(ms)));
 const ksBadge = (ok, yes, no) => `<span class="${ok ? "badge-match" : "badge-mismatch"}">${ok ? "✓" : "✕"} ${escapeHtml(ok ? yes : no)}</span>`;
 const ksRevealClass = () => (window.sceneAlreadyVisited ? "ks-reveal ks-instant" : "ks-reveal");
@@ -206,7 +206,7 @@ function buildKeySteps(result) {
             randBtn.disabled = true;
             status.className = "overview-status";
             status.textContent = msg;
-            const r = await runPipeline(result.model, result.input_text, value);
+            const r = await runPipeline(result.model, result.input, value);
             lockBtn.disabled = false;
             randBtn.disabled = false;
             if (!r.ok) { status.className = "overview-status error"; status.textContent = r.error; return; }

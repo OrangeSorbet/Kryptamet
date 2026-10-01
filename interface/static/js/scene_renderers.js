@@ -6,81 +6,7 @@
 // static text authored here once per step type. renderVisual may return a
 // Promise (poly-grid reveals) -- the Scrubber's autoplay waits for it.
 
-// --- Overview (entry form) ------------------------------------------------
-// Suggested inputs only -- the model's real prediction for each is whatever
-// the run produces.
-const EXAMPLE_INPUTS = {
-    human_vs_ai_text: [
-        "honestly no idea why the bus was so late today, ended up walking half the way lol",
-        "Artificial intelligence represents a transformative paradigm shift, offering unprecedented opportunities to enhance efficiency across diverse industries.",
-    ],
-    sms_spam: [
-        "URGENT! You have won a 1000 cash prize. Call now to claim your reward, reply YES.",
-        "Hey, are we still on for dinner tonight? I'll be there around 7.",
-    ],
-};
-
-function renderOverviewScene(el) {
-    el.innerHTML = `
-        <div class="overview">
-            <div class="overview-eyebrow">Privacy-preserving ML, step by step</div>
-            <div class="scene-title">Homomorphic encryption, live</div>
-            <p class="overview-lede">Pick a model and type a sentence. It gets encrypted, a model scores it
-                <em>without ever decrypting it</em>, and only you can read the answer. Every step that follows
-                is the real computation on your actual input.</p>
-            <label class="overview-label" for="modelSelect">Model</label>
-            <select id="modelSelect" class="dropdown">
-                <option value="human_vs_ai_text">Human vs AI Text -- 8 stylometric features</option>
-                <option value="sms_spam">SMS Spam -- TF-IDF bag of words</option>
-            </select>
-            <label class="overview-label" for="textInput">Your input</label>
-            <textarea id="textInput" class="input-text" rows="3" placeholder="Type a real sentence here..."></textarea>
-            <div class="overview-examples"></div>
-            <div class="overview-actions">
-                <button id="runInferenceBtn" class="btn btn-run" type="button">
-                    <span class="btn-spinner" aria-hidden="true"></span><span class="btn-run-label">Encrypt &amp; run</span>
-                </button>
-                <span class="overview-hint">Ctrl+Enter</span>
-                <span id="runStatus" class="overview-status" role="status"></span>
-            </div>
-        </div>
-    `;
-    const select = el.querySelector("#modelSelect");
-    const input = el.querySelector("#textInput");
-    const btn = el.querySelector("#runInferenceBtn");
-    const status = el.querySelector("#runStatus");
-    const examples = el.querySelector(".overview-examples");
-
-    function renderExamples() {
-        examples.innerHTML = `<span class="overview-examples-label">Try:</span>` + EXAMPLE_INPUTS[select.value]
-            .map((t, i) => `<button type="button" class="example-chip" data-i="${i}" title="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("");
-        examples.querySelectorAll(".example-chip").forEach((chip) => chip.addEventListener("click", () => {
-            input.value = EXAMPLE_INPUTS[select.value][Number(chip.dataset.i)];
-            input.focus();
-        }));
-    }
-    select.addEventListener("change", renderExamples);
-    renderExamples();
-
-    async function run() {
-        if (btn.disabled) return;
-        btn.disabled = true;
-        btn.classList.add("loading");
-        status.className = "overview-status";
-        status.textContent = "Extracting features, generating keys, encrypting, computing...";
-        const r = await window.onRunRequested(select.value, input.value);
-        btn.disabled = false;
-        btn.classList.remove("loading");
-        if (!r.ok) {
-            status.className = "overview-status error";
-            status.textContent = r.error;
-        } else {
-            status.textContent = "";
-        }
-    }
-    btn.addEventListener("click", run);
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) run(); });
-}
+// --- Overview (entry form): see overview_form.js -----------------------------
 
 // Class names come from the backend model registry with every run.
 function resultLabel(model, pred) {
@@ -116,28 +42,79 @@ function inputVector(result) {
 const findEv = (result, name) => result.events.find((e) => e.operation_name === name);
 
 // --- Feature Extraction ------------------------------------------------
+// A traced value is a number, or a list for a one-hot category (German Credit).
+const fmtFeatureShort = (v) => (Array.isArray(v) ? `${v.length} columns` : fmt(v));
+
 function renderFeatureVector(el, trace, activeIdx) {
     const feats = trace.filter((s) => s.value !== null);
     return `<div class="vector-row">${feats.map((s, i) => `
         <div class="vector-cell${trace.indexOf(s) === activeIdx ? " active" : ""}${trace.indexOf(s) > activeIdx ? " pending" : ""}">
             <div class="vector-name">${escapeHtml(s.name)}</div>
-            <div class="vector-value">${trace.indexOf(s) > activeIdx ? "?" : fmt(s.value)}</div>
+            <div class="vector-value">${trace.indexOf(s) > activeIdx ? "?" : fmtFeatureShort(s.value)}</div>
         </div>`).join("")}</div>`;
 }
 
+// Symptom Diagnosis: every symptom column, the ones you picked lit (x_i = 1).
+function buildSymptomFeatureSteps(result) {
+    const t = result.feature_trace[0];
+    const on = result.x.filter((v) => v === 1).length;
+    return [{
+        what: `${t.raw_computation}.`,
+        why: t.why,
+        formal: `x ∈ {0,1}^${result.feature_dim},  x_i = 1 ⇔ symptom i present`,
+        next: t.next,
+        renderVisual: (el) => {
+            el.innerHTML = `<div class="scene-title">${on} of ${result.feature_dim} symptoms present</div>
+                <div class="scene-body"><div class="vector-caption">One flag per column of the training table, in column order: x_i = 1 (lit) or 0.</div>
+                <div class="sym-flags">${result.feature_names.map((n, i) => `<span class="sym-flag${result.x[i] === 1 ? " on" : ""}" title="x[${i}] = ${result.x[i]}">${escapeHtml(symptomLabel(n))}</span>`).join("")}</div></div>`;
+        },
+    }];
+}
+
+// MNIST: your 784 raw pixels, then the same pixels scaled to 0..1 (the vector that is encrypted).
+function buildDigitFeatureSteps(result) {
+    const raw = result.input.pixels, t = result.feature_trace[0];
+    const inked = raw.filter((v) => v > 0).length;
+    // float32, as the model was trained (data/features/mnist.py): exact match with Math.fround.
+    const scaledOk = result.x.every((v, i) => v === Math.fround(raw[i] / 255));
+    const view = (el, title, caption, checks) => {
+        el.innerHTML = `<div class="scene-title">${escapeHtml(title)}</div><div class="scene-body">
+            <div class="vector-caption">${escapeHtml(caption)}</div>${checks || ""}${digitGridSvg(raw, "digit-svg digit-feature")}</div>`;
+    };
+    return [
+        {
+            what: `Your drawing: a 28 × 28 grid = 784 pixels, ${inked} of them with ink (0 = background, 255 = full ink).`,
+            why: "The model was trained on MNIST images of exactly this size, so the input is always 784 numbers, read row by row.",
+            formal: "image ∈ {0..255}^(28×28)",
+            next: "Next: each pixel is scaled to 0..1.",
+            renderVisual: (el) => view(el, "Your digit, 784 pixels", "Each square is one pixel; brighter = more ink."),
+        },
+        {
+            what: `${t.raw_computation}.`,
+            why: t.why,
+            formal: "x_(28r+c) = pixel(r, c) / 255",
+            next: t.next,
+            renderVisual: (el) => view(el, "Scaled to 0..1", `Row by row: x[28·row + col] = pixel / 255. ${inked} non-zero values.`,
+                renderChecks([{ label: "browser: every x_i = float32(pixel_i / 255), exactly (all 784)", ok: scaledOk }])),
+        },
+    ];
+}
+
 function buildFeatureSteps(result) {
-    // Small vectors: one card per traced feature. Large sparse ones (TF-IDF,
-    // pixels): the bar view of the non-zero entries below.
+    if (result.input_kind === "symptoms") return buildSymptomFeatureSteps(result);
+    if (result.input_kind === "image") return buildDigitFeatureSteps(result);
+    // Small vectors (stylometric, tabular): one card per traced feature.
+    // Large sparse TF-IDF: the bar view of the non-zero entries below.
     if (result.feature_trace && result.feature_dim <= 64) {
         const trace = result.feature_trace;
         return trace.map((step, idx) => ({
-            what: step.raw_computation + (step.value !== null ? ` = ${fmt(step.value)}` : ""),
+            what: step.raw_computation + (step.value !== null && !Array.isArray(step.value) ? ` = ${fmt(step.value)}` : ""),
             why: step.why,
-            formal: FEATURE_FORMULAS[step.name] || "",
+            formal: (step.name === "assemble_vector" ? `x = [x_0, …, x_${result.feature_dim - 1}]` : FEATURE_FORMULAS[step.name]) || (result.input_kind === "tabular" ? (Array.isArray(step.value) ? "one-hot(code), then z = (v − μ) / σ per column" : "z = (v − μ) / σ  (μ, σ from the training data)") : ""),
             next: step.next,
             renderVisual: (el) => {
                 el.innerHTML = `
-                    <div class="scene-title">${escapeHtml(step.name)}${step.value !== null ? " = " + fmt(step.value) : ""}</div>
+                    <div class="scene-title">${escapeHtml(step.name)}${step.value !== null && !Array.isArray(step.value) ? " = " + fmt(step.value) : ""}</div>
                     <div class="scene-body">
                         <div class="data-preview">${escapeHtml(step.raw_computation)}</div>
                         <div class="vector-caption">Feature vector x, filling in:</div>
@@ -160,11 +137,12 @@ function buildFeatureSteps(result) {
                 <div class="tfidf-bars">${nonZero.map((v) => `
                     <div class="tfidf-row${v.index === activeIndex ? " active" : ""}">
                         <span class="tfidf-word">${escapeHtml(v.name ?? "#" + v.index)}</span>
-                        <span class="tfidf-bar"><span style="width:${(v.value / max) * 100}%"></span></span>
+                        <span class="tfidf-bar"><span data-w="${(v.value / max) * 100}"></span></span>
                         <span class="tfidf-value">${fmt(v.value)}</span>
                     </div>`).join("")}
                 </div>
             </div>`;
+        el.querySelectorAll(".tfidf-bar > span").forEach((b) => { b.style.width = `${b.dataset.w}%`; });
     };
     const steps = [{
         what: `Your text was converted into a ${result.feature_dim.toLocaleString()}-dimension TF-IDF vector: one entry per vocabulary word, ${nonZero.length} of them non-zero.`,
@@ -187,175 +165,9 @@ function buildFeatureSteps(result) {
 
 // --- Encryption: see encryption_steps.js ------------------------------------
 
-// --- CKKS Deep-Dive ----------------------------------------------------
-function buildDeepDiveSteps(deepDive) {
-    if (!deepDive) return [];
-    const coeffsEncode = deepDive.encode.m_coeffs;
-    const coeffsSecret = deepDive.keygen.secret_key_s;
-    const aCoeffs = deepDive.keygen.public_key_a.map((v) => v % 1000);
-    const bCoeffs = deepDive.keygen.public_key_b.map((v) => v % 1000);
-    const c0Coeffs = deepDive.encrypt.c0.map((v) => v % 1000);
-    const c1Coeffs = deepDive.encrypt.c1.map((v) => v % 1000);
-    const mPrimeCoeffs = deepDive.decrypt.m_prime;
-    const orig = deepDive.original_vector;
-    const rec = deepDive.decrypt.recovered_vector;
-    const skip = () => ({ skipAnimation: window.sceneAlreadyVisited });
-    const mod1000Note = `<div class="poly-note">Showing each coefficient mod 1000 -- the real values are up to q = ${deepDive.params.Q}.</div>`;
+// --- CKKS Deep-Dive: see deep_dive_steps.js --------------------------------
 
-    return [
-        {
-            what: "Your real feature vector is encoded into a real polynomial with N=256 coefficients using canonical embedding: each coefficient is a dot product of one row of the inverse Vandermonde matrix with your (conjugate-extended) input vector.",
-            why: "Encoding turns your plain numbers into a polynomial because CKKS's encryption math only operates on polynomials, not raw numbers directly.",
-            formal: "m = round(scale * V^-1 . z) in Z[X]/(X^N+1)",
-            next: "Next, a secret key is generated.",
-            renderVisual: (el) => {
-                el.innerHTML = `<div class="scene-title">Real CKKS: Encoding</div><div class="poly-label">m(X): the encoded plaintext polynomial (256 real coefficients)</div><div id="gridEncode"></div>`;
-                const eqs = buildIndexedEquations(coeffsEncode.length, (k) => `m_{${k}} = \\sum_j V^{-1}_{${k},j}\\, z_j`);
-                return renderPolyGrid(el.querySelector("#gridEncode"), coeffsEncode, eqs, skip());
-            },
-        },
-        {
-            what: "A real ternary secret key polynomial s(X) is generated -- each coefficient is randomly -1, 0, or 1. This key never leaves your machine.",
-            why: "It's generated once, before any data exists to encrypt, because the public key (next step) and every later decryption both derive from this exact s(X) -- generate a new one mid-pipeline and nothing downstream would decrypt correctly.",
-            formal: "s <- {-1,0,1}^N",
-            next: "Next, the public key is derived from this secret key.",
-            renderVisual: (el) => {
-                el.innerHTML = `<div class="scene-title">Real CKKS: Secret key</div><div class="poly-label">s(X): secret key (256 coefficients, each in {-1, 0, 1})</div><div id="gridSecret"></div>`;
-                const eqs = buildIndexedEquations(coeffsSecret.length, (k) => `s_{${k}} \\leftarrow \\{-1,0,1\\}`);
-                return renderPolyGrid(el.querySelector("#gridSecret"), coeffsSecret, eqs, skip());
-            },
-        },
-        {
-            what: "The public key is computed as b = -a*s + e (mod q), using real negacyclic polynomial multiplication in Z[X]/(X^256+1). 'a' is uniformly random, 'e' is a small real error term.",
-            why: "This is safe to hand to anyone (including a server) because recovering s from (a, b) alone means solving a hard lattice problem -- it's computed once here, alongside the secret key, so the same public key encrypts every value in this run.",
-            formal: "b = -a*s + e (mod q)",
-            next: "Next, your encoded message is encrypted using this public key, producing the first ciphertext half (c0).",
-            renderVisual: (el) => {
-                el.innerHTML = `
-                    <div class="scene-title">Real CKKS: Public key</div>
-                    <div class="grid-pair">
-                        <div><div class="poly-label">a(X): random polynomial</div><div id="gridA"></div></div>
-                        <div><div class="poly-label">b(X) = -a*s + e (mod q)</div><div id="gridB"></div></div>
-                    </div>${mod1000Note}`;
-                const aEqs = buildIndexedEquations(aCoeffs.length, (k) => `a_{${k}} \\leftarrow \\text{Uniform}(0,q)`);
-                const bEqs = buildIndexedEquations(bCoeffs.length, (k) => `b_{${k}} = \\Big(-\\!\\!\\sum_{i+j\\equiv ${k}}\\! a_i s_j + e_{${k}}\\Big) \\bmod q`);
-                return Promise.all([
-                    renderPolyGrid(el.querySelector("#gridA"), aCoeffs, aEqs, skip()),
-                    renderPolyGrid(el.querySelector("#gridB"), bCoeffs, bEqs, skip()),
-                ]);
-            },
-        },
-        {
-            what: "c0 = b*u + e1 + m (mod q). 'u' is a fresh ephemeral ternary polynomial; e1 is fresh error; m is your encoded message polynomial from the Encoding step.",
-            why: "c0 embeds your message masked by the public-key term b*u -- without the secret key, that mask can't be removed, so c0 reveals nothing about m on its own.",
-            formal: "c0 = b*u + e1 + m (mod q)",
-            next: "Next, c1 is computed to complete the ciphertext.",
-            renderVisual: (el) => {
-                el.innerHTML = `<div class="scene-title">Real CKKS: Encrypting (c0)</div><div class="poly-label">c0(X): first ciphertext polynomial</div><div id="gridC0"></div>${mod1000Note}`;
-                const eqs = buildIndexedEquations(c0Coeffs.length, (k) => `c0_{${k}} = \\Big(\\sum_{i+j\\equiv ${k}}\\! b_i u_j\\Big) + e1_{${k}} + m_{${k}} \\bmod q`);
-                return renderPolyGrid(el.querySelector("#gridC0"), c0Coeffs, eqs, skip());
-            },
-        },
-        {
-            what: "c1 = a*u + e2 (mod q). Together (c0, c1) form the complete ciphertext -- neither reveals your data on its own.",
-            why: "c1 carries no message information by itself -- it exists purely so that multiplying it by the secret key later can cancel out the masking term buried in c0.",
-            formal: "c1 = a*u + e2 (mod q)",
-            next: "Together (c0, c1) are decrypted next to demonstrate recovery.",
-            renderVisual: (el) => {
-                el.innerHTML = `<div class="scene-title">Real CKKS: Encrypting (c1)</div><div class="poly-label">c1(X): second ciphertext polynomial</div><div id="gridC1"></div>${mod1000Note}`;
-                const eqs = buildIndexedEquations(c1Coeffs.length, (k) => `c1_{${k}} = \\Big(\\sum_{i+j\\equiv ${k}}\\! a_i u_j\\Big) + e2_{${k}} \\bmod q`);
-                return renderPolyGrid(el.querySelector("#gridC1"), c1Coeffs, eqs, skip());
-            },
-        },
-        {
-            what: "m' = c0 + c1*s (mod q). Only the secret key s can cancel out the public-key term, leaving your original message plus tiny noise.",
-            why: "Only s can cancel the c1*s term buried in c0's masking -- this is exactly what makes the scheme secure against anyone without the secret key, and correct for anyone with it.",
-            formal: "m' = c0 + c1*s (mod q)",
-            next: "This concludes the CKKS internals walkthrough -- the production pipeline (TenSEAL) performs the same math, just faster and hidden behind an opaque library.",
-            renderVisual: (el) => {
-                el.innerHTML = `
-                    <div class="scene-title">Real CKKS: Decrypting</div>
-                    <div class="poly-label">m'(X): recovered plaintext polynomial</div>
-                    <div id="gridDecrypt"></div>
-                    <div class="recover-table">
-                        <div class="recover-row head"><span></span>${orig.map((_, i) => `<span>x${i}</span>`).join("")}</div>
-                        <div class="recover-row"><span>original</span>${orig.map((v) => `<span>${fmt(v)}</span>`).join("")}</div>
-                        <div class="recover-row"><span>recovered</span>${rec.map((v) => `<span>${fmt(v)}</span>`).join("")}</div>
-                    </div>`;
-                const eqs = buildIndexedEquations(mPrimeCoeffs.length, (k) => `m'_{${k}} = \\Big(c0_{${k}} + \\sum_{i+j\\equiv ${k}}\\! c1_i s_j\\Big) \\bmod q`);
-                return renderPolyGrid(el.querySelector("#gridDecrypt"), mPrimeCoeffs, eqs, skip());
-            },
-        },
-    ];
-}
-
-// --- Computation ---------------------------------------------------------
-const COMPUTE_BAND_LABELS = {
-    compute_overview: "what is computed",
-    compute_general_form: "the real encrypted op",
-    weight_multiply: "non-zero terms (teaching mirror)",
-    zero_terms: "zero terms",
-    add_bias: "add bias",
-};
-
-function buildComputationSteps(result) {
-    const events = result.events.filter((e) => e.stage === "compute");
-    const names = result.feature_names || [];
-    const termHtml = (ev) => {
-        const i = ev.data_before.index;
-        return `<span class="term-name">${escapeHtml(names[i] ?? "x[" + i + "]")}</span>
-                <span>${fmt(ev.data_before.weight)} × ${fmt(ev.data_before.input)} = <strong>${fmt(ev.data_after.product)}</strong></span>`;
-    };
-    return events.map((ev, idx) => ({
-        what: ev.description,
-        why: ev.why,
-        formal: ev.formal,
-        next: ev.next_step,
-        renderVisual: (el) => {
-            let body;
-            if (ev.operation_name === "weight_multiply") {
-                const history = events.slice(Math.max(0, idx - 5), idx).filter((e) => e.operation_name === "weight_multiply");
-                body = `
-                    <div class="compute-ledger">
-                        ${history.map((h) => `<div class="compute-term past">${termHtml(h)}</div>`).join("")}
-                        <div class="compute-term current">${termHtml(ev)}</div>
-                    </div>
-                    <div class="compute-sum"><span>running sum</span><strong>${fmt(ev.data_after.running_sum)}</strong></div>`;
-            } else if (ev.operation_name === "add_bias") {
-                body = `
-                    <div class="compute-current-line">${escapeHtml(ev.description)}</div>
-                    <div class="compute-sum"><span>score (plaintext-equivalent)</span><strong>${fmt(ev.data_after.score)}</strong></div>`;
-            } else if (ev.operation_name === "compute_general_form") {
-                const d = ev.data_after;
-                body = `
-                    <div class="compute-current-line">${escapeHtml(ev.formal)}</div>
-                    <div class="ciphertext-box">${escapeHtml(d.output_ciphertext_b64)}</div>
-                    <p class="step-text muted">Encrypted result: ${d.output_ciphertext_size.toLocaleString()} bytes (${formatBytes(d.output_ciphertext_size)}), SHA-256 ${escapeHtml(d.output_ciphertext_sha256)}. Computed in ${fmt(d.he_elapsed_ms, 0)} ms on a context with no secret key.</p>`;
-            } else {
-                body = `<div class="compute-current-line">${escapeHtml(ev.description)}</div>`;
-            }
-            el.innerHTML = `<div class="scene-title">Computation on encrypted data</div><div class="scene-body">${body}</div>`;
-        },
-    }));
-}
-
-function buildComputationBands(result) {
-    const events = result.events.filter((e) => e.stage === "compute");
-    const bands = [];
-    if (!events.length) return bands;
-    let start = 0;
-    let curOp = events[0].operation_name;
-    const push = (end) => bands.push({ start, end, label: COMPUTE_BAND_LABELS[curOp] || curOp });
-    events.forEach((ev, i) => {
-        if (ev.operation_name !== curOp) {
-            push(i - 1);
-            start = i;
-            curOp = ev.operation_name;
-        }
-    });
-    push(events.length - 1);
-    return bands;
-}
+// --- Computation: see computation_steps.js ---------------------------------
 
 // --- Transport: see transport_steps.js ---------------------------------------
 
@@ -399,7 +211,7 @@ function buildDecryptionSteps(result) {
                 <div class="scene-title">Decryption</div>
                 <div class="scene-body">
                     <div class="compute-current-line">Dec<sub>sk</sub>(ciphertext) &nbsp;→&nbsp; ${ev.data_after.scores.length === 1 ? fmt(score, 6) : `${ev.data_after.scores.length} class scores`}</div>
-                    <p class="step-text muted" style="text-align:center">Only your secret key can do this. The compute node never had it.</p>
+                    <p class="step-text muted centered">Only your secret key can do this. The compute node never had it.</p>
                 </div>`;
         },
     };
@@ -457,7 +269,7 @@ function buildResultSteps(result) {
                             <div class="compare-col"><div class="compare-title">Plaintext score</div><div class="compare-value">${fmt(result.plaintext_equivalent_score, 6)}</div></div>
                             <div class="compare-col"><div class="compare-title">HE score (decrypted)</div><div class="compare-value">${fmt(result.raw_score, 6)}</div></div>
                         </div>
-                        <p class="step-text" style="text-align:center">Difference: <strong>${diff.toExponential(2)}</strong> <span class="${result.scores_match ? "badge-match" : "badge-mismatch"}">${result.scores_match ? "within CKKS noise ✓" : "larger than expected ✕"}</span></p>
+                        <p class="step-text centered">Difference: <strong>${diff.toExponential(2)}</strong> <span class="${result.scores_match ? "badge-match" : "badge-mismatch"}">${result.scores_match ? "within CKKS noise ✓" : "larger than expected ✕"}</span></p>
                     </div>`;
             },
         },
@@ -470,12 +282,12 @@ function buildResultSteps(result) {
                 el.innerHTML = `
                     <div class="scene-title">Result</div>
                     <div class="scene-body">
-                        <div class="verdict ${result.match ? "ok" : "bad"}">Your text was classified as <strong>${escapeHtml(heLabel)}</strong></div>
+                        <div class="verdict ${result.match ? "ok" : "bad"}">Your input was classified as <strong>${escapeHtml(heLabel)}</strong></div>
                         <div class="compare-grid">
                             <div class="compare-col"><div class="compare-title">Plaintext</div><div class="compare-value">${result.plain_pred}</div><div class="step-text muted">${escapeHtml(plainLabel)}</div></div>
                             <div class="compare-col"><div class="compare-title">HE (decrypted)</div><div class="compare-value">${result.he_pred}</div><div class="step-text muted">${escapeHtml(heLabel)}</div></div>
                         </div>
-                        <p class="step-text" style="text-align:center">Match: <span class="${result.match ? "badge-match" : "badge-mismatch"}">${result.match ? "yes ✓" : "no ✕"}</span></p>
+                        <p class="step-text centered">Match: <span class="${result.match ? "badge-match" : "badge-mismatch"}">${result.match ? "yes ✓" : "no ✕"}</span></p>
                     </div>`;
             },
         },
@@ -489,14 +301,14 @@ function renderBenchmarksTable(el, rows, active) {
     el.innerHTML = `
         <div class="scene-title">Benchmarks</div>
         <div class="scene-body">
-            <p class="step-text muted">Saved measurements: the same trained model on plaintext vs. encrypted input. <strong>Slowdown</strong> = HE time / plaintext time. <strong>Agreement</strong> = fraction of samples where both predicted the same.</p>
+            <p class="step-text muted">Saved measurements: the same trained model on plaintext vs. encrypted input. <strong>Slowdown</strong> = HE time / plaintext time. <strong>Peak memory</strong> is Python's tracemalloc peak during the run. <strong>Agreement</strong> = fraction of samples where both predicted the same.</p>
             <div class="table-scroll"><table class="benchmark-table">
-                <tr><th>Model</th><th>Samples</th><th>Plaintext (s)</th><th>HE (s)</th><th>Slowdown</th><th>Agreement</th></tr>
+                <tr><th>Model</th><th>Samples</th><th>Plaintext (s)</th><th>HE (s)</th><th>Slowdown</th><th>Plain mem</th><th>HE mem</th><th>Agreement</th></tr>
                 ${rows.map((b, i) => `
                     <tr class="${i === active ? "active" : ""}">
                         <td>${escapeHtml(b.model)}</td><td>${b.n_samples}</td>
                         <td>${b.plaintext_time_sec.toFixed(4)}</td><td>${b.he_time_sec.toFixed(4)}</td>
-                        <td>${b.slowdown_factor.toFixed(1)}x</td><td>${b.plain_vs_he_agreement.toFixed(2)}</td>
+                        <td>${b.slowdown_factor.toFixed(1)}x</td><td>${formatBytes(b.plaintext_peak_mem_bytes)}</td><td>${formatBytes(b.he_peak_mem_bytes)}</td><td>${b.plain_vs_he_agreement.toFixed(2)}</td>
                     </tr>`).join("")}
             </table></div>
         </div>`;
@@ -514,7 +326,7 @@ function buildBenchmarksSteps() {
         }];
     }
     return rows.map((b, i) => ({
-        what: `${b.model}: ${b.n_samples} samples took ${b.plaintext_time_sec.toFixed(4)}s in plaintext vs ${b.he_time_sec.toFixed(4)}s encrypted -- ${b.slowdown_factor.toFixed(1)}x slower, agreement ${b.plain_vs_he_agreement.toFixed(2)}.`,
+        what: `${b.model}: ${b.n_samples} samples took ${b.plaintext_time_sec.toFixed(4)}s in plaintext vs ${b.he_time_sec.toFixed(4)}s encrypted -- ${b.slowdown_factor.toFixed(1)}x slower; peak memory ${formatBytes(b.plaintext_peak_mem_bytes)} vs ${formatBytes(b.he_peak_mem_bytes)}; agreement ${b.plain_vs_he_agreement.toFixed(2)}.`,
         why: "Every ciphertext multiply or add works on polynomials with thousands of large coefficients instead of single numbers, so HE has no shortcuts. Agreement 1.00 means encryption never changed an outcome.",
         formal: `slowdown = ${b.he_time_sec.toFixed(4)} / ${b.plaintext_time_sec.toFixed(4)} = ${b.slowdown_factor.toFixed(1)}x`,
         next: i < rows.length - 1 ? `Next: ${rows[i + 1].model}.` : "That's the end of the walkthrough -- go back to the chapters to revisit any of them, or try a new input.",

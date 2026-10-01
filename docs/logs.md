@@ -280,3 +280,166 @@
   - Phone 390×844 (human_vs_ai_text): the same, clean.
   - New interaction script: flowchart order, intros for both chapters, minimap jump to Result (nth=8), deep-dive at nth=3: ALL PASS.
   - Backend unchanged in this step, so the Python tests were not re-run (they passed after the GCM switch).
+
+## Phase 7.4 — Encryption chapter, 10 browser-verified steps (2026-10-01)
+- Files:
+  - NEW interface/static/js/encrypt_check.js: browser re-checks of event ckks_encrypt
+    - packing rule (slot[j] = x[j mod d], copies, first 16 slots)
+    - Δ-rounding (round-half-even, like Python)
+    - re-embedding: m(X) (all 8192 coefficients) evaluated at all 4096 SEAL slot roots ζ^(3^j mod 2N), divided by Δ, must give x back (memoized, ~110 ms; max error 9.2e-11 on the SMS sample)
+    - every prime: deterministic Miller–Rabin, q ≡ 1 mod 2N, bit size; RNS residues with BigInt
+    - TenSEAL protobuf + SEAL header parse: field 1 = vector size d, field 2 = SEAL blob (magic 0xA15E, header size, version, compr mode zstd, size), zstd frame magic, field 3 = scale 2^40 as float64 in the last 9 bytes
+    - WebCrypto SHA-256 of the full ciphertext; round-trip noise
+  - NEW interface/static/js/encryption_steps.js (replaces the old 2-step builder in scene_renderers.js):
+    1. plaintext input
+    2. pipeline node graph
+    3. 4096-slot packing grid (sparse x: non-zero slots lit; dense x: copy 1 lit)
+    4. Δ-scaling table
+    5. σ⁻¹: m(X) byte matrix + full 8192-coefficient list + server and browser re-embedding checks
+    6. RNS prime cards + residue table
+    7. encryption equation + c0/c1 coefficients (u, e not exposed by TenSEAL; points to the Deep-Dive)
+    8. serialization header bytes, parsed
+    9. full ciphertext + browser SHA-256 == leg-1 payload_sha256
+    10. decryption round trip
+  - NEW interface/static/css/encryption.css (slot grid height-capped by vh, phone query).
+  - byte_matrix.css: .byte-matrix font-size 11.5px so ch-based column minimums match the cells (fixed a clipped 8th column).
+  - scenes.html loads encryption.css, encrypt_check.js, encryption_steps.js; chapter_intros encrypt gained "What you will see"; glossary: RNS, Ring-LWE, Miller–Rabin, zstd.
+- Verified:
+  - Node run of encrypt_check.js on the saved real SMS response: every flag true.
+  - Headless Chrome (tmp/enc74.py) sms_spam 1440×900, first visit + revisit: 10 steps, every check ✓, none ✕/unresolved, no overflow, no console errors.
+  - Phone 390×844 (human_vs_ai_text): the same, clean; slot grid and legend fit above the dock.
+  - Key Setup regression after the byte_matrix change: all WebCrypto checks ✓, 17 steps, clean.
+  - Backend unchanged, so Python tests were not re-run.
+
+## Phase 7.5 — CKKS deep-dive: evaluation, BigInt checks, grid controls (2026-10-01)
+- Backend (`hecrypto/ckks_math.py`, `run_full_deep_dive`):
+  - every polynomial is sent as decimal strings (centered values reach 2^59, past JS's 2^53); Q as a string
+  - the chunk shown is the one with the most non-zero x values (`params.shown_chunk`; SMS no longer shows an all-zero chunk)
+  - new: `evaluate.bias_pt`, `galois` per rotation, `params.digits`; `decrypt.recovered_vector` now has all 128 slots
+  - `tests/test_ckks_math.py` updated (128 recovered slots, string coefficients). Run `uv run python -m tests.test_ckks_math`: all PASS (score errors 5e-6–8e-5, 11–26 ms).
+  - `ckks_encode_trace.py` note: "Real CKKS rounds..." → "CKKS itself rounds...".
+- Frontend:
+  - NEW js/deep_dive_check.js: BigInt negacyclic products mod 2^60 and decoding at the slot roots ζ^(5^j). Checks:
+    - b ≡ −a·s + e, c0 ≡ b·u + e1 + m, c1 ≡ a·u + e2, c·ŵ (both halves), c0 + β with c1 unchanged, m′ ≡ c0 + c1·s: all exact
+    - encode(x), encode(w) and the fresh decrypt = x
+    - the decrypted slots after the multiply, the chunk sum and every rotation = sums the browser computes from x and w
+    - each Galois element = 5^k mod 2N
+    - final score = the server's decode ≈ plaintext ≈ TenSEAL
+  - NEW js/deep_dive_steps.js (old builder removed from scene_renderers.js): 18 steps (17 for a one-chunk x)
+    - encode x, s, public key, c0, c1 (+ fresh decrypt), encode w, × ŵ, chunk sum, 7 rotation steps, + bias, decrypt, decode
+    - slot tables put non-zero inputs first and name the feature in each slot
+    - titles "CKKS · …" ("Real CKKS" removed)
+  - poly_grid.js returns a controller {play, pause, stepCell, restart, done, onChange}
+    - cells show a 2-significant-digit short form; the title and readout show the exact BigInt string
+  - NEW js/grid_controls.js + css/grid_controls.css: per-grid ▶/❚❚, ‹ › cell, ↺, own speed dial
+  - speed_dial.js takes {key, storage, label}. The Scrubber speed is window.stepSpeed (kryptamet.speed); grids use window.gridSpeed (kryptamet.gridSpeed). byte_matrix/key_setup_steps/pbkdf2_graph/scrubber read stepSpeed.
+  - scrubber.js: Space on a focused grid button no longer toggles step playback; arrows still step.
+  - CSS:
+    - .recover-table flex-shrink: 0 (it was squashed to 0 px in the scene's flex column)
+    - .grid-pair stacks vertically (side by side, 16 columns were too narrow for "-1.6e17")
+    - phone poly grid scrolls at 800 px
+  - chapter_registry: deep-dive gets (deepDive, result); summary "N=256 · encrypted w·x+b · off by …"
+  - chapter_intros deepdive rewritten; glossary: rotation, key switching
+  - scenes.html loads grid_controls.css/js, deep_dive_check.js, deep_dive_steps.js
+  - CLAUDE.md: deep-dive path → hecrypto/ckks_math.py (ARCHITECTURE.md left for 7.8)
+- Verified:
+  - Node run of deep_dive_check.js on saved real responses (SMS 4 chunks, Human vs AI 1 chunk): every exact check true, slot errors ≤ 8e-4, browser score = server score to 1e-15, ~5 ms per product.
+  - Headless Chrome (tmp/dd75.py), sms_spam 1440×900, first visit + revisit: 18 steps, every check ✓, no squashed tables, no clipped cells, no overflow, no console errors.
+  - Grid controls: pause holds, ‹ › step cells, Scrubber step unchanged by Space on a grid button, restart replays to 256/256, c0 readout shows the exact 18-digit value.
+  - Phone 390×844 (human_vs_ai_text): 17 steps, clean.
+  - Regressions after the speed split: keysetup, transport73, enc74, interact73: all clean.
+
+## Phase 7.6 — Computation chapter: largest terms first, captions, waterfall, browser checks (2026-10-01)
+- Backend (`inference/he_infer.py`):
+  - non-zero terms are ordered by |w·x|, largest first
+  - `TERM_STEPS = 20` get one `weight_multiply` event each (with captions); the rest go into one new `smaller_terms` event carrying every (index, name, weight, input, product), its sum and the running sum
+  - `next_step` texts follow the new order
+  - `tests/test_two_party_pipeline.py`: the expected op order includes `smaller_terms` when there are more than 20 terms; terms must be descending by |w·x|; new dense symptom_diagnosis case (132 non-zero → 20 + 1)
+  - Run `uv run python -m tests.test_two_party_pipeline`: ALL PASS (sms 13 terms, human 8, symptom 4, symptom dense 132).
+- Frontend:
+  - NEW js/computation_steps.js (buildComputationSteps/Bands moved out of scene_renderers.js):
+    - overview: what the client has and never has, the decision rule
+    - the real encrypted op: input SHA = the leg-1 unwrap = the Encryption ciphertext; is_private false; the browser's WebCrypto SHA-256 of the FULL output ciphertext = the reported hash = the leg-2 payload; full ciphertext box
+    - each term: w × x = w·x as big values with faded `.value-caption` meanings under each; browser checks x[i] = the encrypted value and recomputes the product and running sum
+    - smaller terms: scrollable table; browser re-sums them
+    - zero terms: the browser counts the zeros in the encrypted x; the heaviest weights × 0
+    - bias: the browser adds the bias = the plaintext model's score ≈ the decrypted HE score
+    - a waterfall SVG (current row highlighted, later rows faded) on every term step; drawn at the scene's real width so its text stays readable on phones
+  - NEW css/computation.css; chapter_registry summary uses load_plaintext nonzero_count; scenes.html loads both.
+- Verified:
+  - Headless Chrome (tmp/cmp76.py), sms_spam 1440×900 with a long 30-word message: 25 steps (overview, op, 20 terms, 10 smaller terms, zeros, bias), every check ✓ on first visit and revisit, no squashed blocks, no overflow, no console errors.
+  - Phone 390×844 (human_vs_ai_text): 12 steps, clean; the term card stacks vertically, the waterfall text is readable.
+  - interact73 regression: ALL PASS.
+
+## Phase 7.7 — Inline styles, Next → next chapter, proof badges, all six models (2026-10-01)
+- Inline styles (rules.md #2):
+  - scenes.html `style="display:none"` → `hidden`; components.css `[hidden] { display: none !important; }`
+  - zoom_transition/chapter_state/step_slider toggle `.hidden`
+  - flowchart box/connector geometry and TF-IDF bar widths are applied by JS after render (data-geo / data-w)
+  - centred paragraphs use `.step-text.centered`
+  - CSS now gives the minimap (flex), chrome buttons (flex) and navbar buttons (inline-flex) the display that JS used to set inline (found by screenshot: the minimap had stacked vertically)
+- Next → next chapter:
+  - scrubber.js: `onEnd` / `nextLabel`; on the last step Next (button or →) is highlighted (`.scrubber-next-chapter`) and calls onEnd
+  - autoplay now waits on the current step's animation (`settledNow`) instead of `scheduleNext(undefined)`
+  - chapter_state.js: `goToNextChapter` zooms out to the flowchart, then into the next enabled chapter's box; `exitToFlowchart(originEl, then)`
+- Proof badges:
+  - chapter_state.js tallies the ✓/✕ `.ks-check` chips per chapter/step: when a step's animation settles, when leaving a step, before a minimap jump or re-lock, on exit
+  - flowchart.js shows "✓ N browser checks" or "✕ k of N failed" on each visited box; reset per run
+- All six models in /live:
+  - NEW js/overview_form.js (moved out of scene_renderers.js): model list from GET /api/models, input help, one panel per input kind
+  - NEW js/text_input.js, js/tabular_input.js (real test rows + editable numeric/A-code fields), js/symptom_input.js (132 filterable toggle chips + real test cases), js/digit_canvas.js (28×28 soft-brush canvas, real MNIST test images, `digitGridSvg`)
+  - NEW css/tabular_input.css, css/symptom_input.css, css/digit_canvas.css; overview.css help/panel rules
+  - pipeline_api.js:
+    - `runPipeline(model, input, passphrase)` → POST /api/infer {model, input}
+    - `fetchCkksDeepDive(model, input)`
+    - `fetchModels()`
+    - `inputSummary()` for the navbar
+  - chapter_state.js and key_setup_steps.js (re-lock) pass `result.input`
+  - Feature chapter:
+    - tabular traces with one-hot list values ("k columns"); formulas z = (v − μ)/σ; assemble formula uses the real dimension
+    - symptoms: all 132 flags with yours lit
+    - MNIST: your 784 pixels, then scaled, with a browser check x_i = float32(pixel/255) exactly. The first run failed this check: the featurizer divides in float32 like training, and the check had compared with float64. Fixed with Math.fround.
+  - registry summary and intro text cover all input kinds; "Your text was classified" → "Your input was classified"
+- Verified:
+  - `uv run python -m tests.test_model_registry`: ALL PASS.
+  - Headless Chrome (tmp/all77.py), 1440×900, all six models one after another, each run from its own panel (MNIST from a stroke drawn with the mouse). Every step of all 10 chapters was visited, moving between chapters only with Next; Next chained all 10 every time.
+  - Proof badges after each run, 0 failed: sms 138, human 123, german 149, price 115, symptom 116, mnist 151 checks ✓. No overflow, no console errors.
+  - Phone 390 px (tmp/panels77.py): every panel without overflow; the symptom filter and toggle work.
+  - Regressions: interact73 ALL PASS; keysetup (incl. the random-passphrase re-lock) clean.
+
+## Phase 8 gate (2026-10-01)
+- User directive: Phase 8 must not start on a bare "go"; it needs the second PC's real config first (GPU, driver/CUDA, OS, Python, RAM). Recorded in docs/checklist.md (Phase 8 "Gate" line) and in Claude's project memory.
+
+## Phase 7.8 — Docs (2026-10-01)
+- NEW docs/LIVE_UI_TRUTH.md: the two-party flow, where every /live value comes from (events, tracers asserted against the libraries, deep-dive), a per-chapter table of every browser check, how proof badges count, and the honest limits (one process, plaintext mirror, TenSEAL hides u/e, toy deep-dive parameters, WebCrypto needs a secure context, no live CNN at ~256 s per image).
+- docs/ARCHITECTURE.md rewritten for the current code. The old version described AES-CBC, crypto_teaching/, /api/infer_text with text only, 9 chapters, gridRevealSpeed and old index.html routes. The new one covers the hecrypto tracers, the registry, the two-party events, all routes, every /live JS file by role, CSS rules, benchmarks and tests. This closes the 6.5 file-list item.
+- CLAUDE.md: pointer to LIVE_UI_TRUTH.md; the stage order now follows the two-party flow.
+- README claims re-checked against the app:
+  - "Benchmarks: … time, memory and agreement" was false (no memory column) → scene_renderers Benchmarks table and step text now show plaintext/HE peak memory from results.json
+  - the "Proof" paragraph now mentions the AES-GCM/OAEP/CKKS/deep-dive checks and the badges
+  - every other claim holds
+- Cleanup found while documenting:
+  - removed `run_traced_inference` and `run_full_traced_pipeline` from inference/he_infer.py (no callers since 7.2) and the then-unused `unwrap_payload` import
+  - hecrypto/keygen.py demo path `crypto/keys` → `hecrypto/keys`
+- Verified:
+  - `uv run python -m tests.test_he_inference`: ALL PASS; `tests.test_two_party_pipeline`: ALL PASS
+  - headless Chrome Benchmarks chapter: 8 columns (memory included), real values, no console errors
+
+## Phase 7.9 — Full verification; Phase 7 complete (2026-10-01)
+- Python: all 9 test files run as `uv run python -m tests.<name>`, every one rc=0:
+  - test_transport_roundtrip 1 s
+  - test_pbkdf2_rsa_trace 1 s
+  - test_aes_trace 1 s (FIPS-197 and McGrew-Viega vectors)
+  - test_ckks_encode_trace 6 s
+  - test_ckks_math 5 s
+  - test_model_registry 4 s
+  - test_two_party_pipeline 19 s
+  - test_he_inference 14 s
+  - test_he_cnn_inference 352 s (plain 3/3, HE 3/3)
+- Headless Chrome (tmp/all77.py all; PHONE=1 for 390×844), for each of the 6 models (sms_spam, human_vs_ai_text, german_credit, price_data, symptom_diagnosis, mnist_logreg drawn with the mouse):
+  - run from its own input panel
+  - every step of all 10 chapters visited, chapters reached only through Next on the last step
+  - proof badges read from the flowchart
+  - Desktop 1440×900: badges sms 138, human 123, german 149, price 115, symptom 116, mnist 151 = 792 checks ✓, 0 failed; no overflow, no console errors.
+  - Phone 390×844: identical counts, 0 failed, no overflow, no console errors.
+- Phase 7 is complete. Phase 8 (GPU encrypted CNN) is gated on the user sending the second PC's config.

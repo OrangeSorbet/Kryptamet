@@ -1,0 +1,21 @@
+/* Digit input panel and 28x28 pixel views (interface/static/js/digit_canvas.js). */
+.digit-panel { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.digit-canvas {
+    width: 280px;
+    max-width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: crosshair;
+    touch-action: none;
+    image-rendering: pixelated;
+}
+.digit-side { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; flex: 1; min-width: 200px; }
+.digit-samples { display: grid; grid-template-columns: repeat(4, 52px); gap: 6px; }
+.digit-sample { padding: 0; border: 1px solid var(--color-border); border-radius: 6px; background: none; cursor: pointer; line-height: 0; }
+.digit-sample:hover { border-color: var(--color-primary-hover); }
+.digit-thumb { width: 50px; height: 50px; border-radius: 5px; }
+.digit-count { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-muted); }
+.digit-bg { fill: var(--color-bg); }
+.digit-ink { fill: var(--color-text); }
+.digit-feature { width: min(300px, 70vw); height: auto; display: block; margin: 0.75rem auto 0; border: 1px solid var(--color-border); border-radius: 8px; }
