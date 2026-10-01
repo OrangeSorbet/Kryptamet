@@ -1,0 +1,210 @@
+/* Transport chapters (interface/static/js/transport_steps.js). */
+
+/* Wire between the two parties, with a travelling packet */
+.transport-track {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 2px;
+    background: var(--color-border);
+    margin: 2rem 0.5rem;
+}
+
+/* Labels sit under the wire so the packet can stop at either end without covering them. */
+.transport-endpoint {
+    position: relative;
+    top: 1rem;
+    background: var(--color-bg);
+    padding: 0 0.5rem;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.transport-packet {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    margin-top: -6px;
+    border-radius: 3px;
+    background: var(--color-warning);
+    box-shadow: 0 0 8px 1px var(--color-warning);
+}
+
+.transport-packet-outbound { animation: transport-travel-out 1.6s ease forwards; }
+.transport-packet-arrived { left: calc(100% - 12px); }
+
+@keyframes transport-travel-out {
+    from { left: 0; }
+    to { left: calc(100% - 12px); }
+}
+
+/* Step 1: nested layers of the packet */
+.tp-layers { display: flex; flex-direction: column; gap: 10px; }
+
+.tp-layer {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    min-width: 0;
+}
+
+.tp-layer .tp-layer { margin-top: 8px; background: var(--color-bg); }
+.tp-layer-rsa { border-color: var(--color-warning); }
+.tp-layer-gcm { border-color: var(--color-primary-hover); }
+.tp-layer-ckks { border-style: dashed; }
+.tp-layer-name { font-size: 13.5px; color: var(--color-text); font-weight: var(--font-weight-bold); }
+.tp-layer-note { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); overflow-wrap: anywhere; }
+
+/* Hex tables: counters, keystream blocks, GHASH steps, SHA-256 chain */
+.tp-table,
+.tp-tag {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    overflow-x: auto;
+}
+
+.tp-row {
+    display: grid;
+    grid-template-columns: 90px minmax(0, 1fr) 60px;
+    gap: 10px;
+    padding: 3px 8px;
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+    min-width: 420px;
+}
+
+.tp-row > span { overflow-wrap: anywhere; }
+.tp-row3 { grid-template-columns: 150px minmax(0, 1fr) 30px; }
+.tp-row4 { grid-template-columns: 70px repeat(3, minmax(0, 1fr)); min-width: 760px; }
+.tp-row5 { grid-template-columns: 95px repeat(3, minmax(0, 1fr)) 60px; min-width: 900px; }
+.tp-headrow { background: transparent; font-size: 10.5px; }
+.tp-final { color: var(--color-warning); font-weight: var(--font-weight-bold); }
+.tp-gap { text-align: center; color: var(--color-text-muted); font-style: italic; padding: 1px 0; min-width: 420px; }
+.tp-ok { color: var(--color-success); }
+.tp-bad { color: var(--color-error); }
+
+/* Step 7: one AES round as a row of 4x4 matrices + a history list */
+.tp-round-head { font-size: 13px; color: var(--color-text); margin-bottom: 0.5rem; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+
+.tp-stages {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    gap: 10px;
+}
+
+.tp-stage .poly-label { text-align: center; }
+
+.tp-round-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 0.75rem;
+    max-height: 150px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.tp-round-row {
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr) 60px;
+    gap: 10px;
+    padding: 2px 8px;
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+}
+
+.tp-round-row > span { overflow-wrap: anywhere; }
+.tp-round-headrow { background: transparent; font-size: 10.5px; }
+
+/* Step 11: OAEP matrices side by side */
+.tp-oaep {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 14px;
+    margin-top: 0.75rem;
+}
+
+/* Step 12: packet fields */
+.tp-fields { display: flex; flex-direction: column; gap: 6px; margin-bottom: 0.75rem; }
+
+.tp-field {
+    display: grid;
+    grid-template-columns: 130px 90px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 7px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-surface);
+    font-size: 12.5px;
+}
+
+.tp-field-name { color: var(--color-warning); font-weight: var(--font-weight-bold); }
+.tp-field-size { font-family: var(--font-mono); color: var(--color-text); }
+.tp-field-note { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); overflow-wrap: anywhere; }
+
+/* Step 13: server vs browser checks */
+.tp-unwrap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.tp-unwrap .ks-checks { flex-direction: column; }
+.tp-unwrap .ks-check { border-radius: 8px; }
+
+/* Step 14: flipped bits */
+.tp-flips { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 0.75rem; }
+
+.tp-flip {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+}
+
+.tp-flip-head { font-size: 13px; color: var(--color-text); }
+
+.tp-flip-bits {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.tp-bits { display: inline-flex; gap: 2px; }
+
+.tp-bit {
+    display: inline-block;
+    width: 1.3em;
+    text-align: center;
+    border-radius: 3px;
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+
+.tp-bit.flip { background: color-mix(in srgb, var(--color-error) 45%, var(--color-bg)); }
+
+@media (max-width: 640px) {
+    .tp-field { grid-template-columns: 1fr auto; }
+    .tp-field-note { grid-column: 1 / -1; }
+    .tp-oaep { grid-template-columns: minmax(0, 1fr); }
+}

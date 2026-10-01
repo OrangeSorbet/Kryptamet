@@ -155,3 +155,128 @@
 - User added .claude/settings.json {"worktree": {"bgIsolation": "none"}} so Claude can edit the main dir directly.
 - Session moved from the worktree back to the main dir. Deleted .claude/worktrees/live-polish (and the empty .claude/worktrees) with a plain file delete; it held only copies plus .venv/.git pointer/caches. Git's worktree entry and branch worktree-live-polish are left for the user (git worktree prune / git branch -D worktree-live-polish).
 - .gitignore: added .claude/worktrees/, .claude/settings.local.json, .omc/ (Claude Code/plugin local state).
+
+## Phase 7.0 — Checklist revamp (2026-09-30)
+- docs/checklist.md rewritten: clean sequential phases 0–7 in Markdown. The 6D–6H history is collapsed into Phase 6. Dropped deviated/abandoned items: Tauri packaging, the instant-mode toggle, the running-sum chart, the old build-order line. Dead-code deletions were verified already done (no index.html/sections/pipeline_animations.js remain). New Phase 7 = the truthful /live plan milestones 7.1–7.9.
+
+## Phase 7.1 — Tracers + asserts (2026-09-30)
+- 4 parallel subagents, disjoint files; no git.
+- NEW hecrypto/pbkdf2_trace.py:
+  - `sha256_traced(message)`: pure-Python SHA-256; per block W[0..63] and a..h after each of 64 rounds.
+  - `trace_pbkdf2(passphrase, salt, iterations=200_000, dklen=32)`: HMAC ipad/opad, U1 inner/outer digests, traced inner SHA-256 (2 blocks), U-chain samples (1–5, every 20 000th, last) with the XOR accumulator T.
+  - Verified against hashlib.pbkdf2_hmac AND cryptography PBKDF2HMAC; raises RuntimeError on mismatch. 0.57 s at 200k iterations.
+- NEW hecrypto/rsa_trace.py: `trace_rsa_keypair(private_key, label)` returns p, q, n, e, d, phi, lambda, CRT params (decimal strings) and the DER public key SHA-256. Checks n=p·q, gcd(e,λ)=1, e·d≡1 (mod λ) and the CRT params.
+- NEW hecrypto/aes_trace.py:
+  - Pure-Python AES-256 with the S-box computed from the GF(2^8) inverse and affine transform, the key expansion with derivation notes, and a traced block (4×4 state after SubBytes/ShiftRows/MixColumns/AddRoundKey for 14 rounds).
+  - `trace_aes_cbc(key, iv, plaintext, n_blocks=3)`: PKCS7 plus the CBC chain; block 1 is fully traced. Asserts against cryptography ECB/CBC.
+  - Test: FIPS-197 C.3 vector, including intermediate round states. Note: the brief mislabelled 4f63…e705 as round[1]; it is round[2].start.
+- EDIT hecrypto/transport.py:
+  - `derive_key_from_passphrase(passphrase, salt)`: salt is now required (the fixed "kryptamet-demo-salt" is removed). `wrap_with_passphrase` uses a random 16-byte salt returned in the dict.
+  - `wrap_payload(..., aes_key=None)`. `wrap_payload_traced` adds full aes_key_hex/iv_hex/encrypted_aes_key_b64/aes_ciphertext_b64, SHA-256s and padding_len. Preview keys are kept until 7.2.
+  - NEW `unwrap_payload_traced`. AES-CBC/PKCS7 is unchanged, factored into helpers with a ponytail note: no integrity tag.
+- EDIT inference/he_infer.py (one caller): the passphrase fingerprint is now derived with wrapped["salt"].
+- MOVED crypto_teaching/real_ckks.py -> hecrypto/ckks_math.py (crypto_teaching/ deleted; the rules.md #4 violation is fixed; "real" is dropped from the name):
+  - Parameters: N=256, Q=2^60, Δ=2^25 (not 2^20: fresh noise·‖w‖ gave ~1e-2 error at 2^20).
+  - Slots at ζ^(5^j). Added mul_plain, add_plain, apply_galois, BV key-switching (base 2^15, 4 digits) and rotate.
+  - negacyclic_mul uses np.convolve on uint64; it is exact because Q divides 2^64.
+  - `run_full_deep_dive(x, w, b)`: encode → keygen → encrypt (⌈d/128⌉ chunks) → ×w → chunk sum → 7 rotate-and-add rounds → +bias (Δ², every slot) → decrypt → decode. Old keys are kept.
+  - Real models: human_vs_ai_text err ~6e-5, sms_spam err ~3e-4, ~20 ms.
+  - Caveat: coefficients reach 2^59 > JS safe-int 2^53; strings/BigInt are needed in 7.5.
+- EDIT interface/app.py: /api/ckks_deep_dive now uses the full real x, model.coef_[0] and intercept_ (it was x[:8]); 400 on empty text or an unknown model.
+- NEW hecrypto/ckks_encode_trace.py: `trace_ckks_encryption(context, x, enc_vector=None)`.
+  - FINDING: TenSEAL replicates x cyclically over all 4096 slots (CKKSVector::encrypt → pt.replicate), not zero-padding; verified by decrypting all slots.
+  - m(X) is computed by Kryptamet (numpy FFT, slot j at ζ^(3^j)) and matches SEAL's CKKSEncoder output on 0/8192 differing coefficients, compared via Kryptamet's inverse NTT (itself checked against SEAL transform_from_ntt).
+  - Primes are READ from tenseal.sealapi: q0=1152921504606748673, q1=1099510890497, q2=1099511480321, special=1152921504606830593.
+  - The real c0/c1 coefficients are read from the ciphertext. Serialization: SEAL header magic 0xA15E, v4.3, compr_mode=zstd, ~331.6 KB vs 393,216 B uncompressed.
+  - Full base64 plus SHA-256. Round-trip error ~5e-9; noise coefficients ~80–100. ~630 ms.
+- NEW tests: test_pbkdf2_rsa_trace, test_aes_trace, test_ckks_math, test_ckks_encode_trace.
+- Verified (all in main dir): the 4 new tests + test_transport_roundtrip + test_he_inference (5 models ALL PASS) → all PASS; `import interface.app` ok.
+
+## Phase 7.2 — Two-party pipeline + model registry (2026-09-30)
+- 2 parallel subagents (registry / pipeline) against a fixed contract; the parent wired app.py and the frontend. No git.
+- NEW inference/model_registry.py: MODELS / get_model / public_models for 6 models.
+  - Each entry: id, label, input_kind (text/tabular/symptoms/image), task, class_names (in classes_ order, verified per loader), weights() → (W k×d, b k), featurize(inp) → {x, feature_names, x_captions, feature_trace, input_echo}, plain_predict, plain_scores, and samples (lazy real test rows/examples).
+  - Inputs are validated at the trust boundary (ValueError → HTTP 400).
+- NEW featurizers data/features/{tfidf,tabular,symptoms}.py. Additions to text_stylometric.py and mnist.py; loader helpers in german_credit.py (load() output byte-identical), price_data.py and symptom_diagnosis.py; price_data_logreg.py uses price_data.direction.
+- FIX text_stylometric.extract_traced: it now uses extract()'s exact values (avg_word_length previously differed).
+- NEW models/train/mnist_logreg.py: multinomial LR, lbfgs, 200 iterations, 259 s; train 0.9385 / test 0.9267. Output: models/saved/mnist_logreg.pkl. Added to benchmarks/metrics.py.
+- Ran `uv run python -m benchmarks.metrics` (full suite). New row: mnist_logreg slowdown 1198.4x, agreement 1.00. All 7 rows agree 1.00; mnist_cnn_he he=767 s for 3 samples.
+- NEW inference/he_infer.py `run_two_party_pipeline(context, x, W, b, *, feature_names, x_captions, class_names, passphrase=None, ckks_params=None)`. It emits 18 party-tagged event types:
+  - keys: ckks_keygen, rsa_keygen_server, rsa_keygen_client, passphrase, pbkdf2
+  - encrypt: load_plaintext, ckks_encrypt
+  - transport_out: leg1_wrap (the PBKDF2 key wraps Enc(x); the client's RSA key wraps that key), leg1_unwrap
+  - compute: compute_overview, compute_general_form (the real Enc(x)·Wᵀ+b on a context rebuilt from public-only bytes, is_private False), weight_multiply (non-zero x_i only; captions + per-term rank-based why; labelled as the plaintext teaching mirror), zero_terms, add_bias
+  - transport_back: leg2_session_key, leg2_wrap, leg2_unwrap
+  - decrypt: ckks_decrypt (all k scores, argmax, sigmoid/softmax)
+  - A random passphrase (secrets.token_urlsafe(12)) is used when none is given.
+- NEW hecrypto/evaluate.py (encrypted_linear_scores via matmul). hecrypto/ckks_context.py: serialize_context, context_from_bytes, ckks_params_of. hecrypto/transport.py: new_aes_key, new_salt, new_passphrase. pipeline_events.emit gains `party`.
+- REMOVED run_full_traced_pipeline_with_events (no callers) and an unused import in he_infer.py.
+- REWROTE interface/app.py:
+  - GET /api/models.
+  - POST /api/infer, with /api/infer_text as an alias ({model, input} or legacy {model, text}); the response keeps the old keys and adds class_names, task, x, x_captions, scores, probabilities, passphrase, and more.
+  - /api/ckks_deep_dive works for any model (multiclass → the plaintext-predicted row).
+- Frontend compatibility (scene_renderers.js, chapter_registry.js, components.css):
+  - class names come from the response.
+  - inputVector reads result.x.
+  - The key step shows the real passphrase, salt and PBKDF2 key.
+  - Encryption/compute/transport show the FULL base64 ciphertext with SHA-256; .ciphertext-box is 10 lines and scrollable.
+  - The transport chapter covers leg 1 + the leg-2 key + leg 2.
+  - Decryption handles multiclass (softmax top 5).
+  - The TF-IDF bars view is kept for vectors with more than 64 dimensions.
+- Verified:
+  - All 8 test files PASS (model_registry, two_party_pipeline, ckks_encode_trace, pbkdf2_rsa_trace, aes_trace, ckks_math, transport_roundtrip, he_inference).
+  - Flask test_client: all 6 models via /api/infer, plain == HE prediction, scores_match, 1.6–1.9 MB, 6.6–10.9 s; deep-dive score ≈ plaintext for each; legacy /api/infer_text and 400s OK.
+  - Headless Chrome: full walkthrough for sms_spam + human_vs_ai_text with no console errors; interaction checks ALL PASS. SMS Computation went from 502 to 18 steps.
+
+## Phase 7.3 — AES-GCM, Key Setup chapter, Transport chapters, README (2026-09-30)
+- WHY GCM: AES-CBC hid bytes but could not detect tampering. The user's goal is that the HE ciphertext can't be meddled with in transit.
+- hecrypto/transport.py switched to AES-256-GCM:
+  - 12-byte random nonce, 16-byte tag stored separately, AAD header. Wrapped dict: {encrypted_key, nonce, ciphertext, tag, aad}.
+  - Removed iv/padding/*_hex_preview keys. Added nonce_hex, tag_hex, aad_hex, aad_utf8, tag_size, nonce_size.
+  - InvalidTag propagates. wrap_with_passphrase is also GCM.
+  - NEW tamper_test(key_or_private_key, wrapped): flips a random ciphertext bit and a tag bit on copies; both must be rejected, otherwise RuntimeError.
+- hecrypto/aes_trace.py: trace_aes_gcm replaces the CBC trace. H, J0, counters, keystream (block 1 fully round-traced), and GHASH over the FULL ciphertext using 16×256 tables (~33 ms for 21k multiplications), cross-checked with the bitwise gf128_mul. The tag is asserted == cryptography.
+- he_infer: both legs use GCM with headers "kryptamet|leg1|server->client" / "kryptamet|leg2|client->server"; unwrap events carry a real tamper_test on the wire payload. Pipeline time unchanged (~9 s).
+- Tests: test_aes_trace adds McGrew-Viega GCM cases 13–16 (AES-256, case 16 with AAD). test_pbkdf2_rsa_trace, test_transport_roundtrip and test_two_party_pipeline updated → all PASS (re-verified by the parent). test_he_cnn_inference was not run to completion by the subagent (>10 min, independent of transport).
+- Key Setup chapter rebuilt (subagent): 17 real steps.
+  - NEW js/key_setup_steps.js (buildKeySteps moved out of scene_renderers.js) + css/key_setup.css.
+  - NEW generic components: js/byte_matrix.js, js/pbkdf2_graph.js (a generic node graph), js/sub_zoom.js (nested dolly zoom via zoomUnits), js/sha256_check.js (browser recomputation of a SHA-256 block), each with its own CSS.
+  - Browser checks: RSA (Fermat test, n=p·q, lcm/gcd, e·d mod λ, CRT), ipad/opad bytes, SHA-256 schedule + 64 rounds, WebCrypto PBKDF2 re-derivation. "Use random passphrase" (#randomKeyBtn) sits beside "Lock with my passphrase".
+  - chapter_state.onPassphraseRelock lands on the passphrase step.
+  - Glossary and intro updated. scrubber.css gets overflow-wrap:anywhere.
+  - Verified in headless Chrome for both text models, desktop + phone, no console errors; interaction checks pass (Key Setup step count 17).
+- README.md rewritten: purpose, clinic use case, the 10-step two-party flow, features, setup and run. No folder structure. It describes the Phase 7 target; claims are re-checked in 7.8.
+- Transport split into two chapters (7.3 finished, 2026-09-30). The flowchart now has 10 chapters: Feature, Key Setup, Encryption, CKKS Deep-Dive, **Transport → client**, Computation, **Transport ← server**, Decryption, Result, Benchmarks.
+  - NEW js/transport_steps.js: shared `buildTransportSteps(result, leg)`, 14 real steps per leg:
+    1. why two layers (nested RSA/GCM/CKKS diagram)
+    2. AES key (leg 1 == Key Setup PBKDF2 key; leg 2 fresh, ≠ leg-1 key)
+    3. key schedule (60 words / 15 round keys)
+    4. nonce, J₀, counters
+    5. counter-mode node graph
+    6. nested dolly zoom into the AES_K node (state matrix, K₀)
+    7. 14-round player (SubBytes/ShiftRows/MixColumns/AddRoundKey 4×4 matrices with KaTeX per cell)
+    8. S-box
+    9. P ⊕ keystream = C
+    10. GHASH + tag
+    11. RSA-OAEP envelope opened
+    12. packet on the wire + full ciphertext
+    13. unwrap
+    14. tamper test with the flipped bits shown
+  - NEW js/aes_check.js does the browser re-computation:
+    - S-box from GF(2⁸) inverse + affine; key expansion; every stage of all 14 rounds from the browser's own state; counters/keystreams/XOR for blocks 1–3; H and AES_K(J₀)
+    - each shown GHASH step with a BigInt GF(2¹²⁸) multiply; the length block and the tag
+    - RSA-OAEP: c^d mod n (BigInt) + MGF1-SHA256 unmasking (lHash, zero padding, 01 separator, key)
+    - WebCrypto: JWK import of the recipient private key, RSA-OAEP decrypt, AES-GCM decrypt of the FULL wire payload, SHA-256 == the ciphertext from the Encryption/Computation chapter, and the server's exact ciphertext/tag bit flips replayed (both rejected)
+  - NEW css/transport.css. The .transport-track/.transport-packet rules moved out of components.css; the endpoint labels now sit under the wire.
+  - Removed the old single-chapter transport builder from scene_renderers.js.
+  - chapter_registry: transport_out / transport_back with summaries "AES-256-GCM · size · tag ✓ · tamper rejected".
+  - chapter_intros: transport_out / transport_back.
+  - glossary: GCM, nonce, keystream, GHASH, tag, OAEP, S-box, round key, AAD.
+  - scenes.html loads aes_check.js and transport_steps.js.
+  - Also fixed: the Feature Extraction summary said "500 stylometric features" for SMS; it is now "500-dim TF-IDF vector".
+- Verified:
+  - Node run of aes_check.js on a real saved response: every flag true for both legs (OAEP decode ~20 ms; WebCrypto unwrap of 331 KB ~40 ms; both flips rejected).
+  - Headless Chrome (sms_spam, 1440×900): 10 boxes in the right order, both chapters 14 steps, every browser check resolved ✓ and none ✕ (first visit and revisit), no overflow, no console errors.
+  - Phone 390×844 (human_vs_ai_text): the same, clean.
+  - New interaction script: flowchart order, intros for both chapters, minimap jump to Result (nth=8), deep-dive at nth=3: ALL PASS.
+  - Backend unchanged in this step, so the Python tests were not re-run (they passed after the GCM switch).

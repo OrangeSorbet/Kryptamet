@@ -1,0 +1,29 @@
+/* Nested dolly zoom stage (interface/static/js/sub_zoom.js). Both layers
+   sit in the same grid cell; zoomUnits() drives transform/opacity/filter
+   and these transitions animate them, like .zoom-unit does page-wide. */
+.sub-zoom-stage {
+    display: grid;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+.sub-zoom-layer {
+    grid-area: 1 / 1;
+    position: relative;
+    min-width: 0;
+    transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease, filter 0.5s ease;
+}
+
+.sub-zoom-crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+}
+
+.sub-zoom-crumbs span:last-child { color: var(--color-warning); }

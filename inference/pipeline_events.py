@@ -10,10 +10,11 @@ class PipelineRecorder:
         self.events = []
         self._start_time = time.perf_counter()
 
-    def emit(self, stage, operation_name, description, data_before=None, data_after=None, why="", next_step="", formal=""):
+    def emit(self, stage, operation_name, description, data_before=None, data_after=None, why="", next_step="", formal="", party=None):
         self.events.append({
             "index": len(self.events),
             "stage": stage,
+            "party": party,
             "operation_name": operation_name,
             "description": description,
             "why": why,

@@ -10,6 +10,7 @@ from inference.he_infer import encrypted_linear_score
 from inference.he_cnn_infer import run_encrypted_cnn
 from data.loaders import sms_spam, german_credit, symptom_diagnosis, price_data, human_vs_ai_text, mnist
 from data.features import text_stylometric
+from data.features import mnist as mnist_features
 from models.train.mnist_cnn_he import HECompatibleCNN
 
 SAVE_DIR = "models/saved"
@@ -140,6 +141,11 @@ def run_all():
     X_text, y = human_vs_ai_text.load(nrows=N_SAMPLES)
     X = text_stylometric.extract(X_text)
     results.append(_benchmark_model("human_vs_ai_text", X, bundle["model"]))
+
+    bundle = _load_pickle("mnist_logreg")
+    X, y = mnist.load(split="test")
+    X = mnist_features.normalize(X[:N_SAMPLES]).astype(float)
+    results.append(_benchmark_model("mnist_logreg", X, bundle["model"]))
 
     results.append(_benchmark_mnist_cnn())
 

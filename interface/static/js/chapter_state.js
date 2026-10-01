@@ -202,7 +202,10 @@ window.onRunRequested = async (model, text) => {
 window.onPassphraseRelock = () => {
     buildAllChapterSteps();
     const keyIndex = CHAPTERS.findIndex((c) => c.id === "key");
-    stepIndices[keyIndex] = chapterSteps[keyIndex].steps.length - 1;
+    // Land back on the step that holds the passphrase controls (flagged `relock`).
+    const steps = chapterSteps[keyIndex].steps;
+    const relockIdx = steps.findIndex((s) => s.relock);
+    stepIndices[keyIndex] = relockIdx >= 0 ? relockIdx : steps.length - 1;
     buildChapterVisual(keyIndex);
 };
 

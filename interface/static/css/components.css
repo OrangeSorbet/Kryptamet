@@ -193,6 +193,10 @@ table.benchmark-table th, table.benchmark-table td {
     font-size: var(--font-size-sm);
     word-break: break-all;
     margin: 1rem 0;
+    /* Always the full ciphertext: 10 visible lines, scroll for the rest. */
+    line-height: 1.5;
+    max-height: calc(10 * 1.5em + 2rem);
+    overflow-y: auto;
 }
 
 .compare-grid {
@@ -222,55 +226,3 @@ table.benchmark-table th, table.benchmark-table td {
     font-family: var(--font-mono);
 }
 
-.transport-track {
-    position: relative;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    height: 2px;
-    background: var(--color-border);
-    margin: 2rem 0.5rem;
-}
-
-.transport-endpoint {
-    position: relative;
-    top: -0.5rem;
-    background: var(--color-bg);
-    padding: 0 0.5rem;
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-}
-
-.transport-packet {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    width: 12px;
-    height: 12px;
-    margin-top: -6px;
-    border-radius: 3px;
-    background: var(--color-warning);
-    box-shadow: 0 0 8px 1px var(--color-warning);
-}
-
-.transport-packet-outbound {
-    animation: transport-travel-out 1.2s ease forwards;
-}
-
-.transport-packet-return {
-    animation: transport-travel-back 1.2s ease forwards;
-}
-
-.transport-packet-arrived {
-    left: calc(100% - 12px);
-}
-
-@keyframes transport-travel-out {
-    from { left: 0; }
-    to { left: calc(100% - 12px); }
-}
-
-@keyframes transport-travel-back {
-    from { left: calc(100% - 12px); }
-    to { left: 0; }
-}

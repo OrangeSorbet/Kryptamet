@@ -1,0 +1,78 @@
+/* Byte/word matrix (interface/static/js/byte_matrix.js). Same look and
+   reveal behaviour as the CKKS poly grid, sized to hex content. */
+.byte-matrix-host { width: 100%; min-width: 0; }
+
+.byte-matrix-scroll {
+    width: 100%;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+}
+
+.byte-matrix {
+    position: relative;
+    display: grid;
+    gap: 3px;
+    padding: 3px;
+    width: max-content;
+    min-width: 100%;
+    box-sizing: border-box;
+    font-size: 11.5px; /* column minimums are in ch: measure them at the cell font size */
+    background: var(--color-border);
+    border-radius: 6px;
+}
+
+.bm-cell {
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 22px;
+    height: 22px;
+    padding: 0 3px;
+    text-align: center;
+    white-space: nowrap;
+    border-radius: 2px;
+    transition: background 0.3s, color 0.3s;
+}
+
+.bm-cell.active,
+.bm-cell.hover {
+    background: var(--color-surface);
+    box-shadow: inset 0 0 0 1px var(--color-warning);
+    color: var(--color-warning);
+}
+
+.bm-cell.flash { background: var(--color-primary); color: var(--color-text); }
+
+.bm-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 22px;
+    color: var(--color-text-muted);
+    text-align: center;
+    padding: 0 4px;
+    background: var(--color-surface);
+    border-radius: 2px;
+}
+
+.bm-row-label { text-align: right; }
+
+/* Column headers stay visible while a tall matrix scrolls. */
+.bm-col-label { position: sticky; top: 0; z-index: 2; }
+
+.bm-eq-overlay {
+    position: absolute;
+    z-index: 5;
+    display: none;
+    max-width: calc(100% - 6px);
+    padding: 5px 9px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-warning);
+    border-radius: 6px;
+    color: var(--color-warning);
+    font-size: 12.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--color-bg) 70%, transparent);
+    pointer-events: none;
+}

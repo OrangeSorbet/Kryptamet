@@ -82,14 +82,10 @@ function renderOverviewScene(el) {
     input.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) run(); });
 }
 
-const RESULT_LABELS = {
-    sms_spam: { 0: "not spam", 1: "spam" },
-    human_vs_ai_text: { 0: "written by a human", 1: "written by AI" },
-};
-
+// Class names come from the backend model registry with every run.
 function resultLabel(model, pred) {
-    const labels = RESULT_LABELS[model] || {};
-    return labels[pred] ?? String(pred);
+    const r = pipelineResult;
+    return (r && r.model === model && r.class_names[pred]) ?? String(pred);
 }
 
 const FEATURE_FORMULAS = {
@@ -112,14 +108,12 @@ function buildIndexedEquations(n, template) {
     return out;
 }
 
-// Real (index, value) pairs of the input vector, recovered from the compute
-// events' data_before -- the vector that was actually encrypted.
+// Real (index, value) pairs of the input vector -- the vector that was actually encrypted.
 function inputVector(result) {
-    return result.events
-        .filter((e) => e.operation_name === "weight_multiply")
-        .map((e) => ({ index: e.data_before.index, value: e.data_before.input, weight: e.data_before.weight,
-                       name: (result.feature_names || [])[e.data_before.index] }));
+    return result.x.map((value, index) => ({ index, value, name: result.feature_names[index] }));
 }
+
+const findEv = (result, name) => result.events.find((e) => e.operation_name === name);
 
 // --- Feature Extraction ------------------------------------------------
 function renderFeatureVector(el, trace, activeIdx) {
@@ -132,7 +126,9 @@ function renderFeatureVector(el, trace, activeIdx) {
 }
 
 function buildFeatureSteps(result) {
-    if (result.feature_trace) {
+    // Small vectors: one card per traced feature. Large sparse ones (TF-IDF,
+    // pixels): the bar view of the non-zero entries below.
+    if (result.feature_trace && result.feature_dim <= 64) {
         const trace = result.feature_trace;
         return trace.map((step, idx) => ({
             what: step.raw_computation + (step.value !== null ? ` = ${fmt(step.value)}` : ""),
@@ -187,122 +183,9 @@ function buildFeatureSteps(result) {
     return steps;
 }
 
-// --- Key Setup -----------------------------------------------------------
-function buildKeySteps(result) {
-    const p = result.ckks_params;
-    const bits = p.coeff_mod_bit_sizes;
-    const totalBits = bits.reduce((a, b) => a + b, 0);
-    const wrapEvent = result.events.find((e) => e.operation_name === "passphrase_aes_wrap");
-    const usedPassphrase = result.used_passphrase;
-    return [
-        {
-            what: `Built a CKKS context: ring degree N=${p.poly_modulus_degree} (${p.poly_modulus_degree / 2} SIMD slots), a ${bits.length}-prime modulus chain [${bits.join(", ")}] bits (${totalBits}-bit q), scale 2^${p.global_scale_bits}; then generated the secret key, public key and Galois keys.`,
-            why: "N sets both capacity and security: more slots and a bigger modulus budget, at the cost of slower operations. Each middle prime is used up by one rescale after a multiplication, and the scale is the fixed-point precision real numbers are encoded at.",
-            formal: `N=${p.poly_modulus_degree}, q = ${bits.map((b, i) => `q${i}`).join("·")} (${bits.join("+")} bits), Δ=2^${p.global_scale_bits}; (sk, pk) <- KeyGen`,
-            next: "Next: the transport layer gets its own, separate key.",
-            renderVisual: (el) => {
-                el.innerHTML = `
-                    <div class="scene-title">CKKS parameters &amp; keys</div>
-                    <div class="scene-body">
-                        <div class="param-grid">
-                            <div class="param-card"><div class="param-name">Ring degree N</div><div class="param-value">${p.poly_modulus_degree}</div><div class="param-note">polynomials have N coefficients</div></div>
-                            <div class="param-card"><div class="param-name">SIMD slots</div><div class="param-value">${p.poly_modulus_degree / 2}</div><div class="param-note">values packed per ciphertext</div></div>
-                            <div class="param-card"><div class="param-name">Scale Δ</div><div class="param-value">2^${p.global_scale_bits}</div><div class="param-note">fixed-point precision</div></div>
-                        </div>
-                        <div class="vector-caption">Coefficient modulus chain -- ${totalBits} bits total:</div>
-                        <div class="modulus-chain">${bits.map((b) => `<div class="modulus-prime" style="flex:${b}">${b}-bit</div>`).join("")}</div>
-                        <div class="key-row">
-                            <div class="key-chip secret">secret key sk<span>stays on your machine</span></div>
-                            <div class="key-chip">public key pk<span>encrypts; safe to share</span></div>
-                            <div class="key-chip">Galois keys<span>let the server rotate slots</span></div>
-                        </div>
-                    </div>`;
-            },
-        },
-        {
-            what: usedPassphrase && wrapEvent
-                ? `Transport key derived from your passphrase with PBKDF2 (200,000 iterations). Key fingerprint ${wrapEvent.data_after.key_fingerprint}...`
-                : "No passphrase given, so transport uses a fresh random AES-256 key, itself encrypted with a fresh RSA key pair.",
-            why: "The CKKS keys protect the math; this separate key protects the bytes in transit. Locking it with your own passphrase re-runs the whole pipeline with a key only you could reproduce.",
-            formal: usedPassphrase ? "k = PBKDF2-HMAC-SHA256(passphrase, salt, 200000)" : "k <- random 256 bits; enc_k = RSA-OAEP_pk(k)",
-            next: "Your feature vector is encrypted with the CKKS public key next.",
-            renderVisual: (el) => {
-                el.innerHTML = `
-                    <div class="scene-title">Transport key</div>
-                    <div class="scene-body">
-                        <p class="step-text">Optionally lock the transport step with your own passphrase instead of a random key (re-runs the pipeline):</p>
-                        <input type="text" id="keyPassphraseInput" class="input-text" placeholder="Type your own passphrase">
-                        <button id="lockKeyBtn" class="btn" type="button" style="margin-top:0.75rem">Lock with my passphrase</button>
-                        <span id="lockKeyStatus" class="overview-status"></span>
-                        <div style="margin-top:1rem">
-                            ${usedPassphrase && wrapEvent ? `
-                                <p class="step-text">Your passphrase was run through <strong>PBKDF2 (200,000 iterations)</strong> to derive a real 256-bit AES key.</p>
-                                <div class="data-preview">Derived key fingerprint: ${escapeHtml(wrapEvent.data_after.key_fingerprint)}...</div>
-                            ` : `<p class="step-text muted">No passphrase locked yet -- a random AES+RSA wrap is used for transport.</p>`}
-                        </div>
-                    </div>`;
-                const btn = el.querySelector("#lockKeyBtn");
-                const status = el.querySelector("#lockKeyStatus");
-                btn.addEventListener("click", async () => {
-                    const val = el.querySelector("#keyPassphraseInput").value;
-                    if (!val.trim()) { status.className = "overview-status error"; status.textContent = "Type a passphrase first."; return; }
-                    btn.disabled = true;
-                    status.className = "overview-status";
-                    status.textContent = "Re-running with your passphrase...";
-                    const r = await runPipeline(result.model, result.input_text, val);
-                    btn.disabled = false;
-                    if (!r.ok) { status.className = "overview-status error"; status.textContent = r.error; return; }
-                    if (window.onPassphraseRelock) window.onPassphraseRelock();
-                });
-            },
-        },
-    ];
-}
+// --- Key Setup: see key_setup_steps.js --------------------------------------
 
-// --- Encryption ------------------------------------------------------------
-function buildEncryptionSteps(result) {
-    const loadEv = result.events.find((e) => e.operation_name === "load_plaintext");
-    const encEv = result.events.find((e) => e.operation_name === "ckks_encrypt");
-    const vec = inputVector(result);
-    const preview = (vec.some((v) => v.value !== 0) ? vec.filter((v) => v.value !== 0) : vec).slice(0, 8);
-    const rawBytes = vec.length * 8; // float64 per value
-    const ctSize = encEv.data_after.ciphertext_size;
-    const vectorHtml = `<div class="vector-row">${preview.map((v) => `
-        <div class="vector-cell"><div class="vector-name">${escapeHtml(v.name ?? "x[" + v.index + "]")}</div><div class="vector-value">${fmt(v.value)}</div></div>`).join("")}
-        ${vec.length > preview.length ? `<div class="vector-cell more">+${(vec.length - preview.length).toLocaleString()} more</div>` : ""}</div>`;
-    return [
-        {
-            what: loadEv.description,
-            why: loadEv.why,
-            formal: loadEv.formal,
-            next: loadEv.next_step,
-            renderVisual: (el) => {
-                el.innerHTML = `
-                    <div class="scene-title">Plaintext input</div>
-                    <div class="scene-body">
-                        <div class="vector-caption">Readable feature vector (${vec.length.toLocaleString()} values${vec.length > preview.length ? ", non-zero ones shown" : ""}):</div>
-                        ${vectorHtml}
-                    </div>`;
-            },
-        },
-        {
-            what: `${encEv.description} -- ${ctSize.toLocaleString()} bytes, ~${Math.round(ctSize / rawBytes).toLocaleString()}x the ${rawBytes.toLocaleString()} bytes of raw float64 values.`,
-            why: encEv.why,
-            formal: encEv.formal,
-            next: encEv.next_step,
-            renderVisual: (el) => {
-                el.innerHTML = `
-                    <div class="scene-title">Encryption</div>
-                    <div class="scene-body">
-                        ${vectorHtml}
-                        <div class="flow-down">&#8595; Enc<sub>pk</sub></div>
-                        <div class="ciphertext-box">${escapeHtml(encEv.data_after.hex_preview)}...</div>
-                        <p class="step-text muted">First ${encEv.data_after.hex_preview.length / 2} of ${ctSize.toLocaleString()} ciphertext bytes (${formatBytes(ctSize)}). This unreadable blob is all the server ever receives.</p>
-                    </div>`;
-            },
-        },
-    ];
-}
+// --- Encryption: see encryption_steps.js ------------------------------------
 
 // --- CKKS Deep-Dive ----------------------------------------------------
 function buildDeepDiveSteps(deepDive) {
@@ -408,9 +291,11 @@ function buildDeepDiveSteps(deepDive) {
 
 // --- Computation ---------------------------------------------------------
 const COMPUTE_BAND_LABELS = {
-    weight_multiply: "weight × feature terms",
+    compute_overview: "what is computed",
+    compute_general_form: "the real encrypted op",
+    weight_multiply: "non-zero terms (teaching mirror)",
+    zero_terms: "zero terms",
     add_bias: "add bias",
-    ckks_vectorized_compute: "the real encrypted SIMD op",
 };
 
 function buildComputationSteps(result) {
@@ -439,12 +324,15 @@ function buildComputationSteps(result) {
             } else if (ev.operation_name === "add_bias") {
                 body = `
                     <div class="compute-current-line">${escapeHtml(ev.description)}</div>
-                    <div class="compute-sum"><span>raw score (plaintext-equivalent)</span><strong>${fmt(ev.data_after.raw_score)}</strong></div>`;
-            } else {
+                    <div class="compute-sum"><span>score (plaintext-equivalent)</span><strong>${fmt(ev.data_after.score)}</strong></div>`;
+            } else if (ev.operation_name === "compute_general_form") {
+                const d = ev.data_after;
                 body = `
-                    <div class="compute-current-line">Enc(x) · w + b &nbsp;→&nbsp; Enc(score)</div>
-                    <div class="ciphertext-box">${escapeHtml(ev.data_after.hex_preview)}...</div>
-                    <p class="step-text muted">Encrypted result: ${ev.data_after.ciphertext_size.toLocaleString()} bytes (${formatBytes(ev.data_after.ciphertext_size)}). The server never saw a single plaintext value.</p>`;
+                    <div class="compute-current-line">${escapeHtml(ev.formal)}</div>
+                    <div class="ciphertext-box">${escapeHtml(d.output_ciphertext_b64)}</div>
+                    <p class="step-text muted">Encrypted result: ${d.output_ciphertext_size.toLocaleString()} bytes (${formatBytes(d.output_ciphertext_size)}), SHA-256 ${escapeHtml(d.output_ciphertext_sha256)}. Computed in ${fmt(d.he_elapsed_ms, 0)} ms on a context with no secret key.</p>`;
+            } else {
+                body = `<div class="compute-current-line">${escapeHtml(ev.description)}</div>`;
             }
             el.innerHTML = `<div class="scene-title">Computation on encrypted data</div><div class="scene-body">${body}</div>`;
         },
@@ -469,50 +357,7 @@ function buildComputationBands(result) {
     return bands;
 }
 
-// --- Transport -------------------------------------------------------------
-function renderTransportVisual(el, wrapEv, dir, integrity) {
-    const d = wrapEv.data_after;
-    el.innerHTML = `
-        <div class="scene-title">Secure transport</div>
-        <div class="scene-body">
-            <div class="transport-track">
-                <span class="transport-endpoint">Server</span>
-                <div class="transport-packet" id="transportPacket"></div>
-                <span class="transport-endpoint">You</span>
-            </div>
-            <div class="ciphertext-box">${escapeHtml(d.hex_preview || "")}...</div>
-            <p class="step-text muted">AES ciphertext: ${d.aes_ciphertext_size.toLocaleString()} bytes${d.rsa_key_size ? ` · RSA-wrapped AES key: ${d.rsa_key_size} bytes` : ""}</p>
-            ${integrity === undefined ? "" : `<p class="step-text">Integrity check: <span class="${integrity ? "badge-match" : "badge-mismatch"}">${integrity ? "bytes identical ✓" : "bytes differ ✕"}</span></p>`}
-        </div>
-    `;
-    // "out": the wrapped result travels server -> you; "arrived": it's already here.
-    el.querySelector("#transportPacket").classList.add(dir === "out" ? "transport-packet-outbound" : "transport-packet-arrived");
-}
-
-function buildTransportSteps(result) {
-    const wrapEv = result.events.find((e) => e.operation_name === "passphrase_aes_wrap" || e.operation_name === "rsa_aes_wrap");
-    const unwrapEv = result.events.find((e) => e.operation_name === "rsa_aes_unwrap");
-    const steps = [];
-    if (wrapEv) {
-        steps.push({
-            what: wrapEv.description,
-            why: wrapEv.why,
-            formal: wrapEv.formal,
-            next: wrapEv.next_step,
-            renderVisual: (el) => renderTransportVisual(el, wrapEv, "out"),
-        });
-    }
-    if (unwrapEv) {
-        steps.push({
-            what: unwrapEv.description,
-            why: unwrapEv.why,
-            formal: unwrapEv.formal,
-            next: unwrapEv.next_step,
-            renderVisual: (el) => renderTransportVisual(el, wrapEv || unwrapEv, "arrived", unwrapEv.data_after.integrity_preserved),
-        });
-    }
-    return steps;
-}
+// --- Transport: see transport_steps.js ---------------------------------------
 
 // --- Decryption ------------------------------------------------------------
 // Sigmoid curve over [-8, 8] with the real score marked (clamped to the plot).
@@ -541,24 +386,41 @@ function sigmoidPlotSvg(score) {
 }
 
 function buildDecryptionSteps(result) {
-    const ev = result.events.find((e) => e.operation_name === "ckks_decrypt");
-    const score = ev.data_after.raw_score;
-    const p = ev.data_after.sigmoid;
-    return [
-        {
-            what: ev.description,
-            why: ev.why,
-            formal: ev.formal,
-            next: ev.next_step,
+    const ev = findEv(result, "ckks_decrypt");
+    const score = result.raw_score;
+    const p = result.sigmoid_score;
+    const decryptStep = {
+        what: ev.description,
+        why: ev.why,
+        formal: ev.formal,
+        next: ev.next_step,
+        renderVisual: (el) => {
+            el.innerHTML = `
+                <div class="scene-title">Decryption</div>
+                <div class="scene-body">
+                    <div class="compute-current-line">Dec<sub>sk</sub>(ciphertext) &nbsp;→&nbsp; ${ev.data_after.scores.length === 1 ? fmt(score, 6) : `${ev.data_after.scores.length} class scores`}</div>
+                    <p class="step-text muted" style="text-align:center">Only your secret key can do this. The compute node never had it.</p>
+                </div>`;
+        },
+    };
+    if (result.task === "multiclass") {
+        const ranked = result.probabilities.map((pr, i) => ({ pr, i, s: result.scores[i] })).sort((a, b) => b.pr - a.pr).slice(0, 5);
+        return [decryptStep, {
+            what: `softmax over the ${result.scores.length} decrypted class scores: the top class is "${resultLabel(result.model, result.he_pred)}" with p = ${fmt(result.probabilities[result.he_pred])}.`,
+            why: "Each class got its own linear score; softmax turns them into probabilities that sum to 1. Like the sigmoid, it isn't a polynomial, so it runs after decryption, on your side.",
+            formal: "p_j = e^{s_j} / Σ_k e^{s_k};  prediction = argmax_j s_j",
+            next: "Next it's compared against the plaintext result.",
             renderVisual: (el) => {
                 el.innerHTML = `
-                    <div class="scene-title">Decryption</div>
-                    <div class="scene-body">
-                        <div class="compute-current-line">Dec<sub>sk</sub>(ciphertext) &nbsp;→&nbsp; ${fmt(score, 6)}</div>
-                        <p class="step-text muted" style="text-align:center">Only your secret key can do this. The server never had it.</p>
-                    </div>`;
+                    <div class="scene-title">Scores → probabilities</div>
+                    <div class="scene-body"><div class="compute-ledger">${ranked.map((r) => `
+                        <div class="compute-term${r.i === result.he_pred ? " current" : ""}"><span class="term-name">${escapeHtml(resultLabel(result.model, r.i))}</span><span>score ${fmt(r.s)} · p = <strong>${fmt(r.pr)}</strong></span></div>`).join("")}
+                    </div></div>`;
             },
-        },
+        }];
+    }
+    return [
+        decryptStep,
         {
             what: `sigmoid(${fmt(score)}) = 1 / (1 + e^${fmt(-score)}) = ${fmt(p)} -- a ${(p * 100).toFixed(1)}% probability of "${resultLabel(result.model, 1)}".`,
             why: "The raw score can be any real number; the sigmoid maps it to a probability between 0 and 1. It isn't a polynomial, so it's applied after decryption, on your side -- the server only ever computed the linear part.",
@@ -602,7 +464,7 @@ function buildResultSteps(result) {
         {
             what: `Plaintext prediction: ${result.plain_pred} (${plainLabel}). HE prediction: ${result.he_pred} (${heLabel}). ${result.match ? "They match." : "They DO NOT match."}`,
             why: "A match means the model reached the same conclusion on the encrypted ciphertext as it did on your original plaintext input -- proof the computation was correct even though the server never saw your real data.",
-            formal: "predict(x) == Dec_sk(f(Enc_pk(x))) > 0",
+            formal: result.task === "multiclass" ? "argmax W·x + b  ==  argmax Dec_sk(Enc_pk(x)·Wᵀ + b)" : "predict(x) == [Dec_sk(Enc_pk(x)·wᵀ + b) > 0]",
             next: "See the Benchmarks chapter for how much slower this was compared to plaintext.",
             renderVisual: (el) => {
                 el.innerHTML = `

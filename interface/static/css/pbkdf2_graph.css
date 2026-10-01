@@ -1,0 +1,84 @@
+/* PBKDF2 node graph (interface/static/js/pbkdf2_graph.js). */
+.pg-scroll {
+    width: 100%;
+    overflow-x: auto;
+    padding: 6px 0;
+}
+
+.pg-graph {
+    position: relative;
+    display: grid;
+    gap: 30px 44px;
+    min-width: 640px;
+    padding: 4px;
+    box-sizing: border-box;
+}
+
+.pg-edges {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.pg-edge {
+    fill: none;
+    stroke: var(--color-border);
+    stroke-width: 2;
+    transition: stroke 0.3s;
+}
+
+.pg-edge.flowing { stroke: var(--color-warning); stroke-dasharray: 5 4; }
+.pg-edge.lit { stroke: var(--color-primary-hover); }
+
+.pg-packet {
+    fill: var(--color-warning);
+    filter: drop-shadow(0 0 6px var(--color-warning));
+}
+
+.pg-node {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    opacity: 0.55;
+    cursor: default;
+    transition: opacity 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+.pg-node.lit { opacity: 1; border-color: var(--color-primary-hover); }
+
+.pg-node.focus {
+    opacity: 1;
+    border-color: var(--color-warning);
+    box-shadow: 0 0 0 1px var(--color-warning), 0 0 18px color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+
+.pg-node-title {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-bottom: 3px;
+}
+
+.pg-node-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pg-node.focus .pg-node-value { color: var(--color-warning); }
+
+/* Phone: shrink the graph to the screen instead of scrolling it sideways. */
+@media (max-width: 640px) {
+    .pg-graph { min-width: 0; gap: 18px 12px; }
+    .pg-node { padding: 5px 6px; border-radius: 7px; }
+    .pg-node-title { font-size: 9px; line-height: 1.25; }
+    .pg-node-value { font-size: 9.5px; }
+}

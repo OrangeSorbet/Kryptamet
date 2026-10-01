@@ -5,6 +5,7 @@ from hecrypto.transport import (
     generate_rsa_keypair,
     wrap_payload,
     unwrap_payload,
+    tamper_test,
 )
 
 
@@ -26,6 +27,12 @@ def run_roundtrip_test():
 
     assert unwrapped_bytes == serialized_ciphertext, "Transport layer altered ciphertext bytes"
     print("PASS: transport round-trip preserved ciphertext bytes")
+
+    tt = tamper_test(rsa_private_key, wrapped)
+    assert tt["rejected"] and tt["tag_flip"]["rejected"]
+    print(f"PASS: flipping bit {tt['bit']} of ciphertext byte {tt['flipped_byte_index']} "
+          f"({tt['byte_before']}->{tt['byte_after']}) and bit {tt['tag_flip']['bit']} of tag byte "
+          f"{tt['tag_flip']['flipped_byte_index']} were both rejected with {tt['error']}")
 
 
 if __name__ == "__main__":

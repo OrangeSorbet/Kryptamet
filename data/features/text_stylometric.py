@@ -46,6 +46,10 @@ def extract_traced(text):
     num_unique_words = len(set(w.lower() for w in words))
     num_punct = sum(1 for c in text if c in '.,;:!?"\'')
     num_upper = sum(1 for c in text if c.isupper())
+    word_chars = sum(len(w) for w in words)
+    # Values come from extract() itself, so the trace is exactly what the model receives.
+    (_, _, avg_word_len, _, avg_sentence_len, lexical_diversity,
+     punct_ratio, upper_ratio) = (float(v) for v in extract([text])[0])
 
     steps = []
 
@@ -65,10 +69,9 @@ def extract_traced(text):
         "next": "Used directly as one input, and as the denominator for punctuation_ratio and uppercase_ratio below.",
     })
 
-    avg_word_len = num_chars / num_words if num_words else 0.0
     steps.append({
         "name": "avg_word_length",
-        "raw_computation": f"char_count / word_count = {num_chars} / {num_words} = {avg_word_len:.4f}",
+        "raw_computation": f"mean length of the words (spaces excluded) = {word_chars} / {num_words} = {avg_word_len:.4f}",
         "value": avg_word_len,
         "why": "Average word length can differ between human and AI writing styles (AI often favors more uniform, moderate-length words).",
         "next": "Used directly as one input value to the model.",
@@ -82,7 +85,6 @@ def extract_traced(text):
         "next": "Used directly as one input, and as the denominator for avg_sentence_length below.",
     })
 
-    avg_sentence_len = num_words / num_sentences
     steps.append({
         "name": "avg_sentence_length",
         "raw_computation": f"word_count / sentence_count = {num_words} / {num_sentences} = {avg_sentence_len:.4f}",
@@ -91,7 +93,6 @@ def extract_traced(text):
         "next": "Used directly as one input value to the model.",
     })
 
-    lexical_diversity = num_unique_words / num_words if num_words else 0.0
     steps.append({
         "name": "lexical_diversity",
         "raw_computation": f"unique_words / word_count = {num_unique_words} / {num_words} = {lexical_diversity:.4f}",
@@ -100,7 +101,6 @@ def extract_traced(text):
         "next": "Used directly as one input value to the model.",
     })
 
-    punct_ratio = num_punct / num_chars if num_chars else 0.0
     steps.append({
         "name": "punctuation_ratio",
         "raw_computation": f"punctuation_chars / char_count = {num_punct} / {num_chars} = {punct_ratio:.4f}",
@@ -109,7 +109,6 @@ def extract_traced(text):
         "next": "Used directly as one input value to the model.",
     })
 
-    upper_ratio = num_upper / num_chars if num_chars else 0.0
     steps.append({
         "name": "uppercase_ratio",
         "raw_computation": f"uppercase_chars / char_count = {num_upper} / {num_chars} = {upper_ratio:.4f}",
@@ -128,3 +127,31 @@ def extract_traced(text):
     })
 
     return steps
+
+
+FEATURE_NAMES = [
+    "word_count", "char_count", "avg_word_length", "sentence_count",
+    "avg_sentence_length", "lexical_diversity", "punctuation_ratio", "uppercase_ratio",
+]
+
+_CAPTIONS = [
+    "number of whitespace-separated words in your text",
+    "number of characters in your text (spaces included)",
+    "mean word length in your text",
+    "number of . ! ? runs in your text (at least 1)",
+    "words per sentence in your text",
+    "unique words / total words in your text",
+    "share of your characters that are punctuation",
+    "share of your characters that are uppercase",
+]
+
+
+def featurize(text):
+    x = extract([text])[0].astype(float)
+    return {
+        "x": x,
+        "feature_names": list(FEATURE_NAMES),
+        "x_captions": list(_CAPTIONS),
+        "feature_trace": extract_traced(text),
+        "input_echo": {"text": text},
+    }

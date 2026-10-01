@@ -22,18 +22,20 @@ const CHAPTER_INTROS = {
     },
     key: {
         title: "Key Setup",
-        io: "CKKS parameters → secret key + public key (+ transport key)",
+        io: "random numbers + a passphrase → CKKS keys, 2 RSA keypairs, 1 AES key",
         sections: [
-            ["What this stage does", "Builds the CKKS context -- ring size N, the modulus chain q, the fixed-point scale -- and generates the key pair. Separately, the transport layer gets a key: random RSA+AES by default, or one derived from a passphrase you type."],
-            ["Why it comes before encryption", "Every later step depends on these exact keys. The public key encrypts your data, and only this secret key can decrypt the result. A key generated later wouldn't match the ciphertext."],
+            ["What this stage does", "Creates every key the pipeline uses, step by step. The server makes the CKKS keys (it keeps the secret one) and an RSA keypair; the client makes its own RSA keypair. Then a passphrase -- yours, or a random one -- is stretched by PBKDF2 into the AES-256 key that protects the first network trip."],
+            ["What you will see", "The real primes and exponents of both RSA keys, re-checked in your browser. PBKDF2 as a graph of nodes, with the key flowing through it. A zoom into one node shows the SHA-256 compression inside HMAC as matrices, round by round. At the end your browser re-derives the same AES key on its own."],
+            ["Why it comes first", "Every later step depends on these exact keys. A key generated later wouldn't match the ciphertext or the wrapped envelopes."],
         ],
     },
     encrypt: {
         title: "Encryption",
         io: "feature vector → one CKKS ciphertext",
         sections: [
-            ["What this stage does", "Packs the whole feature vector into the slots of a single CKKS ciphertext using the public key. The result is a few hundred kilobytes of bytes that look random."],
-            ["Why the server can't just read it", "Without the secret key, recovering the values means solving a hard lattice problem (Ring-LWE). The ciphertext is safe to send anywhere."],
+            ["What this stage does", "The server packs the whole feature vector into the slots of a single CKKS ciphertext using the public key. The result is a few hundred kilobytes of bytes that look random."],
+            ["What you will see", "Every stage of the real encryption: the vector repeated across all slots, scaling to integers, the polynomial m(X) (all of its coefficients), its residues modulo three primes, the two ciphertext polynomials, the serialized bytes, and a decryption round trip. Your browser re-checks each stage, including evaluating m(X) at every slot root to get your values back."],
+            ["Why nobody can just read it", "Without the secret key, recovering the values means solving a hard lattice problem (Ring-LWE). The ciphertext is safe to send anywhere."],
         ],
     },
     deepdive: {
@@ -52,12 +54,21 @@ const CHAPTER_INTROS = {
             ["Why only linear math here", "CKKS can only add and multiply. Logistic regression's score (w·x + b) is exactly that; the sigmoid is applied after decryption, on your side."],
         ],
     },
-    transport: {
-        title: "Transport",
-        io: "ciphertext bytes → wrapped payload → the same bytes",
+    transport_out: {
+        title: "Transport → client",
+        io: "Enc(x) on the server → sealed packet → Enc(x) on the client",
         sections: [
-            ["What this stage does", "Wraps the already-encrypted result in a second, independent layer for the network: AES for the bulk bytes, with the AES key protected by RSA (or derived from your passphrase with PBKDF2). Then it unwraps and checks the bytes arrived unchanged."],
-            ["Why a second layer", "Defense in depth. The transport layer protects the bytes in transit and proves they weren't tampered with, independent of CKKS."],
+            ["What this stage does", "The server seals the CKKS ciphertext for the network: AES-256-GCM (with the PBKDF2 key) encrypts the bytes and adds a 16-byte tag, and RSA-OAEP locks the AES key with the client's public key. The client opens the envelope with its private key, checks the tag, and gets the CKKS ciphertext back -- still encrypted, so it can compute on it but not read it."],
+            ["Why HE goes on first", "The client has to compute on the CKKS ciphertext. Nothing can be computed on AES or RSA bytes, so CKKS is the inner layer and transport encryption wraps it only for the trip."],
+            ["What you will see", "The AES key schedule, a zoom into one AES block with all 14 rounds as 4×4 matrices, the S-box, counter-mode XOR, the GHASH tag, the opened RSA-OAEP envelope, the packet, and a tamper test. Your browser recomputes every one of them, and decrypts the real payload itself."],
+        ],
+    },
+    transport_back: {
+        title: "Transport ← server",
+        io: "Enc(score) on the client → sealed packet → Enc(score) on the server",
+        sections: [
+            ["What this stage does", "The client sends the encrypted result back. It does not know the passphrase, so it draws a fresh random AES-256 key, seals the result with AES-256-GCM, and locks the key with the server's RSA public key. The server opens it with its private key and checks the tag."],
+            ["Why seal it again", "The result is still CKKS-encrypted, so nobody on the route can read it -- but they could change it. The GCM tag guarantees the server decrypts exactly what the client computed."],
         ],
     },
     decrypt: {

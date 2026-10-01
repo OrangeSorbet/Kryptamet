@@ -1,0 +1,308 @@
+/* Key Setup chapter visuals (interface/static/js/key_setup_steps.js). */
+
+/* Staggered reveal of a block's children; .ks-instant on revisits. */
+.ks-reveal > * { animation: ks-rise 0.45s ease-out both; }
+.ks-reveal > :nth-child(2) { animation-delay: 0.25s; }
+.ks-reveal > :nth-child(3) { animation-delay: 0.5s; }
+.ks-reveal > :nth-child(4) { animation-delay: 0.75s; }
+.ks-reveal > :nth-child(5) { animation-delay: 1s; }
+.ks-reveal > :nth-child(6) { animation-delay: 1.25s; }
+.ks-reveal > :nth-child(n+7) { animation-delay: 1.5s; }
+.ks-reveal.ks-instant > * { animation: none; }
+
+@keyframes ks-rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Step 1: party diagram */
+.party-grid {
+    display: grid;
+    grid-template-columns: 1fr minmax(180px, 0.8fr) 1fr;
+    gap: 14px;
+    align-items: start;
+}
+
+.party-col,
+.party-mid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.party-head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-text-muted);
+    text-align: center;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.party-item {
+    padding: 9px 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 9px;
+    min-width: 0;
+}
+
+.party-item.secret { border-color: var(--color-warning); }
+.party-item-name { font-size: 13.5px; color: var(--color-text); }
+
+.party-item-note {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.party-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 6px 8px;
+    border: 1px dashed var(--color-border);
+    border-radius: 9px;
+    font-size: 12.5px;
+    color: var(--color-text);
+    text-align: center;
+}
+
+.party-arrow-dir { font-size: 20px; line-height: 1; color: var(--color-primary-hover); }
+
+/* Step 3: context size bars */
+.size-bars { display: flex; flex-direction: column; gap: 12px; }
+
+.size-bar-row {
+    display: grid;
+    grid-template-columns: 250px 1fr 130px;
+    gap: 4px 12px;
+    align-items: center;
+}
+
+.size-bar-name { font-size: 13px; color: var(--color-text); }
+.size-bar { height: 14px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 7px; overflow: hidden; }
+
+.size-bar-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--color-primary-hover);
+    transition: width 1.1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.size-bar-fill.secret { background: var(--color-warning); }
+.size-bar-fill.galois { background: var(--color-primary); }
+.size-bar-val { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-muted); text-align: right; }
+
+.size-bar-sha {
+    grid-column: 1 / -1;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+}
+
+/* Steps 4-6: RSA numbers */
+.rsa-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+}
+
+.rsa-wide { grid-column: 1 / -1; }
+.rsa-compact .bignum-box { max-height: calc(2 * 1.5em + 12px); }
+.ks-wrap { overflow-wrap: anywhere; }
+
+.rsa-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    margin-bottom: 4px;
+}
+
+.rsa-name { font-family: var(--font-mono); font-size: 16px; color: var(--color-warning); min-width: 2.5em; }
+.rsa-formula { font-size: 12.5px; color: var(--color-text); }
+.rsa-bits { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); }
+
+.bignum-box {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--color-text);
+    word-break: break-all;
+    max-height: calc(3 * 1.5em + 12px);
+    overflow-y: auto;
+}
+
+.ks-checks,
+.ks-verify {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+}
+
+.ks-verify { flex-direction: column; margin-top: 0.75rem; }
+
+.ks-check {
+    padding: 4px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.ks-check.ok { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 45%, transparent); }
+.ks-check.bad { color: var(--color-error); border-color: var(--color-error); }
+.ks-verify .ks-check { border-radius: 8px; }
+
+/* Step 7: passphrase + lock controls */
+.ks-passphrase {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px;
+    margin-bottom: 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+}
+
+.ks-passphrase.yours { border-color: var(--color-warning); }
+.ks-passphrase-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--color-text-muted); }
+.ks-passphrase-value { font-family: var(--font-mono); font-size: 24px; color: var(--color-warning); overflow-wrap: anywhere; text-align: center; }
+
+.ks-lock-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.ks-lock-row .input-text { flex: 1 1 240px; min-width: 0; margin: 0; }
+.ks-lock-btns { display: flex; gap: 8px; flex: 0 1 auto; }
+.ks-lock-btns .btn { white-space: nowrap; }
+.ks-lock-btns .btn:disabled { opacity: 0.6; cursor: progress; }
+
+.ks-btn-alt {
+    background: transparent;
+    border: 1px solid var(--color-primary-hover);
+    color: var(--color-text);
+}
+
+.ks-btn-alt:hover { background: color-mix(in srgb, var(--color-primary) 35%, transparent); }
+
+/* Segment colours shared by byte-matrix cells and legends */
+.bm-seg-ipad { background: color-mix(in srgb, var(--color-primary) 30%, var(--color-bg)); color: var(--color-text); }
+.bm-seg-salt { background: color-mix(in srgb, var(--color-warning) 22%, var(--color-bg)); color: var(--color-text); }
+.bm-seg-int { background: color-mix(in srgb, var(--color-success) 25%, var(--color-bg)); color: var(--color-text); }
+.bm-seg-one { background: color-mix(in srgb, var(--color-error) 30%, var(--color-bg)); color: var(--color-text); }
+.bm-seg-len { background: color-mix(in srgb, var(--color-text-muted) 30%, var(--color-bg)); color: var(--color-text); }
+.bm-seg-key { background: color-mix(in srgb, var(--color-warning) 18%, var(--color-bg)); color: var(--color-text); }
+.bm-seg-msg { background: color-mix(in srgb, var(--color-primary) 30%, var(--color-bg)); color: var(--color-text); }
+.bm-seg-zero { color: var(--color-text-muted); }
+
+.ks-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 0.5rem;
+    font-size: 11px;
+}
+
+.ks-legend span {
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border);
+}
+
+.ks-matrix-trio {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 14px;
+}
+
+.ks-matrix-trio .poly-label { display: flex; justify-content: center; gap: 6px; }
+
+/* SHA-256 rounds: 64 rows scroll inside a capped box */
+.ks-tall .byte-matrix-scroll { max-height: 330px; overflow-y: auto; }
+
+.ks-zoom-host { width: 100%; }
+.ks-u1 { margin-top: 0.75rem; word-break: break-all; }
+
+/* U chain table */
+.uchain-table {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    overflow: auto;
+    max-height: 190px;
+}
+
+.uchain-row {
+    display: grid;
+    grid-template-columns: 90px minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    padding: 2px 8px;
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+    min-width: 560px;
+}
+
+.uchain-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uchain-headrow { background: transparent; font-size: 10.5px; }
+.uchain-i { color: var(--color-text); }
+.uchain-t { color: var(--color-warning); }
+.uchain-row:last-child .uchain-t { font-weight: var(--font-weight-bold); }
+.uchain-gap { text-align: center; color: var(--color-text-muted); font-style: italic; padding: 1px 0; min-width: 560px; }
+
+/* Summary */
+.ks-summary { display: flex; flex-direction: column; gap: 6px; }
+
+.ks-summary-row {
+    display: grid;
+    grid-template-columns: 190px 170px 170px 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-surface);
+    font-size: 12.5px;
+    color: var(--color-text);
+}
+
+.ks-summary-key { color: var(--color-warning); font-weight: var(--font-weight-bold); }
+.ks-summary-size { font-family: var(--font-mono); font-size: 11.5px; color: var(--color-text-muted); }
+.ks-summary-use { color: var(--color-text-muted); }
+
+/* Step 15 shares the scene with the chain table: tighter graph. */
+.ks-graph-compact .pg-graph { gap: 16px 44px; }
+.ks-graph-compact .pg-node { padding: 5px 10px; }
+
+@media (max-width: 640px) {
+    .rsa-grid { grid-template-columns: minmax(0, 1fr); }
+    .party-grid { grid-template-columns: 1fr; }
+    .party-arrow-dir { transform: rotate(90deg); } /* columns stack: server above client */
+    .size-bar-row { grid-template-columns: 1fr 90px; }
+    .size-bar-row .size-bar { grid-column: 1 / -1; grid-row: 2; }
+    .rsa-bits { margin-left: 0; }
+    .ks-lock-btns { flex: 1 1 100%; }
+    .ks-lock-btns .btn { flex: 1; padding: 0.6rem 0.5rem; white-space: normal; }
+    .ks-summary-row { grid-template-columns: 1fr; gap: 2px; }
+}

@@ -1,4 +1,4 @@
-// The 9 real chapters in pipeline order. `requiresResult: false` (only
+// The 10 real chapters in pipeline order. `requiresResult: false` (only
 // Benchmarks) means the chapter is reachable from the flowchart before
 // running any inference. `buildSteps` and `stepBands` are called once,
 // right after a run completes (see chapter_state.js). `summary` is the
@@ -12,29 +12,39 @@ function formatBytes(n) {
 
 const findEvent = (result, name) => result.events.find((e) => e.operation_name === name);
 
+function transportSummary(result, leg) {
+    const w = findEvent(result, `${leg}_wrap`).data_after;
+    const u = findEvent(result, `${leg}_unwrap`).data_after;
+    return `AES-256-GCM · ${formatBytes(w.aes_ciphertext_size)}`
+        + (u.integrity_preserved && u.tag_verified ? " · tag ✓" : " · CORRUPTED")
+        + (u.tamper_test.rejected ? " · tamper rejected" : " · TAMPER ACCEPTED");
+}
+
 const CHAPTERS = [
     { id: "feature", label: "Feature Extraction", requiresResult: true,
       buildSteps: (result) => buildFeatureSteps(result),
-      summary: (result) => result.feature_trace
-          ? `${result.feature_dim} stylometric features`
-          : `${result.feature_dim.toLocaleString()}-dim TF-IDF vector` },
+      summary: (result) => (result.model === "sms_spam"
+          ? `${result.feature_dim.toLocaleString()}-dim TF-IDF vector`
+          : `${result.feature_dim.toLocaleString()} ${result.model === "human_vs_ai_text" ? "stylometric " : ""}features`) },
     { id: "key", label: "Key Setup", requiresResult: true,
       buildSteps: (result) => buildKeySteps(result),
-      summary: (result) => `N=${result.ckks_params.poly_modulus_degree} · scale 2^${result.ckks_params.global_scale_bits}` },
+      summary: (result) => `CKKS N=${result.ckks_params.poly_modulus_degree} · 2× RSA-${findEvent(result, "rsa_keygen_server").data_after.key_size} · PBKDF2 ${findEvent(result, "pbkdf2").data_after.iterations.toLocaleString()}×` },
     { id: "encrypt", label: "Encryption", requiresResult: true,
       buildSteps: (result) => buildEncryptionSteps(result),
-      summary: (result) => `→ ${formatBytes(findEvent(result, "ckks_encrypt").data_after.ciphertext_size)} ciphertext` },
+      summary: (result) => `→ ${formatBytes(findEvent(result, "ckks_encrypt").data_after.serialization.size_bytes)} ciphertext` },
     { id: "deepdive", label: "CKKS Deep-Dive", requiresResult: true, requiresDeepDive: true,
       buildSteps: (result, deepDive) => buildDeepDiveSteps(deepDive),
       summary: (result, deepDive) => `${deepDive.original_vector.length} values · N=${deepDive.encode.m_coeffs.length} ring` },
+    { id: "transport_out", label: "Transport → client", requiresResult: true,
+      buildSteps: (result) => buildTransportSteps(result, "leg1"),
+      summary: (result) => transportSummary(result, "leg1") },
     { id: "compute", label: "Computation", requiresResult: true,
       buildSteps: (result) => buildComputationSteps(result),
       stepBands: (result) => buildComputationBands(result),
-      summary: (result) => `${result.events.filter((e) => e.operation_name === "weight_multiply").length} multiplies + bias → 1 SIMD op` },
-    { id: "transport", label: "Transport", requiresResult: true,
-      buildSteps: (result) => buildTransportSteps(result),
-      summary: (result) => (result.used_passphrase ? "PBKDF2+AES" : "RSA+AES")
-          + (findEvent(result, "rsa_aes_unwrap").data_after.integrity_preserved ? " · intact ✓" : " · CORRUPTED") },
+      summary: (result) => `Enc(x)·Wᵀ + b · ${result.events.filter((e) => e.operation_name === "weight_multiply").length} non-zero terms` },
+    { id: "transport_back", label: "Transport ← server", requiresResult: true,
+      buildSteps: (result) => buildTransportSteps(result, "leg2"),
+      summary: (result) => transportSummary(result, "leg2") },
     { id: "decrypt", label: "Decryption", requiresResult: true,
       buildSteps: (result) => buildDecryptionSteps(result),
       summary: (result) => `score = ${result.raw_score.toFixed(4)}` },
