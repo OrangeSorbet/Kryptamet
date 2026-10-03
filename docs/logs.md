@@ -945,3 +945,40 @@
 - **Check:** tmp/vn2.py, german_credit + symptom_diagnosis, all 9 chapters × every step × 3 levels:
   - 1,790 labels rendered; no raw tokens in the explanations or scenes; no console errors
   - fixed along the way: the toy-table row name was escaped (step 7), the label fallback for token-named rows, a quoted-name regex typo
+
+## [Phase 7C · 7C.7 extra 2] 2026-10-03 — real values in every popup and every variable (user request)
+- **Rule (user):** wherever a variable has a value in the current step, show the value with the variable underneath, except where the variable is being assigned (`x = …`, including reassignments). Long values: full up to 40 characters; past that `first16…last16 (n digits)`, which expands on click. Whole polynomials keep their symbol. Values TenSEAL hides stay symbols. All three levels.
+- **var_label.js:**
+  - `kv(value, labelTex)` = KaTeX `\underset{\scriptstyle label}{\mathtt{value}}`, shortened past 40 chars, escaping _ # % & $
+  - `vnHtml` shortens past 40 chars into a `.vn-long` click-to-expand value with its digit count
+  - `vnVars` swaps the declared step variables (whole symbols only; not inside words, after an apostrophe or hyphen, before "(" or "e.g."; not when followed by "=")
+  - `withVars(steps, vars)`
+  - the VN_AUTO number pattern no longer swallows a trailing comma
+- **New chapter_vars.js** with per-chapter variables:
+  - How HE: TOY q, Δ, s, e, pk0/pk1, x₁, x₂, m₁, m₂, w₁, w₂, b; per-step c0/c1 (u/e0/e1/m on the unlock)
+  - Key Setup: N, Δ, P, K, U₁, T; each RSA step gets its party's p, q, n, e, d, λ(n), and the ELI1 twins the toy RSA numbers
+  - Encryption: N, Δ, d, q₀ q₁ q₂, q, m₀
+  - Transport: n, e, d, k, H, J₀, c (the receiver's RSA)
+  - Computation: Δ, b (binary)
+  - Result: p (binary)
+  - Up close: N, q, Δ; b only in the compute part (elsewhere b is the public-key polynomial)
+- **explain_level.js:** `levelVars` (ELI1 uses its twin's toy vars). scrubber.js and linkExplanation pass the vars through.
+- **Popups with real values** (kv):
+  - Up close: m, s, a, b = (−(a s)ₖ + eₖ) mod q, c0/c1 with (b u)ₖ and (a u)ₖ, ŵ, c0′, the chunk sum, each rotation (previous + KS term), β, m′. Product coefficients are computed on hover with the new `ddCoef`.
+  - Encryption: the slot rule, m rows, c₀ = ((pk₀u + e₀)ᵢ + mᵢ) mod q₀ (hidden part = c₀ − m mod q₀), c₁, header bytes
+  - Key Setup:
+    - padding bytes, P, salt, K, ipad, opad
+    - the schedule with σ₀/σ₁ values (sha256_check now returns them)
+    - the full T₁/T₂ round sums with h, Σ₁, Ch, K, W, Σ₀, Maj, a and e
+    - H′, U₁ bytes, the U/T chain (neighbours shown as values when sampled), T bytes
+  - Transport: key bytes; key schedule (rot/sub/rcon values); nonce/J₀; state; K₀; ARK; SubBytes; ShiftRows; MixColumns terms; AddRoundKey; S-box rows; P⊕K = C; DB = maskedDB ⊕ MGF1
+  - Feature: symptom flags, pixels ÷ 255
+  - PBKDF2 graph boxes
+- **Popup placement** (cell_formula.js): below, else above, else beside the hovered cell; never on top of it. Max width 900 px.
+- **Fixed during checks:**
+  - single backslashes from heredocs (`\cdot`, `\text` in a template literal) on deep_dive_steps 47–48 and pbkdf2_graph; tmp/scan_tex.py now finds none
+  - escaped braces broke `2^{60}`
+  - the Up-close b was wrongly swapped for the bias
+- **Checks:**
+  - tmp/vn2.py: german_credit + symptom_diagnosis, every chapter, step and level: 2,802 labels; no raw tokens, no bad text, no console errors
+  - tmp/pv2.py: 256 popups hovered across all chapters (human_vs_ai_text): no KaTeX errors

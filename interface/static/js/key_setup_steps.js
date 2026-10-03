@@ -164,14 +164,14 @@ function buildKeySteps(result) {
         if (i >= paddedBytes.length - 8) return "bm-seg-len";
         return "bm-seg-zero";
     };
-    const segEq = (i) => ({
+    const segEq = (i) => { const lhs = ({
         "bm-seg-ipad": `(K \\oplus \\mathrm{ipad})_{${i}}`,
         "bm-seg-salt": `\\mathrm{salt}_{${i - 64}}`,
         "bm-seg-int": `\\mathrm{INT}(1)_{${i - 64 - saltLen}}`,
         "bm-seg-one": "\\text{end marker } 1\\text{ bit}",
         "bm-seg-zero": "\\text{zero padding}",
-        "bm-seg-len": `\\text{length} = ${sha.message_bit_length}\\text{ bits}`,
-    })[segOf(i)] + ` = \\mathtt{${paddedBytes[i]}}`;
+        "bm-seg-len": `\\text{length} = ${kv(sha.message_bit_length, "\\text{bits}")}`,
+    })[segOf(i)]; return `${lhs} = ${kv(paddedBytes[i], `\\text{byte}_{${i}}`)}`; };
     const renderPadded = (el, skip) => {
         el.innerHTML = `${innerCrumbs}
             <div class="vector-caption">SHA-256 input: (K ⊕ ipad) ‖ salt ‖ INT(1) = ${msgLen} bytes, padded to ${paddedBytes.length} bytes = ${blockNo} blocks of 64 (rows ${blockNo > 1 ? "1–4 are block 1, 5–8 block 2" : "1–4"}):</div>
@@ -345,6 +345,7 @@ function buildKeySteps(result) {
                 what: `Toy RSA: p = 5, q = 11, so n = ⟨5|p⟩ × ⟨11|q⟩ = ⟨55|n⟩.`,
                 why: `Splitting 55 back into 5 × 11 is easy because 55 is tiny. Your real n has ${rsaS.n.length} digits: nobody can split it.`,
                 formal: "toy: n = ⟨5|p⟩ × ⟨11|q⟩ = ⟨55|n⟩.",
+                vars: { p: 5, q: 11, n: 55 },
                 next: "Next: the toy lock and key.",
             },
             what: `The client picked two random primes, p (${rsaS.bit_lengths.p} bits, ${rsaS.p.length} digits) and q (${rsaS.bit_lengths.q} bits), and multiplied them: n = p·q has ${rsaS.bit_lengths.n} bits (${rsaS.n.length} decimal digits).`,
@@ -352,6 +353,7 @@ function buildKeySteps(result) {
             formal: `n = p · q; browser: p·q = n ${checksS.primes[2].ok ? "✓" : "✕"}, Fermat(p) ${checksS.primes[0].ok ? "✓" : "✕"}, Fermat(q) ${checksS.primes[1].ok ? "✓" : "✕"}`,
             next: "Next: the client turns p and q into its public and private exponents.",
             facts: [{ id: "rsa_n_client", label: "Your RSA public modulus n = p × q", value: rsaS.n }],
+            vars: { p: rsaS.p, q: rsaS.q, n: rsaS.n, e: rsaS.e, "λ(n)": rsaS.lambda },
             renderVisual: (el) => renderRsaKeypair(el, rsaS, checksS, false),
         },
         {
@@ -366,11 +368,13 @@ function buildKeySteps(result) {
                 why: "⟨3|e⟩ × ⟨7|d⟩ leaves remainder 1 after dividing by ⟨20|λ⟩, so raising to 3 then to 7 goes all the way round the cycle and lands on the start. The real run does exactly this with numbers hundreds of digits long.",
                 formal: `toy: ⟨2|m⟩³ mod ⟨55|n⟩ = ⟨8|c⟩; ⟨8|c⟩⁷ mod ⟨55|n⟩ = ${vn(Number(8n ** 7n % 55n), "m")}.`,
                 next: "Next: the server's own toy-sized pair.",
+                vars: { p: 5, q: 11, n: 55, "λ": 20, e: 3, d: 7 },
             },
             what: `λ(n) = lcm(p−1, q−1) (${rsaS.bit_lengths.lambda} bits). Public exponent e = ${rsaS.e}; private exponent d = e⁻¹ mod λ(n) (${rsaS.bit_lengths.d} bits). Public key = (n, e), private key = d. Your browser re-checked ${[...checksS.primes, ...checksS.exponents].length} identities: ${allOk(checksS) ? "all hold" : "SOME FAILED"}.`,
             why: "Raising a number to e and then to d (mod n) gives it back unchanged, because e·d ≡ 1 mod λ(n). Computing λ(n), and so d, needs p and q -- which is why only the key's owner can undo what anyone can do with the public (n, e).",
             formal: rsaSEv.formal,
             next: rsaSEv.next_step,
+            vars: { p: rsaS.p, q: rsaS.q, n: rsaS.n, e: rsaS.e, d: rsaS.d, "λ(n)": rsaS.lambda },
             renderVisual: (el) => renderRsaKeypair(el, rsaS, checksS, true),
         },
         {
@@ -385,12 +389,14 @@ function buildKeySteps(result) {
                 why: "A different pair from yours: what is locked for the server can't be opened with your key, and the other way round.",
                 formal: `toy: ⟨2|m⟩⁵ mod ⟨91|n⟩ = ⟨32|c⟩; ⟨32|c⟩⁵ mod ⟨91|n⟩ = ${vn(Number(32n ** 5n % 91n), "m")}.`,
                 next: "Next: the passphrase.",
+                vars: { p: 7, q: 13, n: 91, "λ": 12, e: 5, d: 5 },
             },
             what: `${rsaCEv.description} Test on the real leg-1 AES key: m^e mod n, then ^d mod n, gives the key back ${demoBack === demoM ? "exactly ✓" : "WRONG ✕"}.`,
             why: rsaCEv.why,
             formal: `c = m^e mod n, m = c^d mod n (m = the ${d.dklen}-byte AES key); ${rsaCEv.formal}`,
             next: rsaCEv.next_step,
             facts: [{ id: "rsa_n_server", label: "The server's RSA public modulus n", value: rsaC.n }],
+            vars: { p: rsaC.p, q: rsaC.q, n: rsaC.n, e: rsaC.e, d: rsaC.d, "λ(n)": rsaC.lambda },
             renderVisual: (el) => renderRsaKeypair(el, rsaC, checksC, true, `
                 <div class="vector-caption ks-wrap">Textbook RSA on the real ${d.dklen}-byte leg-1 AES key m = 0x${escapeHtml(d.transport_key_hex)} (the real envelope adds OAEP random padding first):</div>
                 <div class="rsa-row"><div class="rsa-head"><span class="rsa-name">c</span><span class="rsa-formula">m^e mod n</span><span class="rsa-bits">${demoC.toString().length} digits</span></div><div class="bignum-box">${demoC.toString()}</div></div>
@@ -462,10 +468,10 @@ function buildKeySteps(result) {
                 return renderByteMatrix(el.querySelector("#ksPBytes"), pBytes, {
                     cols: Math.min(16, pBytes.length), skipAnimation: ksSkip(),
                     title: (i) => `P[${i}] = 0x${pBytes[i]}${pChar(i)}`,
-                    equation: (i) => `P_{${i}} = \\mathtt{0x${pBytes[i]}}`,
+                    equation: (i) => `P_{${i}} = ${kv(`0x${pBytes[i]}`, `P_{${i}}`)}`,
                 }).then(() => renderByteMatrix(el.querySelector("#ksSalt"), sBytes, {
                     cols: Math.min(16, sBytes.length), skipAnimation: ksSkip(), cellClass: () => "bm-seg-salt",
-                    equation: (i) => `\\mathrm{salt}_{${i}} \\leftarrow \\text{random byte} = \\mathtt{0x${sBytes[i]}}`,
+                    equation: (i) => `\\mathrm{salt}_{${i}} \\leftarrow \\text{random byte} = ${kv(`0x${sBytes[i]}`, `\\mathrm{salt}_{${i}}`)}`,
                 }));
             },
         },
@@ -517,9 +523,9 @@ function buildKeySteps(result) {
                 const ip = bytesOfHex(hk.K_xor_ipad_hex), op = bytesOfHex(hk.K_xor_opad_hex);
                 const opts = (extra) => ({ cols: 8, cellClass: cls, skipAnimation: ksSkip(), ...extra });
                 return Promise.all([
-                    renderByteMatrix(el.querySelector("#ksK"), kBytes, opts({ equation: (i) => (i < keyLen ? `K_{${i}} = P_{${i}} = \\mathtt{${kBytes[i]}}` : `K_{${i}} = \\mathtt{00}\\ \\text{(pad)}`) })),
-                    renderByteMatrix(el.querySelector("#ksIpad"), ip, opts({ equation: (i) => `\\mathtt{${kBytes[i]}} \\oplus \\mathtt{36} = \\mathtt{${ip[i]}}` })),
-                    renderByteMatrix(el.querySelector("#ksOpad"), op, opts({ equation: (i) => `\\mathtt{${kBytes[i]}} \\oplus \\mathtt{5c} = \\mathtt{${op[i]}}` })),
+                    renderByteMatrix(el.querySelector("#ksK"), kBytes, opts({ equation: (i) => (i < keyLen ? `K_{${i}} = P_{${i}} = ${kv(kBytes[i], `K_{${i}}`)}` : `K_{${i}} = ${kv("00", `K_{${i}}`)}\\ \\text{(pad)}`) })),
+                    renderByteMatrix(el.querySelector("#ksIpad"), ip, opts({ equation: (i) => `${kv(kBytes[i], `K_{${i}}`)} \\oplus ${kv("36", "\\mathrm{ipad}")} = ${kv(ip[i], `(K \\oplus \\mathrm{ipad})_{${i}}`)}` })),
+                    renderByteMatrix(el.querySelector("#ksOpad"), op, opts({ equation: (i) => `${kv(kBytes[i], `K_{${i}}`)} \\oplus ${kv("5c", "\\mathrm{opad}")} = ${kv(op[i], `(K \\oplus \\mathrm{opad})_{${i}}`)}` })),
                 ]);
             },
         },
@@ -576,9 +582,11 @@ function buildKeySteps(result) {
                     rowLabels: [0, 1, 2, 3, 4, 5, 6, 7].map((r) => `W${r * 8}`),
                     cellClass: (t) => (t < 16 ? "bm-seg-msg" : ""),
                     title: (t) => `W${t} = ${W[t]}${t >= 16 ? (shaCheck.schedule[t].ok ? " ✓ recomputed" : " ✕") : " (message word)"}`,
-                    equation: (t) => (t < 16
-                        ? `W_{${t}} = M_{${t}} = \\mathtt{${W[t]}}`
-                        : `W_{${t}} = \\sigma_1(W_{${t - 2}}) + W_{${t - 7}} + \\sigma_0(W_{${t - 15}}) + W_{${t - 16}} = \\mathtt{${W[t]}}`),
+                    equation: (t) => {
+                        if (t < 16) return `W_{${t}} = M_{${t}} = ${kv(W[t], `W_{${t}}`)}`;
+                        const c = shaCheck.schedule[t];
+                        return `W_{${t}} = ${kv(c.s1, `\\sigma_1(W_{${t - 2}})`)} + ${kv(W[t - 7], `W_{${t - 7}}`)} + ${kv(c.s0, `\\sigma_0(W_{${t - 15}})`)} + ${kv(W[t - 16], `W_{${t - 16}}`)} \\bmod 2^{32} = ${kv(W[t], `W_{${t}}`)}`;
+                    },
                 });
             },
         },
@@ -615,7 +623,7 @@ function buildKeySteps(result) {
                     title: (i) => { const r = shaCheck.rounds[Math.floor(i / 8)]; return `round ${r.t}: T1=${r.T1} T2=${r.T2} K=${r.K} W=${r.W} ${r.ok ? "✓" : "✕"}`; },
                     equation: (t) => {
                         const r = shaCheck.rounds[t];
-                        return `\\begin{aligned} t=${t}:\\ T_1 &= h + \\Sigma_1(e) + \\mathrm{Ch}(e,f,g) + K_{${t}} + W_{${t}} = \\mathtt{${r.T1}} \\\\ T_2 &= \\Sigma_0(a) + \\mathrm{Maj}(a,b,c) = \\mathtt{${r.T2}} \\\\ a &\\leftarrow T_1 + T_2,\\ e \\leftarrow d + T_1 \\end{aligned}`;
+                        return `\\begin{aligned} t=${t}:\\ T_1 &= ${kv(r.h, "h")} + ${kv(r.S1, "\\Sigma_1(e)")} + ${kv(r.ch, "\\mathrm{Ch}(e,f,g)")} + ${kv(r.K, `K_{${t}}`)} + ${kv(r.W, `W_{${t}}`)} = ${kv(r.T1, "T_1")} \\\\ T_2 &= ${kv(r.S0, "\\Sigma_0(a)")} + ${kv(r.maj, "\\mathrm{Maj}(a,b,c)")} = ${kv(r.T2, "T_2")} \\\\ a &\\leftarrow ${kv(r.T1, "T_1")} + ${kv(r.T2, "T_2")} = ${kv(r.a2, "a")},\\quad e \\leftarrow ${kv(r.d, "d")} + ${kv(r.T1, "T_1")} = ${kv(r.e2, "e")} \\end{aligned}`;
                     },
                 });
             },
@@ -643,10 +651,10 @@ function buildKeySteps(result) {
                 const u1 = bytesOfHex(d.u1.outer_digest_hex);
                 return renderByteMatrix(el.querySelector(".ks-digest"), block.H_after, {
                     cols: 8, skipAnimation: ksSkip(), cellClass: () => "bm-seg-msg",
-                    equation: (i) => `H'_{${i}} = H_{${i}} + \\mathrm{reg}_{${i}} \\bmod 2^{32} = \\mathtt{${block.H_after[i]}}`,
+                    equation: (i) => `H'_{${i}} = ${kv(block.H_before[i], `H_{${i}}`)} + ${kv(block.rounds[block.rounds.length - 1][i], `\\mathrm{reg}_{${i}}`)} \\bmod 2^{32} = ${kv(block.H_after[i], `H'_{${i}}`)}`,
                 }).then(() => renderByteMatrix(el.querySelector(".ks-u1-matrix"), u1, {
                     cols: 16, skipAnimation: ksSkip(), cellClass: () => "bm-seg-key",
-                    equation: (i) => `U_1[${i}] = \\mathrm{SHA256}((K \\oplus \\mathrm{opad}) \\| \\mathrm{inner})[${i}] = \\mathtt{${u1[i]}}`,
+                    equation: (i) => `U_1[${i}] = \\mathrm{SHA256}((K \\oplus \\mathrm{opad}) \\| ${kv(ksShort(d.u1.inner_digest_hex), "\\mathrm{inner}")})[${i}] = ${kv(u1[i], `U_1[${i}]`)}`,
                 }));
             },
         },
@@ -683,10 +691,12 @@ function buildKeySteps(result) {
                         </div>
                     </div>`;
                 attachFormulaHover(el.querySelector(".uchain-table"), ".uchain-u, .uchain-t", (c) => {
-                    const i = +c.dataset.i, u = d.u_chain.find((v) => v.i === i);
+                    // The previous U / T appear as values when they are among the sampled rows, else as symbols.
+                    const i = +c.dataset.i, u = d.u_chain.find((v) => v.i === i), prev = d.u_chain.find((v) => v.i === i - 1);
+                    const P = kv(`"${pp}"`, "P"), S = kv(d.salt_hex, "S");
                     return c.classList.contains("uchain-u")
-                        ? { tex: i === 1 ? "U_1 = \\mathrm{HMAC}(P,\\ S \\,\\|\\, \\mathrm{INT}(1))" : `U_{${i}} = \\mathrm{HMAC}(P,\\ U_{${i - 1}})`, note: u.U_i }
-                        : { tex: i === 1 ? "T_1 = U_1" : `T_{${i}} = T_{${i - 1}} \\oplus U_{${i}}`, note: u.T_after_i };
+                        ? { tex: i === 1 ? `U_1 = \\mathrm{HMAC}(${P},\\ ${S} \\,\\|\\, \\mathrm{INT}(1)) = ${kv(u.U_i, "U_1")}` : `U_{${i}} = \\mathrm{HMAC}(${P},\\ ${prev ? kv(prev.U_i, `U_{${i - 1}}`) : `U_{${i - 1}}`}) = ${kv(u.U_i, `U_{${i}}`)}`, note: u.U_i }
+                        : { tex: i === 1 ? `T_1 = U_1 = ${kv(u.T_after_i, "T_1")}` : `T_{${i}} = ${prev ? kv(prev.T_after_i, `T_{${i - 1}}`) : `T_{${i - 1}}`} \\oplus ${kv(u.U_i, `U_{${i}}`)} = ${kv(u.T_after_i, `T_{${i}}`)}`, note: u.T_after_i };
                 });
             },
         },
@@ -716,7 +726,7 @@ function buildKeySteps(result) {
                     </div>`;
                 const matrix = renderByteMatrix(el.querySelector("#ksFinal"), kb, {
                     cols: 8, skipAnimation: ksSkip(), cellClass: () => "bm-seg-key",
-                    equation: (i) => `T_{${i}} = \\textstyle\\bigoplus_{j=1}^{${d.iterations}} U_j[${i}] = \\mathtt{${kb[i]}}`,
+                    equation: (i) => `T_{${i}} = \\textstyle\\bigoplus_{j=1}^{${kv(d.iterations.toLocaleString(), "c")}} U_j[${i}] = ${kv(kb[i], `T_{${i}}`)}`,
                 });
                 const check = webCryptoCheck().then((r) => {
                     const box = el.querySelector("#ksWebCrypto");

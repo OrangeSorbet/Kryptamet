@@ -8,6 +8,11 @@
     margin: 0 1px;
 }
 .vn-v { white-space: nowrap; }
+.vn-long { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.vn-long.vn-open { white-space: normal; word-break: break-all; }
+.vn-v:has(.vn-open) { white-space: normal; }
+.vn:has(.vn-open) { display: inline; }
+.vn-len { font-size: 0.6em; color: var(--color-text-muted); margin-left: 4px; }
 .vn-l {
     font-family: var(--font-sans, inherit);
     font-size: 0.62em;

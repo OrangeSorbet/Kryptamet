@@ -26,7 +26,7 @@ function checkSha256Block(block) {
         if (t < 16) return { t, value: shaHex(w), ok: shaWord(block.words[t]) === w };
         const s0 = shaRotr(W[t - 15], 7) ^ shaRotr(W[t - 15], 18) ^ (W[t - 15] >>> 3);
         const s1 = shaRotr(W[t - 2], 17) ^ shaRotr(W[t - 2], 19) ^ (W[t - 2] >>> 10);
-        return { t, value: shaHex(w), ok: ((W[t - 16] + s0 + W[t - 7] + s1) >>> 0) === w };
+        return { t, value: shaHex(w), s0: shaHex(s0), s1: shaHex(s1), ok: ((W[t - 16] + s0 + W[t - 7] + s1) >>> 0) === w };
     });
     let prev = block.H_before.map(shaWord);
     const rounds = block.rounds.map((row, t) => {
@@ -40,7 +40,11 @@ function checkSha256Block(block) {
         const next = [(T1 + T2) >>> 0, a, b, c, (d + T1) >>> 0, e, f, g];
         const actual = row.map(shaWord);
         prev = actual;
-        return { t, T1: shaHex(T1), T2: shaHex(T2), K: shaHex(SHA256_K[t]), W: shaHex(W[t]), ok: next.every((v, i) => v === actual[i]) };
+        return {
+            t, T1: shaHex(T1), T2: shaHex(T2), K: shaHex(SHA256_K[t]), W: shaHex(W[t]),
+            h: shaHex(h), S1: shaHex(S1), ch: shaHex(ch >>> 0), S0: shaHex(S0 >>> 0), maj: shaHex(maj >>> 0), d: shaHex(d),
+            a2: shaHex(next[0]), e2: shaHex(next[4]), ok: next.every((v, i) => v === actual[i]),
+        };
     });
     const hIn = block.H_before.map(shaWord);
     const hAfterOk = prev.every((v, i) => ((v + hIn[i]) >>> 0) === shaWord(block.H_after[i]));

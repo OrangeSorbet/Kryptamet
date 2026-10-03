@@ -42,12 +42,16 @@ function buildDeepDiveSteps(dd, result, stage) {
             ${rows.map(([label, vals]) => `<div class="recover-row"><span>${escapeHtml(label)}</span>${slots.map((j) => `<span class="recover-val" data-j="${j}" data-label="${escapeHtml(label)}" data-v="${escapeHtml(String(vals[j]))}">${fmt(vals[j])}</span>`).join("")}</div>`).join("")}
         </div>`;
     const hookSlotTables = (el) => el.querySelectorAll(".recover-table").forEach((t) => attachFormulaHover(t, ".recover-val", (c) => {
-        const j = +c.dataset.j, f = SLOT_TEX[c.dataset.label];
-        return { tex: f ? f(j) : null, note: `slot ${j}${names[base + j] !== undefined ? ` (${names[base + j]})` : ""}: ${c.dataset.label} = ${c.dataset.v}` };
+        const j = +c.dataset.j, f = SLOT_TEX[c.dataset.label], v = fmt(Number(c.dataset.v), 6);
+        // x·w also shows its two factors as values.
+        const factors = c.dataset.label === "x·w" ? `${kv(fmt(C.xs[j], 6), `x_{${base + j}}`)} \\cdot ${kv(fmt(dd.weights[base + j] ?? 0, 6), `w_{${base + j}}`)} = ` : "";
+        return { tex: f ? `${f(j)} = ${factors}${kv(v, c.dataset.label === "x" || c.dataset.label === "w" ? f(j) : `\\text{slot } ${j}`)}` : null, note: `slot ${j}${names[base + j] !== undefined ? ` (${names[base + j]})` : ""}: ${c.dataset.label} = ${c.dataset.v}` };
     }));
     const grid = (el, sel, coeffs, name, eq) => renderPolyGrid(el.querySelector(sel), coeffs, buildIndexedEquations(coeffs.length, eq), { name, skipAnimation: skip() }).done;
-    // Negacyclic product coefficient k: terms with i + j ≥ N come back negated.
-    const mulEq = (a, b) => (k) => `\\sum_{i+j\\equiv ${k}} \\pm ${a}_i ${b}_j`;
+    // Popup terms: each value with its variable underneath (var_label.js kv). Product coefficients are
+    // computed on hover (ddCoef: one coefficient of the negacyclic product, 256 BigInt multiplications).
+    const qTex = kv("2^{60}", "q");
+    const mulKv = (A, B, k, label) => kv(String(ddCoef(A, B, k)), label);
 
     const chunkLine = P.n_chunks > 1
         ? `x has ${dd.original_vector.length} values, more than the ${P.slots} slots of one N=${P.N} ciphertext, so it is split into ${P.n_chunks} chunks. Chunk ${P.shown_chunk + 1} (features ${base}–${base + P.slots - 1}) holds ${nzSlots.length} of your non-zero values, so it is the one shown.`
@@ -71,7 +75,7 @@ function buildDeepDiveSteps(dd, result, stage) {
                 el.innerHTML = `${title("Encoding")}<div class="poly-label">m(X): your chunk as ${P.N} integer coefficients</div>
                     ${renderChecks([{ label: `browser: m(ζ^(5^j))/Δ = x for all ${P.slots} slots (max err ${e1(r.xErr)})`, ok: r.xErr < 1e-4 }])}
                     ${slotTable(shownSlots, [["x", C.xs], ["decoded", r.mx]], true)}<div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", dd.encode.m_coeffs, "m", (k) => `m_{${k}} = \\mathrm{round}\\big(\\Delta \\sum_j V^{-1}_{${k},j}\\, z_j\\big)`);
+                return grid(el, "#ddGrid", dd.encode.m_coeffs, "m", (k) => `m_{${k}} = \\mathrm{round}\\big(${kv(P.scale, "\\Delta")} \\sum_j V^{-1}_{${k},j}\\, z_j\\big) = ${kv(dd.encode.m_coeffs[k], `m_{${k}}`)}`);
             },
         },
         {
@@ -87,7 +91,7 @@ function buildDeepDiveSteps(dd, result, stage) {
             next: "Next: the public key, built from s.",
             renderVisual: (el) => {
                 el.innerHTML = `${title("Secret key")}<div class="poly-label">s(X): ternary secret key</div><div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", dd.keygen.secret_key_s, "s", (k) => `s_{${k}} \\leftarrow \\{-1,0,1\\}`);
+                return grid(el, "#ddGrid", dd.keygen.secret_key_s, "s", (k) => `s_{${k}} \\leftarrow \\{-1,0,1\\} = ${kv(dd.keygen.secret_key_s[k], `s_{${k}}`)}`);
             },
         },
         {
@@ -110,8 +114,8 @@ function buildDeepDiveSteps(dd, result, stage) {
                         <div><div class="poly-label">b(X) = −a·s + e (mod q)</div><div id="ddB"></div></div>
                     </div>`;
                 return Promise.all([
-                    grid(el, "#ddA", dd.keygen.public_key_a, "a", (k) => `a_{${k}} \\leftarrow \\mathrm{Uniform}(0, q)`),
-                    grid(el, "#ddB", dd.keygen.public_key_b, "b", (k) => `b_{${k}} = \\Big(-${mulEq("a", "s")(k)} + e_{${k}}\\Big) \\bmod q`),
+                    grid(el, "#ddA", dd.keygen.public_key_a, "a", (k) => `a_{${k}} \\leftarrow \\mathrm{Uniform}(0, ${qTex}) = ${kv(dd.keygen.public_key_a[k], `a_{${k}}`)}`),
+                    grid(el, "#ddB", dd.keygen.public_key_b, "b", (k) => `b_{${k}} = \\big(-${mulKv(dd.keygen.public_key_a, dd.keygen.secret_key_s, k, `(a s)_{${k}}`)} + ${kv(dd.keygen.error_e[k], `e_{${k}}`)}\\big) \\bmod ${qTex} = ${kv(dd.keygen.public_key_b[k], `b_{${k}}`)}`),
                 ]);
             },
         },
@@ -130,7 +134,7 @@ function buildDeepDiveSteps(dd, result, stage) {
                 const r = C.c0();
                 el.innerHTML = `${title("Encrypt: c0")}${renderChecks([{ label: `browser: c0 ≡ b·u + e1 + m (mod 2^60), exact (${ms(r)})`, ok: r.ok }])}
                     <div class="poly-label">c0(X)</div><div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", dd.encrypt.c0, "c0", (k) => `c0_{${k}} = \\Big(${mulEq("b", "u")(k)}\\Big) + e1_{${k}} + m_{${k}} \\bmod q`);
+                return grid(el, "#ddGrid", dd.encrypt.c0, "c0", (k) => `c0_{${k}} = \\big(${mulKv(dd.keygen.public_key_b, dd.encrypt.ephemeral_u, k, `(b u)_{${k}}`)} + ${kv(dd.encrypt.error_e1[k], `e1_{${k}}`)} + ${kv(dd.encode.m_coeffs[k], `m_{${k}}`)}\\big) \\bmod ${qTex} = ${kv(dd.encrypt.c0[k], `c0_{${k}}`)}`);
             },
         },
         {
@@ -151,7 +155,7 @@ function buildDeepDiveSteps(dd, result, stage) {
                     { label: `browser decrypt (c0 + c1·s)/Δ = x (max err ${e1(f.err)}), = client's decrypt`, ok: slotOk(f.err) && f.serverOk },
                 ])}${slotTable(shownSlots, [["x", C.xs], ["decrypted", f.slots]], true)}
                     <div class="poly-label">c1(X)</div><div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", dd.encrypt.c1, "c1", (k) => `c1_{${k}} = \\Big(${mulEq("a", "u")(k)}\\Big) + e2_{${k}} \\bmod q`);
+                return grid(el, "#ddGrid", dd.encrypt.c1, "c1", (k) => `c1_{${k}} = \\big(${mulKv(dd.keygen.public_key_a, dd.encrypt.ephemeral_u, k, `(a u)_{${k}}`)} + ${kv(dd.encrypt.error_e2[k], `e2_{${k}}`)}\\big) \\bmod ${qTex} = ${kv(dd.encrypt.c1[k], `c1_{${k}}`)}`);
             },
         },
         {
@@ -169,7 +173,7 @@ function buildDeepDiveSteps(dd, result, stage) {
                 const r = C.encode();
                 el.innerHTML = `${title("Encode the weights")}${renderChecks([{ label: `browser: ŵ(ζ^(5^j))/Δ = w (max err ${e1(r.wErr)})`, ok: r.wErr < 1e-4 }])}
                     ${slotTable(shownSlots, [["w", C.ws], ["decoded", r.mw]], true)}<div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", dd.encode.w_coeffs, "ŵ", (k) => `\\hat w_{${k}} = \\mathrm{round}\\big(\\Delta \\sum_j V^{-1}_{${k},j}\\, w_j\\big)`);
+                return grid(el, "#ddGrid", dd.encode.w_coeffs, "ŵ", (k) => `\\hat w_{${k}} = \\mathrm{round}\\big(${kv(P.scale, "\\Delta")} \\sum_j V^{-1}_{${k},j}\\, w_j\\big) = ${kv(dd.encode.w_coeffs[k], `\\hat w_{${k}}`)}`);
             },
         },
         {
@@ -190,7 +194,7 @@ function buildDeepDiveSteps(dd, result, stage) {
                     { label: `decrypted slots = x_j·w_j (max err ${e1(r.err)})`, ok: slotOk(r.err) },
                 ])}${slotTable(shownSlots, [["x·w", r.want], ["decrypted", r.slots]], true)}
                     <div class="poly-label">c0·ŵ (c1·ŵ checked too)</div><div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", ev.mul_plain.c0, "c0'", (k) => `c0'_{${k}} = ${mulEq("c0", "\\hat w")(k)} \\bmod q`);
+                return grid(el, "#ddGrid", ev.mul_plain.c0, "c0'", (k) => `c0'_{${k}} = ${mulKv(dd.encrypt.c0, dd.encode.w_coeffs, k, `(c0\\,\\hat w)_{${k}}`)} \\bmod ${qTex} = ${kv(ev.mul_plain.c0[k], `c0'_{${k}}`)}`);
             },
         },
     ];
@@ -211,7 +215,7 @@ function buildDeepDiveSteps(dd, result, stage) {
                 const r = C.chunkSum();
                 el.innerHTML = `${title("Add the chunks")}${renderChecks([{ label: `decrypted slots = per-slot chunk sums (max err ${e1(r.err)}, ${ms(r)})`, ok: slotOk(r.err) }])}
                     ${slotTable(first8, [["Σ x·w", r.want], ["decrypted", r.slots]])}<div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", ev.chunk_sum.c0, "c0Σ", (k) => `c0^{\\Sigma}_{${k}} = \\sum_{c} c0'^{(c)}_{${k}} \\bmod q`);
+                return grid(el, "#ddGrid", ev.chunk_sum.c0, "c0Σ", (k) => `c0^{\\Sigma}_{${k}} = \\sum_{c=1}^{${P.n_chunks}} c0'^{(c)}_{${k}} \\bmod ${qTex} = ${kv(ev.chunk_sum.c0[k], `c0^{\\Sigma}_{${k}}`)}`);
             },
         });
     }
@@ -237,7 +241,11 @@ function buildDeepDiveSteps(dd, result, stage) {
                     { label: `decrypted slots = plaintext partial sums (max err ${e1(g.err)}, ${ms(g)})`, ok: slotOk(g.err) },
                 ])}${slotTable(first8, [["partial Σ", g.want], ["decrypted", g.slots]])}
                     <div class="poly-label">c0 after round ${r + 1} (c1 changes too)</div><div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", rot.c0, `c0⁽${r + 1}⁾`, (k) => `c0^{(${r + 1})}_{${k}} = c0^{(${r})}_{${k}} + \\big[\\mathrm{KS}(\\sigma_{${rot.galois}}(c^{(${r})}))\\big]_{0,${k}} \\bmod q`);
+                return grid(el, "#ddGrid", rot.c0, `c0⁽${r + 1}⁾`, (k) => {
+                    const prev = r ? ev.rotations[r - 1].c0[k] : ev.chunk_sum.c0[k];
+                    const ks = ddCenter(BigInt(rot.c0[k]) - BigInt(prev));
+                    return `c0^{(${r + 1})}_{${k}} = ${kv(prev, `c0^{(${r})}_{${k}}`)} + ${kv(String(ks), `\\mathrm{KS}(\\sigma_{${rot.galois}}(c^{(${r})}))_{0,${k}}`)} \\bmod ${qTex} = ${kv(rot.c0[k], `c0^{(${r + 1})}_{${k}}`)}`;
+                });
             },
         });
     });
@@ -260,7 +268,7 @@ function buildDeepDiveSteps(dd, result, stage) {
                     { label: `browser: c0 + β exact, c1 unchanged (${ms(r)})`, ok: r.ok },
                     { label: `β decodes to b = ${fmt(dd.bias)} in every slot (max err ${e1(r.biasErr)})`, ok: r.biasErr < 1e-6 },
                 ])}<div class="poly-label">β(X): the bias at scale Δ²</div><div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", ev.bias_pt, "β", (k) => `\\beta_{${k}} = \\mathrm{round}\\big(\\Delta^2 \\sum_j V^{-1}_{${k},j}\\, b\\big)`);
+                return grid(el, "#ddGrid", ev.bias_pt, "β", (k) => `\\beta_{${k}} = \\mathrm{round}\\big(${kv(`2^{${2 * Math.log2(P.scale)}}`, "\\Delta^2")} \\sum_j V^{-1}_{${k},j}\\, ${kv(fmt(dd.bias), "b")}\\big) = ${kv(ev.bias_pt[k], `\\beta_{${k}}`)}`);
             },
         },
         {
@@ -278,7 +286,7 @@ function buildDeepDiveSteps(dd, result, stage) {
                 const r = C.decrypt();
                 el.innerHTML = `${title("Decrypt")}${renderChecks([{ label: `browser: m′ ≡ c0 + c1·s (mod 2^60), exact (${ms(r)})`, ok: r.ok }])}
                     <div class="poly-label">m′(X)</div><div id="ddGrid"></div>`;
-                return grid(el, "#ddGrid", dd.decrypt.m_prime, "m′", (k) => `m'_{${k}} = \\Big(c0_{${k}} + ${mulEq("c1", "s")(k)}\\Big) \\bmod q`);
+                return grid(el, "#ddGrid", dd.decrypt.m_prime, "m′", (k) => `m'_{${k}} = \\big(${kv(ev.add_bias.c0[k], `c0_{${k}}`)} + ${mulKv(ev.add_bias.c1, dd.keygen.secret_key_s, k, `(c1\\,s)_{${k}}`)}\\big) \\bmod ${qTex} = ${kv(dd.decrypt.m_prime[k], `m'_{${k}}`)}`);
             },
         },
         {

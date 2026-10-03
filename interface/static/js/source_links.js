@@ -27,8 +27,9 @@ const srcLinkHtml = (id, text) => (FACTS.has(id)
 
 // Explanation text → HTML: source tokens become links, labelled numbers get their variable underneath
 // (var_label.js, including every plain "name = number"), the rest gets glossary terms.
-function linkExplanation(text, seen) {
-    return richText(text, (t) => linkGlossaryTerms(t, seen), true);
+// vars: the step's declared variables (var_label.js vnVars).
+function linkExplanation(text, seen, vars) {
+    return richText(text, (t) => linkGlossaryTerms(t, seen), true, vars);
 }
 
 // The step a fact comes from marks the value with data-fact-src="<id>"; a jump pulses it.

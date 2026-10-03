@@ -34,6 +34,18 @@ function ddDecode(poly, scale) {
     return DD_EXP.map((e) => c.reduce((s, ci, i) => s + ci * DD_COS[(i * e) % (2 * DD_N)], 0) / scale);
 }
 
+// Coefficient k of the negacyclic product a·b (centered mod Q): one popup's worth of ddMul.
+function ddCoef(a, b, k) {
+    const n = a.length;
+    let acc = 0n;
+    for (let i = 0; i < n; i++) {
+        const j = k - i, ai = BigInt(a[i]);
+        if (ai === 0n) continue;
+        acc += j >= 0 ? ai * BigInt(b[j]) : -ai * BigInt(b[j + n]);
+    }
+    return ddCenter(acc);
+}
+
 const ddMaxErr = (a, b) => a.reduce((m, v, k) => Math.max(m, Math.abs(v - b[k])), 0);
 const ddDec = (ct, s) => ddAdd(ddPoly(ct.c0), ddMul(ddPoly(ct.c1), s)).map(ddMod);
 

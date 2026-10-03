@@ -45,7 +45,12 @@ function renderPbkdf2Graph(containerEl, graph, options) {
         nodeEls[n.id] = el;
     });
     // Hover a box: its full value (the box itself shows a shortened one).
-    attachFormulaHover(wrap, ".pg-node", (el) => (el.dataset.full ? { note: `${el.querySelector(".pg-node-title").textContent}: ${el.dataset.full}` } : null));
+    // Hover a box: its full value with the box's name underneath (the box itself shows a shortened one).
+    attachFormulaHover(wrap, ".pg-node", (el) => {
+        if (!el.dataset.full) return null;
+        const name = el.querySelector(".pg-node-title").textContent;
+        return { tex: kv(el.dataset.full, `\\text{${name.replace(/[\\{}_#%&$^~]/g, " ")}}`), note: `${name}: ${el.dataset.full}` };
+    });
     const lit = new Set(o.lit || []);
     const focus = new Set([].concat(o.focus || []));
     attachFormulaHover(svg, ".pg-edge-hit", (h) => ({ note: h.dataset.label }));

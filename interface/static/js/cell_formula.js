@@ -38,10 +38,19 @@ function createFormulaPop() {
                 el.appendChild(p);
             }
             el.hidden = false;
-            const r = cell.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
-            const below = r.bottom + 6 + h <= innerHeight - 8 || r.top - 6 - h < 8;
-            el.style.top = `${below ? r.bottom + 6 : r.top - 6 - h}px`;
-            el.style.left = `${Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8)}px`;
+            // Never on top of the hovered cell: below it, else above it, else beside it (whichever side has room).
+            const r = cell.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight, gap = 6;
+            const clampX = (x) => Math.min(Math.max(8, x), innerWidth - w - 8);
+            const clampY = (y) => Math.min(Math.max(8, y), innerHeight - h - 8);
+            if (r.bottom + gap + h <= innerHeight - 8) {
+                el.style.top = `${r.bottom + gap}px`; el.style.left = `${clampX(r.left + r.width / 2 - w / 2)}px`;
+            } else if (r.top - gap - h >= 8) {
+                el.style.top = `${r.top - gap - h}px`; el.style.left = `${clampX(r.left + r.width / 2 - w / 2)}px`;
+            } else {
+                const right = innerWidth - r.right, left = r.left;
+                el.style.top = `${clampY(r.top + r.height / 2 - h / 2)}px`;
+                el.style.left = `${right >= left ? Math.min(r.right + gap, innerWidth - w - 8) : Math.max(8, r.left - gap - w)}px`;
+            }
         },
         hide() { el.hidden = true; },
         destroy() { el.remove(); formulaPops.delete(pop); },

@@ -81,7 +81,7 @@ function buildSymptomFeatureSteps(result) {
                 <div class="sym-flags">${result.feature_names.map((n, i) => `<span class="sym-flag${result.x[i] === 1 ? " on" : ""}" data-i="${i}">${escapeHtml(symptomLabel(n))}</span>`).join("")}</div></div>`;
             attachFormulaHover(el.querySelector(".sym-flags"), ".sym-flag", (f) => {
                 const i = +f.dataset.i;
-                return { tex: `x_{${i}} = ${result.x[i]}`, note: `"${symptomLabel(result.feature_names[i])}" ${result.x[i] === 1 ? "present" : "absent"} (column ${i})` };
+                return { tex: `x_{${i}} = ${kv(result.x[i], `x_{${i}}`)}`, note: `"${symptomLabel(result.feature_names[i])}" ${result.x[i] === 1 ? "present" : "absent"} (column ${i})` };
             });
         },
     }];
@@ -106,8 +106,8 @@ function buildDigitFeatureSteps(result) {
         attachFormulaHover(el.querySelector(".digit-feature"), "rect[data-i]", (c) => {
             const i = +c.dataset.i, r = Math.floor(i / 28), col = i % 28;
             return scaled
-                ? { tex: `x_{${i}} = p_{${r},${col}} / 255 = ${raw[i]} / 255`, note: `x[${i}] = ${result.x[i]}` }
-                : { tex: `p_{${r},${col}} = ${raw[i]}`, note: `row ${r}, column ${col}: ${raw[i]} / 255 ink` };
+                ? { tex: `x_{${i}} = p_{${r},${col}} / 255 = ${kv(raw[i], `p_{${r},${col}}`)} / ${kv(255, "\\max")} = ${kv(fmt(result.x[i], 6), `x_{${i}}`)}`, note: `x[${i}] = ${result.x[i]}` }
+                : { tex: `p_{${r},${col}} = ${kv(raw[i], `p_{${r},${col}}`)}`, note: `row ${r}, column ${col}: ${raw[i]} / 255 ink` };
         });
     };
     return [

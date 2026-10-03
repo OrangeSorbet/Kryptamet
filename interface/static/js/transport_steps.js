@@ -79,20 +79,20 @@ function tpRoundStages(R) {
     const pre = R.after_mix_columns || R.after_shift_rows;
     const stages = [
         { label: `start of round ${R.round}`, cells: R.start },
-        { label: "SubBytes", cells: R.after_sub_bytes, eq: (i) => `S(\\mathtt{${flat(R.start)[i]}}) = \\mathtt{${flat(R.after_sub_bytes)[i]}}` },
-        { label: "ShiftRows", cells: R.after_shift_rows, eq: (i) => { const r = i >> 2, c = i & 3; return `s'_{${r},${c}} = s_{${r},${(c + r) % 4}} = \\mathtt{${R.after_shift_rows[r][c]}}`; } },
+        { label: "SubBytes", cells: R.after_sub_bytes, eq: (i) => `S(${kv(flat(R.start)[i], `s_{${i >> 2},${i & 3}}`)}) = ${kv(flat(R.after_sub_bytes)[i], `s'_{${i >> 2},${i & 3}}`)}` },
+        { label: "ShiftRows", cells: R.after_shift_rows, eq: (i) => { const r = i >> 2, c = i & 3; return `s'_{${r},${c}} = s_{${r},${(c + r) % 4}} = ${kv(R.after_shift_rows[r][c], `s_{${r},${(c + r) % 4}}`)}`; } },
     ];
     if (R.after_mix_columns) stages.push({
         label: "MixColumns", cells: R.after_mix_columns,
         eq: (i) => {
             const r = i >> 2, c = i & 3;
-            const terms = MIX_COEFFS[r].map((k, j) => `${k === 1 ? "" : k + "\\cdot "}\\mathtt{${R.after_shift_rows[j][c]}}`).join(" \\oplus ");
-            return `${terms} = \\mathtt{${R.after_mix_columns[r][c]}}`;
+            const terms = MIX_COEFFS[r].map((k, j) => `${k === 1 ? "" : k + "\\cdot "}${kv(R.after_shift_rows[j][c], `s'_{${j},${c}}`)}`).join(" \\oplus ");
+            return `${terms} = ${kv(R.after_mix_columns[r][c], `s''_{${r},${c}}`)}`;
         },
     });
     stages.push(
         { label: `round key K${R.round}`, cells: R.round_key, cls: () => "bm-seg-key" },
-        { label: "AddRoundKey", cells: R.after_add_round_key, eq: (i) => `\\mathtt{${flat(pre)[i]}} \\oplus \\mathtt{${flat(R.round_key)[i]}} = \\mathtt{${flat(R.after_add_round_key)[i]}}` },
+        { label: "AddRoundKey", cells: R.after_add_round_key, eq: (i) => `${kv(flat(pre)[i], `s_{${i >> 2},${i & 3}}`)} \\oplus ${kv(flat(R.round_key)[i], `K_{${R.round}}[${i >> 2}][${i & 3}]`)} = ${kv(flat(R.after_add_round_key)[i], `s'_{${i >> 2},${i & 3}}`)}` },
     );
     return stages;
 }
@@ -230,7 +230,7 @@ function buildTransportSteps(result, leg) {
                     <div class="scene-body"><div id="tpKey"></div>${renderChecks(keyStep.checks)}</div>`;
                 return renderByteMatrix(el.querySelector("#tpKey"), kb, {
                     cols: 8, skipAnimation: ksSkip(), cellClass: () => "bm-seg-key",
-                    equation: (i) => `k_{${i}} = \\mathtt{${kb[i]}}`,
+                    equation: (i) => `k_{${i}} = ${kv(kb[i], `k_{${i}}`)}`,
                 });
             },
         },
@@ -273,10 +273,11 @@ function buildTransportSteps(result, leg) {
                             : `w${i}: RotWord(${dv.prev}) = ${dv.after_rotword}; SubWord = ${dv.after_subword}; ⊕ Rcon ${dv.rcon} = ${dv.after_rcon}; ⊕ w${i - 8} (${dv.w_i_minus_8}) = ${dv.result}`;
                     },
                     equation: (i) => {
-                        if (i < 8) return `w_{${i}} = k_{${4 * i}..${4 * i + 3}} = \\mathtt{${words[i]}}`;
-                        if (i % 8 === 0) return `w_{${i}} = w_{${i - 8}} \\oplus \\mathrm{SubWord}(\\mathrm{RotWord}(w_{${i - 1}})) \\oplus \\mathrm{Rcon}_{${i / 8}} = \\mathtt{${words[i]}}`;
-                        if (i % 8 === 4) return `w_{${i}} = w_{${i - 8}} \\oplus \\mathrm{SubWord}(w_{${i - 1}}) = \\mathtt{${words[i]}}`;
-                        return `w_{${i}} = w_{${i - 8}} \\oplus w_{${i - 1}} = \\mathtt{${words[i]}}`;
+                        const w = (j) => kv(words[j], `w_{${j}}`), dv = notes[i];
+                        if (i < 8) return `w_{${i}} = k_{${4 * i}..${4 * i + 3}} = ${w(i)}`;
+                        if (i % 8 === 0) return `w_{${i}} = ${w(i - 8)} \\oplus \\mathrm{SubWord}(\\mathrm{RotWord}(${w(i - 1)})) \\oplus ${kv(dv.rcon, `\\mathrm{Rcon}_{${i / 8}}`)} = ${w(i - 8)} \\oplus ${kv(dv.after_rcon, "\\text{rot, sub, rcon}")} = ${w(i)}`;
+                        if (i % 8 === 4) return `w_{${i}} = ${w(i - 8)} \\oplus \\mathrm{SubWord}(${w(i - 1)}) = ${w(i - 8)} \\oplus ${kv(dv.after_subword, "\\mathrm{SubWord}")} = ${w(i)}`;
+                        return `w_{${i}} = ${w(i - 8)} \\oplus ${w(i - 1)} = ${w(i)}`;
                     },
                 });
             },
@@ -314,7 +315,7 @@ function buildTransportSteps(result, leg) {
                     </div>`;
                 return renderByteMatrix(el.querySelector("#tpJ0"), j0, {
                     cols: 16, skipAnimation: ksSkip(), cellClass: (i) => (i < 12 ? "bm-seg-salt" : "bm-seg-int"),
-                    equation: (i) => (i < 12 ? `N_{${i}} \\leftarrow \\text{random} = \\mathtt{${j0[i]}}` : `\\text{counter byte } ${i - 12} = \\mathtt{${j0[i]}}`),
+                    equation: (i) => (i < 12 ? `N_{${i}} \\leftarrow \\text{random} = ${kv(j0[i], `N_{${i}}`)}` : `\\text{counter byte } ${i - 12} = ${kv(j0[i], `J_0[${i}]`)}`),
                 });
             },
         },
@@ -362,9 +363,9 @@ function buildTransportSteps(result, leg) {
                         </div>`;
                     const ins = k1.input_state.flat(), rk = k1.round_key_0.flat(), out = k1.after_initial_add_round_key.flat();
                     const opts = (extra) => ({ cols: 4, skipAnimation: skip, ...extra });
-                    return renderByteMatrix(inner.querySelector("#tpIn"), ins, opts({ equation: (i) => `s_{${i >> 2},${i & 3}} = \\mathrm{ctr}_{${(i >> 2) + 4 * (i & 3)}} = \\mathtt{${ins[i]}}` }))
-                        .then(() => renderByteMatrix(inner.querySelector("#tpK0"), rk, opts({ cellClass: () => "bm-seg-key", equation: (i) => `K_0[${i >> 2}][${i & 3}] = \\mathtt{${rk[i]}}` })))
-                        .then(() => renderByteMatrix(inner.querySelector("#tpArk0"), out, opts({ equation: (i) => `\\mathtt{${ins[i]}} \\oplus \\mathtt{${rk[i]}} = \\mathtt{${out[i]}}` })));
+                    return renderByteMatrix(inner.querySelector("#tpIn"), ins, opts({ equation: (i) => `s_{${i >> 2},${i & 3}} = \\mathrm{ctr}_{${(i >> 2) + 4 * (i & 3)}} = ${kv(ins[i], `s_{${i >> 2},${i & 3}}`)}` }))
+                        .then(() => renderByteMatrix(inner.querySelector("#tpK0"), rk, opts({ cellClass: () => "bm-seg-key", equation: (i) => `K_0[${i >> 2}][${i & 3}] = ${kv(rk[i], `K_0[${i >> 2}][${i & 3}]`)}` })))
+                        .then(() => renderByteMatrix(inner.querySelector("#tpArk0"), out, opts({ equation: (i) => `${kv(ins[i], `s_{${i >> 2},${i & 3}}`)} \\oplus ${kv(rk[i], `K_0[${i >> 2}][${i & 3}]`)} = ${kv(out[i], `s'_{${i >> 2},${i & 3}}`)}` })));
                 };
                 return build(el.querySelector(".scene-body"), ksSkip());
             },
@@ -422,7 +423,7 @@ function buildTransportSteps(result, leg) {
                     rowLabels: hexDigits.map((h) => `${h}_`), colLabels: hexDigits.map((h) => `_${h}`),
                     cellClass: (i) => (used.has(i) ? "bm-seg-salt" : ""),
                     title: (i) => `S(0x${i.toString(16).padStart(2, "0")}) = 0x${cells[i]}${used.has(i) ? " (used in round 1)" : ""}`,
-                    equation: (r) => `S(\\mathtt{${hexDigits[r]}0}) \\ldots S(\\mathtt{${hexDigits[r]}f})`,
+                    equation: (r) => `S(\\mathtt{${hexDigits[r]}0}), \\ldots, S(\\mathtt{${hexDigits[r]}f}) = ${kv(cells[16 * r], `S(${hexDigits[r]}0)`)}, \\ldots, ${kv(cells[16 * r + 15], `S(${hexDigits[r]}f)`)}`,
                 });
             },
         },
@@ -463,9 +464,9 @@ function buildTransportSteps(result, leg) {
                     cellClass: (i) => (i < 16 ? "bm-seg-msg" : i < 32 ? "bm-seg-key" : ""),
                     equation: (i) => {
                         const j = i % 16;
-                        if (i < 16) return `P_1[${j}] = \\mathtt{${P[j]}}`;
-                        if (i < 32) return `\\mathrm{AES}_K(\\mathrm{ctr}_1)[${j}] = \\mathtt{${K[j]}}`;
-                        return `\\mathtt{${P[j]}} \\oplus \\mathtt{${K[j]}} = \\mathtt{${C[j]}}`;
+                        if (i < 16) return `P_1[${j}] = ${kv(P[j], `P_1[${j}]`)}`;
+                        if (i < 32) return `\\mathrm{AES}_K(\\mathrm{ctr}_1)[${j}] = ${kv(K[j], `K_1[${j}]`)}`;
+                        return `${kv(P[j], `P_1[${j}]`)} \\oplus ${kv(K[j], `K_1[${j}]`)} = ${kv(C[j], `C_1[${j}]`)}`;
                     },
                 });
             },
@@ -613,7 +614,10 @@ function buildTransportSteps(result, leg) {
                     }).then(() => renderByteMatrix(el.querySelector("#tpDb"), db, {
                         cols: 16, revealBy: "row", skipAnimation: ksSkip(), cellClass: dbCls,
                         title: (i) => `DB[${i}] = maskedDB[${i}] ⊕ MGF1(seed)[${i}] = 0x${db[i]}`,
-                        equation: (r) => `\\mathrm{DB}[${16 * r}..${Math.min(16 * r + 15, db.length - 1)}] = \\mathrm{maskedDB} \\oplus \\mathrm{MGF1}(\\mathrm{seed})`,
+                        equation: (r) => {
+                            const i = 16 * r, md = em[33 + i], mask = (parseInt(md, 16) ^ parseInt(db[i], 16)).toString(16).padStart(2, "0");
+                            return `\\mathrm{DB}[${i}..${Math.min(i + 15, db.length - 1)}] = \\mathrm{maskedDB} \\oplus \\mathrm{MGF1}(\\mathrm{seed});\\quad \\mathrm{DB}[${i}] = ${kv(md, `\\mathrm{maskedDB}[${i}]`)} \\oplus ${kv(mask, `\\mathrm{MGF1}[${i}]`)} = ${kv(db[i], `\\mathrm{DB}[${i}]`)}`;
+                        },
                     }));
                 });
             },

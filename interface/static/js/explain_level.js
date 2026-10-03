@@ -22,6 +22,14 @@ function levelTwin(obj) {
     return (window.explainLevel === "eli1" && obj.eli1) || obj.eli5 || null;
 }
 
+// The variables a step's text may show as values (var_label.js): the ELI1 twin's own toy `vars`, or else the
+// step's real `vars` (ELI5 and Advanced share the real run's values).
+function levelVars(obj) {
+    if (!obj) return null;
+    if (window.explainLevel === "eli1" && obj.eli1) return obj.eli1.vars || null;
+    return obj.vars || null;
+}
+
 // The text of `key` at the current level.
 function levelText(obj, key) {
     if (!obj) return "";

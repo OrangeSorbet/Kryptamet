@@ -113,7 +113,7 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
         const seen = new Set(), plain = !!levelTwin(step);
         EXPLANATION_CELLS.forEach((c) => {
             const el = textEls[c.key];
-            el.innerHTML = linkExplanation(levelText(step, c.key) || "", seen);
+            el.innerHTML = linkExplanation(levelText(step, c.key) || "", seen, levelVars(step));
             el.classList.toggle("explanation-mono", !!c.mono && !plain);
             el.previousElementSibling.textContent = plain && c.eli5Title ? c.eli5Title : c.title;
         });

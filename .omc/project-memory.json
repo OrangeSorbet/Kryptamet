@@ -182,6 +182,12 @@
   },
   "hotPaths": [
     {
+      "path": "interface/static/js/var_label.js",
+      "accessCount": 7,
+      "lastAccessed": 1791045715973,
+      "type": "file"
+    },
+    {
       "path": "interface/static/js/key_setup_steps.js",
       "accessCount": 4,
       "lastAccessed": 1791015210798,
@@ -206,10 +212,10 @@
       "type": "file"
     },
     {
-      "path": "interface/static/js/var_label.js",
+      "path": "interface/static/js/deep_dive_steps.js",
       "accessCount": 3,
-      "lastAccessed": 1791043220417,
-      "type": "file"
+      "lastAccessed": 1791045156917,
+      "type": "directory"
     },
     {
       "path": "docs/ARCHITECTURE.md",
@@ -245,6 +251,12 @@
       "path": "interface/static/js/how_he_steps.js",
       "accessCount": 2,
       "lastAccessed": 1791042360690,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/pbkdf2_graph.js",
+      "accessCount": 2,
+      "lastAccessed": 1791045131503,
       "type": "file"
     },
     {
@@ -293,18 +305,6 @@
       "path": "interface/static/js/reveal_controller.js",
       "accessCount": 1,
       "lastAccessed": 1791014835552,
-      "type": "file"
-    },
-    {
-      "path": "interface/static/js/deep_dive_steps.js",
-      "accessCount": 1,
-      "lastAccessed": 1791015019317,
-      "type": "directory"
-    },
-    {
-      "path": "interface/static/js/pbkdf2_graph.js",
-      "accessCount": 1,
-      "lastAccessed": 1791015253906,
       "type": "file"
     },
     {
@@ -419,6 +419,12 @@
       "path": "interface/static/css/var_label.css",
       "accessCount": 1,
       "lastAccessed": 1791042338175,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/chapter_vars.js",
+      "accessCount": 1,
+      "lastAccessed": 1791045271240,
       "type": "file"
     }
   ],

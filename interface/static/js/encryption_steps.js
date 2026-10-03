@@ -135,7 +135,7 @@ function buildEncryptionSteps(result) {
                         <div class="ks-legend"><span class="enc-key-even">copy 1, 3, …</span><span class="enc-key-odd">copy 2, 4, …</span><span class="enc-key-nz">${dense ? "copy 1 (= x)" : "non-zero x_i"}</span></div>
                     </div>`;
                 const slotEls = [...el.querySelectorAll(".enc-slot")];
-                const slotFormula = (j) => ({ tex: `z_{${j}} = x_{${j} \\bmod ${d}} = x_{${j % d}}`, note: `slot ${j} = x[${j % d}] (${featName(j % d)}) = ${fmt(x[j % d])}, copy ${Math.floor(j / d) + 1}` });
+                const slotFormula = (j) => ({ tex: `z_{${j}} = x_{${j} \\bmod ${kv(d, "d")}} = x_{${j % d}} = ${kv(fmt(x[j % d]), `x_{${j % d}}`)}`, note: `slot ${j} = x[${j % d}] (${featName(j % d)}) = ${fmt(x[j % d])}, copy ${Math.floor(j / d) + 1}` });
                 attachFormulaHover(el.querySelector(".enc-slots"), ".enc-slot", (s) => slotFormula(+s.dataset.j));
                 // Revealed copy by copy (batched to at most 16 groups), with the same controls as every matrix.
                 const copies = Math.ceil(sp.slots / d);
@@ -148,7 +148,7 @@ function buildEncryptionSteps(result) {
                     show: (g) => group(g).forEach((s) => s.classList.add("on")),
                     point: (g) => {
                         const first = g * batch * d, last = Math.min(sp.slots, (g + 1) * batch * d) - 1;
-                        pop.show(group(g)[0], `z_{${first}..${last}} = x_{j \\bmod ${d}}`, `slots ${first}–${last}: copies ${g * batch + 1}–${Math.min(copies, (g + 1) * batch)} of x`);
+                        pop.show(group(g)[0], `z_{${first}..${last}} = x_{j \\bmod ${kv(d, "d")}} = (${kv(fmt(x[0]), "x_0")}, \\ldots, ${kv(fmt(x[d - 1]), `x_{${d - 1}}`)})`, `slots ${first}–${last}: copies ${g * batch + 1}–${Math.min(copies, (g + 1) * batch)} of x`);
                     },
                     clear: () => { slotEls.forEach((s) => s.classList.remove("on")); pop.hide(); },
                     finish: () => pop.hide(),
@@ -220,7 +220,7 @@ function buildEncryptionSteps(result) {
                     cols: 8, revealBy: "row", skipAnimation: ksSkip(),
                     rowLabels: first.filter((_, i) => i % 8 === 0).map((_, r) => `m${8 * r}`),
                     title: (i) => `m_${i} = ${first[i]}`,
-                    equation: (r) => `m_{${8 * r}} \\ldots m_{${8 * r + 7}} \\text{ of } \\mathrm{round}(\\Delta \\cdot \\sigma^{-1}(z))`,
+                    equation: (r) => `(m_{${8 * r}}, \\ldots, m_{${8 * r + 7}}) = \\mathrm{round}(${kv(`2^{${p.scale_bits}}`, "\\Delta")} \\cdot \\sigma^{-1}(z)) = (${kv(first[8 * r], `m_{${8 * r}}`)}, \\ldots, ${kv(first[8 * r + 7], `m_{${8 * r + 7}}`)})`,
                 });
                 const check = encReembed(coeffs, x, sc.delta).then((r) => {
                     const ok = r.maxErr < 1e-6 && r.maxImag < 1e-6;
@@ -296,9 +296,13 @@ function buildEncryptionSteps(result) {
                 return renderByteMatrix(el.querySelector("#encC"), cs, {
                     cols: 8, skipAnimation: ksSkip(), rowLabels: ["c₀", "c₁"],
                     cellClass: (i) => (i < 8 ? "bm-seg-msg" : "bm-seg-key"),
-                    equation: (i) => (i < 8
-                        ? `c_{0,${i}} = (pk_0 u + e_0 + m)_{${i}} \\bmod q_0 = ${cs[i]}`
-                        : `c_{1,${i - 8}} = (pk_1 u + e_1)_{${i - 8}} \\bmod q_0 = ${cs[i]}`),
+                    // pk₀u + e₀ is hidden by TenSEAL; its coefficient is still known exactly as c₀ − m (mod q₀).
+                    equation: (i) => {
+                        const q0 = BigInt(rns.data_primes[0]), qTex = kv(rns.data_primes[0], "q_0");
+                        if (i >= 8) return `c_{1,${i - 8}} = (pk_1 u + e_1)_{${i - 8}} \\bmod ${qTex} = ${kv(cs[i], `c_{1,${i - 8}}`)}`;
+                        const m = BigInt(rns.m_mod_q_first_16[0].coeffs[i]), hid = (((BigInt(cs[i]) - m) % q0) + q0) % q0;
+                        return `c_{0,${i}} = (${kv(String(hid), `(pk_0u + e_0)_{${i}}`)} + ${kv(String(m), `m_{${i}}`)}) \\bmod ${qTex} = ${kv(cs[i], `c_{0,${i}}`)}`;
+                    },
                 });
             },
         },
@@ -340,7 +344,7 @@ function buildEncryptionSteps(result) {
                     return renderByteMatrix(el.querySelector("#encHead"), head, {
                         cols: 16, skipAnimation: ksSkip(), cellClass: seg,
                         title: (i) => `byte ${i} = 0x${head[i]}`,
-                        equation: (i) => `\\text{byte } ${i} = \\mathtt{0x${head[i]}}`,
+                        equation: (i) => `\\text{byte } ${i} = ${kv(`0x${head[i]}`, `\\text{byte}_{${i}}`)}`,
                     });
                 });
             },

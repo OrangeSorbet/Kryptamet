@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /c/Users/ashvi/Documents/VS_Codes/Apps/Kryptamet/interface/static/js; python - <<'PYEOF'\\nimport re, glob\\npat = re.compile(r'(?<!\\\\\\\\)\\\\\\\\(text|cdot|bmod|oplus|ldots|mathrm|Delta|sigma...",
+  "error": "Exit code 1\nTraceback (most recent call last):\r\n  File \"<stdin>\", line 2, in <module>\r\n  File \"C:\\Python313\\Lib\\re\\__init__.py\", line 289, in compile\r\n    return _compile(pattern, flags)\r\n  File \"C:\\Python313\\Lib\\re\\__init__.py\", line 350, in _compile\r\n    p = _compiler.compile(pattern, flags)\r\n  File \"C:\\Python313\\Lib\\re\\_compiler.py\", line 752, in compile\r\n    code = _code(p, flags)\r\n  File \"C:\\Python313\\Lib\\re\\_compiler.py\", line 585, in _code\r\n    _compile(code, p.data, flags)\r\n    ~~~~~~~~^...",
+  "timestamp": "2026-10-03T16:32:50.673Z",
+  "retry_count": 1
+}

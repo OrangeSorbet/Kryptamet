@@ -33,7 +33,7 @@ function joinSteps(...parts) {
 
 const CHAPTERS = [
     { id: "how_he", label: "How HE works", requiresResult: false,
-      buildSteps: () => buildHowHeSteps(),
+      buildSteps: () => withVars(buildHowHeSteps(), howHeVars()),
       summary: () => `toy numbers: lock, compute, unlock · ${TOY.dec(TOY.score) / TOY.delta} ≈ ${TOY.w1 * TOY.x1.x + TOY.w2 * TOY.x2.x + TOY.b}` },
     { id: "feature", label: "Feature Extraction", requiresResult: true,
       buildSteps: (result) => {
@@ -47,30 +47,30 @@ const CHAPTERS = [
           : result.input_kind === "symptoms" ? `${result.x.filter((v) => v === 1).length} of ${result.feature_dim} symptom flags set`
           : `${result.feature_dim.toLocaleString()} ${result.model === "human_vs_ai_text" ? "stylometric " : result.input_kind === "tabular" ? "standardized " : ""}features`) },
     { id: "key", label: "Key Setup", requiresResult: true,
-      buildSteps: (result) => buildKeySteps(result),
+      buildSteps: (result) => withVars(buildKeySteps(result), keyVars(result)),
       summary: (result) => `CKKS N=${result.ckks_params.poly_modulus_degree} · 2× RSA-${findEvent(result, "rsa_keygen_client").data_after.key_size} · PBKDF2 ${findEvent(result, "pbkdf2").data_after.iterations.toLocaleString()}×` },
     { id: "encrypt", label: "Encryption", requiresResult: true,
       buildSteps: (result, dd) => joinSteps(
-          { steps: buildEncryptionSteps(result), then: "Next: the same lock up close, a small CKKS (N=256) where every number is visible." },
-          { steps: buildDeepDiveSteps(dd, result, "encrypt") }),
+          { steps: withVars(buildEncryptionSteps(result), encVars(result)), then: "Next: the same lock up close, a small CKKS (N=256) where every number is visible." },
+          { steps: withVars(buildDeepDiveSteps(dd, result, "encrypt"), ddVars(dd, "encrypt")) }),
       summary: (result) => `→ ${formatBytes(findEvent(result, "ckks_encrypt").data_after.serialization.size_bytes)} ciphertext` },
     { id: "transport_out", label: "Transport → server", requiresResult: true,
-      buildSteps: (result) => buildTransportSteps(result, "leg1"),
+      buildSteps: (result) => withVars(buildTransportSteps(result, "leg1"), transportVars(result, "leg1")),
       summary: (result) => transportSummary(result, "leg1") },
     { id: "compute", label: "Computation", requiresResult: true,
       buildSteps: (result, dd) => joinSteps(
-          { steps: buildComputationSteps(result), then: "Next: the same computation up close (N=256), every number visible." },
-          { steps: buildDeepDiveSteps(dd, result, "compute") }),
+          { steps: withVars(buildComputationSteps(result), computeVars(result)), then: "Next: the same computation up close (N=256), every number visible." },
+          { steps: withVars(buildDeepDiveSteps(dd, result, "compute"), ddVars(dd, "compute")) }),
       stepBands: (result) => buildComputationBands(result),
       summary: (result) => `Enc(x)·Wᵀ + b · ${findEvent(result, "load_plaintext").data_after.nonzero_count} non-zero terms` },
     { id: "transport_back", label: "Transport ← client", requiresResult: true,
-      buildSteps: (result) => buildTransportSteps(result, "leg2"),
+      buildSteps: (result) => withVars(buildTransportSteps(result, "leg2"), transportVars(result, "leg2")),
       summary: (result) => transportSummary(result, "leg2") },
     { id: "result", label: "Result", requiresResult: true,
       buildSteps: (result, dd) => joinSteps(
-          { steps: buildDecryptionSteps(result), then: "Next: the same unlock up close (N=256), every number visible." },
-          { steps: buildDeepDiveSteps(dd, result, "result"), then: "Next: what the score means." },
-          { steps: buildResultSteps(result) }),
+          { steps: withVars(buildDecryptionSteps(result), resultVars(result)), then: "Next: the same unlock up close (N=256), every number visible." },
+          { steps: withVars(buildDeepDiveSteps(dd, result, "result"), ddVars(dd, "result")), then: "Next: what the score means." },
+          { steps: withVars(buildResultSteps(result), resultVars(result)) }),
       summary: (result) => (result.input_kind === "image" && result.characters
           ? `"${readingText(result, "he_label")}" · ${result.characters.every((c) => c.match) ? "match ✓" : "MISMATCH ✕"}`
           : `${resultLabel(result.model, result.he_pred)} · ${result.match ? "match ✓" : "MISMATCH ✕"}`) },

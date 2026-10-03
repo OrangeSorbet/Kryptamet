@@ -290,7 +290,7 @@ table.benchmark-table th, table.benchmark-table td {
 .formula-pop {
     position: fixed;
     z-index: 3000;
-    max-width: min(560px, calc(100vw - 16px));
+    max-width: min(900px, calc(100vw - 16px));
     padding: 7px 11px;
     background: var(--color-surface);
     border: 1px solid var(--color-warning);

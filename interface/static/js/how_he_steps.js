@@ -150,6 +150,7 @@ function buildHowHeSteps() {
             why: "Substituting pk: (−a·s + e)·u + e0 + m + (a·u + e1)·s. The a·u·s terms cancel, leaving m + small noise. Decoding divides by Δ, shrinking the noise by Δ.",
             formal: "c0 + c1·s = m + e·u + e0 + e1·s ≈ m",
             next: "Next: decrypting with the wrong key.",
+            vars: { c0: x1.c0, c1: x1.c1, "c₀": x1.c0, "c₁": x1.c1, u: x1.u, e0: x1.e0, e1: x1.e1, m: x1.m },
             renderVisual: (el) => renderToyCalc(el, "Step 4: unlocking", [
                 ["c0 + c1·s", `${vn(x1.c0, "c0 of x₁")} + ${vn(x1.c1, "c1 of x₁")}×${vn(T.s, "s")} = ${vn(x1.c0 + x1.c1 * T.s, "c0 + c1·s")}`, x1.c0 + x1.c1 * T.s],
                 ["remainder mod q", `${vn(x1.c0 + x1.c1 * T.s, "c0 + c1·s")} mod ${vn(q, "q")} (centred)`, d1],
@@ -168,6 +169,7 @@ function buildHowHeSteps() {
             why: "With the wrong key, the a·u·s term no longer cancels; a uniform-looking value remains.",
             formal: "c0 + c1·s′ = m + noise + c1·(s′ − s)",
             next: "Next: homomorphic addition.",
+            vars: { c0: x1.c0, c1: x1.c1, "c₀": x1.c0, "c₁": x1.c1, m: x1.m },
             renderVisual: (el) => renderToyCalc(el, "Unlocking with the wrong key", [
                 [`c0 + c1·${vn(T.s + 1, "wrong s")}`, `${vn(x1.c0, "c0 of x₁")} + ${vn(x1.c1, "c1 of x₁")}×${vn(T.s + 1, "wrong s")} mod ${vn(q, "q")}`, dWrong, "c0 + c1·s′"],
                 ["\"your number\"", `${vn(dWrong, "wrong-key result")} ÷ ${vn(D, "Δ")}`, dWrong / D, "garbage"],
@@ -184,6 +186,7 @@ function buildHowHeSteps() {
             why: "Decryption is linear in (c0, c1): (c0+c0′) + (c1+c1′)·s = (m+m′) + (noise+noise′).",
             formal: "Enc(m) + Enc(m′) = Enc(m + m′)",
             next: "Next: plaintext multiplication.",
+            vars: { c0: T.sum.c0, c1: T.sum.c1, "c₀": T.sum.c0, "c₁": T.sum.c1 },
             renderVisual: (el) => renderToyCalc(el, "Adding locked numbers", [
                 ["c0 of the sum", `(${vn(x1.c0, "c0 of x₁")} + ${vn(x2.c0, "c0 of x₂")}) mod ${vn(q, "q")}`, T.sum.c0],
                 ["c1 of the sum", `(${vn(x1.c1, "c1 of x₁")} + ${vn(x2.c1, "c1 of x₂")}) mod ${vn(q, "q")}`, T.sum.c1],
@@ -202,6 +205,7 @@ function buildHowHeSteps() {
             why: "Plaintext-ciphertext multiplication by an integer keeps the scale Δ. Real CKKS encodes w at scale Δ, so the product sits at Δ² and is rescaled by a ~40-bit prime.",
             formal: "k·Enc(m) = Enc(k·m), noise × k",
             next: "Next: w·x + b on ciphertexts.",
+            vars: { c0: T.times.c0, c1: T.times.c1, "c₀": T.times.c0, "c₁": T.times.c1, k: T.w1 },
             renderVisual: (el) => renderToyCalc(el, "Multiplying by a plain number", [
                 ["c0", `${vn(T.w1, "w₁")} × ${vn(x1.c0, "c0 of x₁")} mod ${vn(q, "q")}`, T.times.c0],
                 ["c1", `${vn(T.w1, "w₁")} × ${vn(x1.c1, "c1 of x₁")} mod ${vn(q, "q")}`, T.times.c1],
@@ -220,6 +224,7 @@ function buildHowHeSteps() {
             why: "A linear model is only + and ×, so it can be evaluated entirely on ciphertexts. The non-polynomial link function runs on the client after decryption.",
             formal: "Enc(w·x + b) = Σ wᵢ·Enc(xᵢ) + Δb",
             next: "Next: how the real parameters differ.",
+            vars: { c0: T.score.c0, c1: T.score.c1, "c₀": T.score.c0, "c₁": T.score.c1 },
             renderVisual: (el) => renderToyCalc(el, "The model's score, computed while locked", [
                 ["c0", `(${vn(T.w1, "w₁")}×${vn(x1.c0, "c0 of x₁")} + (${vn(T.w2, "w₂")})×${vn(x2.c0, "c0 of x₂")} + ${vn(T.bm, "Δ·b")}) mod ${vn(q, "q")}`, T.score.c0],
                 ["c1", `(${vn(T.w1, "w₁")}×${vn(x1.c1, "c1 of x₁")} + (${vn(T.w2, "w₂")})×${vn(x2.c1, "c1 of x₂")}) mod ${vn(q, "q")}`, T.score.c1],
