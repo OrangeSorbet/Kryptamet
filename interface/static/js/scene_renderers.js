@@ -60,10 +60,16 @@ function buildSymptomFeatureSteps(result) {
     const on = result.x.filter((v) => v === 1).length;
     return [{
         eli5: {
-            what: `You picked ${on} symptom${on === 1 ? "" : "s"}. They become ${result.feature_dim} yes/no switches, one per symptom the model knows; ${on} of them are switched on.`,
-            why: "The model learned which combinations of switches tend to go with each of the 41 conditions. Switches you didn't turn on count as 'no'.",
-            formal: `${result.feature_dim} switches, ${on} on.`,
-            next: "Next chapter: the keys that will lock these switches.",
+            what: `You picked ${on} symptom${on === 1 ? "" : "s"}. They become a list x of ${result.feature_dim} numbers, one per symptom the model knows, in a fixed order: 1 if you have it, 0 if not. ${on} of them are 1.`,
+            why: `A model can only do maths on numbers, and the lock (CKKS) only locks numbers. Yes/no fits perfectly as 1/0. The order is fixed because the model learned one weight per position: position i always means the same symptom. It learned which combinations go with each of the ${result.class_names.length} conditions.`,
+            formal: `x = ${result.feature_dim} numbers, each 0 or 1; ${on} are 1.`,
+            next: "Next chapter: the keys that will lock these numbers.",
+        },
+        eli1: {
+            what: `The first 5 positions of your list: ${result.feature_names.slice(0, 5).map((n, i) => `${symptomLabel(n)} = ${result.x[i]}`).join(", ")}. The whole list continues like this for all ${result.feature_dim} symptoms.`,
+            why: "Think of a row of light switches labelled with symptoms: on = 1, off = 0. The model reads the row of 1s and 0s.",
+            formal: `x = [${result.x.slice(0, 5).join(", ")}, …] (${result.feature_dim} numbers).`,
+            next: "Next chapter: the keys.",
         },
         what: `${t.raw_computation}.`,
         why: t.why,
@@ -107,8 +113,8 @@ function buildDigitFeatureSteps(result) {
     return [
         {
             eli5: {
-                what: `Your drawing, resized and centred like the training images: a 28 × 28 grid of 784 squares, ${inked} of them with ink.${imgs.length > 1 ? ` This is character ${k + 1} of ${imgs.length}; pick another one with the chips at the top left.` : ""}`,
-                why: "The model only ever saw 28 × 28 images, so every drawing is made that size first.",
+                what: `Your drawing, resized and centred like the training images: a 28 × 28 grid of 784 squares (pixels), ${inked} of them with ink. Each pixel is a brightness from 0 (no ink) to 255 (full ink): 255 is the biggest number one byte can hold.${imgs.length > 1 ? ` This is character ${k + 1} of ${imgs.length}; pick another one with the chips at the top left.` : ""}`,
+                why: "The model learned from 28 × 28 images only, so every drawing is shrunk, centred and thickened the same way first; otherwise the same letter drawn bigger or off-centre would look like a different shape to it.",
                 formal: "drawing → 784 squares, 0 (empty) to 255 (full ink).",
                 next: "Next: every square becomes a number between 0 and 1.",
             },
@@ -120,11 +126,20 @@ function buildDigitFeatureSteps(result) {
         },
         {
             eli5: {
-                what: `Each square's brightness (0–255) is divided by 255, giving 784 numbers between 0 and 1. Your browser redid all 784: ${scaledOk ? "identical" : "DIFFERENT"}.`,
-                why: "The model was trained on 0-to-1 numbers, so yours have to be on the same scale.",
-                formal: "number = brightness / 255.",
+                what: `Each pixel's brightness (0-255) is divided by 255, giving 784 numbers between 0 and 1, read row by row: x[28 × row + column]. ${scaledOk ? "✓" : "✕"} all 784 recomputed.`,
+                why: "The model was trained on 0-to-1 numbers, so yours must be on the same scale or its weights would be 255 times too strong. Small numbers also keep the locked maths inside the lock's precision.",
+                formal: "x = brightness / 255.",
                 next: "Next chapter: the keys that will lock these 784 numbers.",
             },
+            eli1: (() => {
+                const i = raw.findIndex((v) => v > 0), v = i < 0 ? 0 : raw[i];
+                return {
+                    what: `Example: pixel ${i < 0 ? 0 : i} (row ${Math.floor(Math.max(i, 0) / 28)}, column ${Math.max(i, 0) % 28}) has brightness ${v}. ${v} ÷ 255 = ${(v / 255).toFixed(4)}. Full ink: 255 ÷ 255 = 1. No ink: 0 ÷ 255 = 0.`,
+                    why: "Dividing by the biggest possible value turns any brightness into a share between 0 and 1.",
+                    formal: `${v} / 255 = ${(v / 255).toFixed(4)}.`,
+                    next: "Next chapter: the keys.",
+                };
+            })(),
             what: `${t.raw_computation}.`,
             why: t.why,
             formal: "x_(28r+c) = pixel(r, c) / 255",
@@ -144,6 +159,7 @@ function buildFeatureSteps(result) {
         const trace = result.feature_trace;
         return trace.map((step, idx) => ({
             eli5: featureEli5(result, trace, idx),
+            eli1: featureEli1(result, trace, idx),
             what: step.raw_computation + (step.value !== null && !Array.isArray(step.value) ? ` = ${fmt(step.value)}` : ""),
             why: step.why,
             formal: (step.name === "assemble_vector" ? `x = [x_0, …, x_${result.feature_dim - 1}]` : FEATURE_FORMULAS[step.name]) || (result.input_kind === "tabular" ? (Array.isArray(step.value) ? "one-hot(code), then z = (v − μ) / σ per column" : "z = (v − μ) / σ  (μ, σ from the training data)") : ""),
@@ -182,10 +198,16 @@ function buildFeatureSteps(result) {
     };
     const steps = [{
         eli5: {
-            what: `Your text becomes a list of ${result.feature_dim.toLocaleString()} numbers, one per word the model knows. ${nonZero.length} of your words are on that list, so ${nonZero.length} numbers are non-zero and the rest are 0.`,
-            why: "A model can only do maths on numbers. Each word's number says how telling that word is: high for words that are rare in normal messages.",
+            what: `Your text becomes a list x of ${result.feature_dim.toLocaleString()} numbers, one per word in the model's vocabulary (the words it learned). ${nonZero.length} of your words are in that vocabulary, so ${nonZero.length} numbers are non-zero; the other ${(result.feature_dim - nonZero.length).toLocaleString()} are 0.`,
+            why: "A model can only do maths on numbers, and the lock only locks numbers. TF-IDF (term frequency × inverse document frequency) gives each word a number: higher when the word appears in your text (TF) and is rare across all training messages (IDF). Rare, tell-tale words count most; words like \"the\" count almost nothing. Finally the list is scaled so its length is 1, so a long message doesn't score higher just for being long.",
             formal: `text → ${result.feature_dim.toLocaleString()} numbers, ${nonZero.length} non-zero.`,
             next: nonZero.length ? "Next: your words, one at a time." : "None of your words are known to the model, so this all-zero list is what gets locked.",
+        },
+        eli1: {
+            what: `Toy: 3 training messages, "free prize now", "see you now", "the bus now". "free" appears in 1 of 3, so IDF = log(3 ÷ 1) = ${Math.log(3).toFixed(2)}. "now" appears in all 3: log(3 ÷ 3) = 0. In your message "free free now": "free" scores 2 × ${Math.log(3).toFixed(2)} = ${(2 * Math.log(3)).toFixed(2)}, "now" scores 0.`,
+            why: "Words every message has tell the model nothing, so they score 0. The real model does this with thousands of training messages and then shrinks the list to length 1.",
+            formal: `toy: free → ${(2 * Math.log(3)).toFixed(2)}, now → 0.`,
+            next: nonZero.length ? "Next: your real words." : "Next chapter: the keys.",
         },
         what: `Your text was converted into a ${result.feature_dim.toLocaleString()}-dimension TF-IDF vector: one entry per vocabulary word, ${nonZero.length} of them non-zero.`,
         why: "TF-IDF weighs each vocabulary word by how important it is in your sentence relative to the whole training vocabulary -- more distinctive words get higher weight.",
@@ -251,10 +273,16 @@ function buildDecryptionSteps(result) {
     const p = result.sigmoid_score;
     const decryptStep = {
         eli5: {
-            what: `The client unlocks the result with its secret key: ${ev.data_after.scores.length === 1 ? `the score is ${fmt(score, 6)}` : `${ev.data_after.scores.length} scores, one per possible answer`}.`,
-            why: "Only the secret key can unlock it, and that key never left the client. The server finished its work without ever seeing your data or the result.",
-            formal: "score = unlock(locked score).",
+            what: `The locked result arrives (fingerprint ${srcRef("result_ct_sha", "from Computation")}). You unlock it with your secret key s from Key Setup: c₀ + c₁·s gives the scores' formula plus tiny noise; plugging in the slot points and dividing by the scale gives ${ev.data_after.scores.length === 1 ? `the score ${fmt(score, 6)}` : `${ev.data_after.scores.length} scores, one per possible answer`}.`,
+            why: "This is the first and only unlock in the whole run. The server computed on locked data and produced a locked answer: it never saw your input or the score. Only s makes the masks cancel, and s never left your computer.",
+            formal: "score = decode(c₀ + c₁·s).",
             next: result.task === "multiclass" ? "Next: turning the scores into percentages." : "Next: turning the score into a probability.",
+        },
+        eli1: {
+            what: `Toy from "How HE works": the locked score (${TOY.score.c0}, ${TOY.score.c1}); unlock (${TOY.score.c0} + ${TOY.score.c1} × ${TOY.s}) mod ${TOY.q} = ${TOY.dec(TOY.score)}; ÷ ${TOY.delta} = ${TOY.dec(TOY.score) / TOY.delta}.`,
+            why: "Your real result is unlocked the same way, with 8192-coefficient formulas.",
+            formal: `toy: → ${TOY.dec(TOY.score) / TOY.delta}.`,
+            next: "Next: percentages.",
         },
         what: ev.description,
         why: ev.why,
@@ -273,10 +301,16 @@ function buildDecryptionSteps(result) {
         const ranked = result.probabilities.map((pr, i) => ({ pr, i, s: result.scores[i] })).sort((a, b) => b.pr - a.pr).slice(0, 5);
         return [decryptStep, {
             eli5: {
-                what: `Each of the ${result.scores.length} possible answers got a score. Turned into percentages that add up to 100%, the top answer is "${resultLabel(result.model, result.he_pred)}" at ${(result.probabilities[result.he_pred] * 100).toFixed(1)}%.`,
-                why: "Percentages are easier to read than raw scores. This happens after unlocking, because the percentage formula can't run on locked numbers.",
-                formal: "percentage = share of e^score.",
+                what: (() => { const top = ranked[0], second = ranked[1]; return `Each of the ${result.scores.length} possible answers got a score. Softmax turns them into percentages: each answer gets e^score (e ≈ 2.718), divided by the total of all of them. Top: "${resultLabel(result.model, top.i)}" score ${fmt(top.s, 2)} → ${(top.pr * 100).toFixed(1)}%${second ? `; next "${resultLabel(result.model, second.i)}" score ${fmt(second.s, 2)} → ${(second.pr * 100).toFixed(1)}%` : ""}.`; })(),
+                why: "e^score is always positive and grows fast, so a slightly higher score gets a much bigger share; dividing by the total makes them add up to 100%. It runs after unlocking, on your side, because e^x isn't an addition or multiplication, so CKKS can't do it.",
+                formal: "percentage = e^score ÷ sum of e^score.",
                 next: "Next: is it the same answer the plain model gives?",
+            },
+            eli1: {
+                what: `Toy scores 2, 1, 0: e² = ${Math.exp(2).toFixed(2)}, e¹ = ${Math.exp(1).toFixed(2)}, e⁰ = 1. Total ${(Math.exp(2) + Math.exp(1) + 1).toFixed(2)}. Shares: ${(Math.exp(2) / (Math.exp(2) + Math.exp(1) + 1) * 100).toFixed(1)}%, ${(Math.exp(1) / (Math.exp(2) + Math.exp(1) + 1) * 100).toFixed(1)}%, ${(1 / (Math.exp(2) + Math.exp(1) + 1) * 100).toFixed(1)}%.`,
+                why: "A score just 1 higher gets about 2.7 times the share.",
+                formal: "toy: (2, 1, 0) → 66.5%, 24.5%, 9.0%.",
+                next: "Next: comparison.",
             },
             what: `softmax over the ${result.scores.length} decrypted class scores: the top class is "${resultLabel(result.model, result.he_pred)}" with p = ${fmt(result.probabilities[result.he_pred])}.`,
             why: "Each class got its own linear score; softmax turns them into probabilities that sum to 1. Like the sigmoid, it isn't a polynomial, so it runs after decryption, on your side.",
@@ -295,10 +329,16 @@ function buildDecryptionSteps(result) {
         decryptStep,
         {
             eli5: {
-                what: `The score ${fmt(score)} is squashed into a probability: ${(p * 100).toFixed(1)}% chance of "${resultLabel(result.model, 1)}". Positive scores mean more than 50%.`,
-                why: "Big positive scores land near 100%, big negative ones near 0%. This also happens after unlocking, on the client.",
+                what: `The score ${fmt(score)} becomes a probability with the sigmoid: 1 ÷ (1 + e^(−score)) = ${(p * 100).toFixed(1)}% chance of "${resultLabel(result.model, 1)}". A score above 0 means more than 50%.`,
+                why: "Scores can be any number; the sigmoid squeezes them into 0-100%: big positive → near 100%, big negative → near 0%, 0 → exactly 50%. It runs after unlocking, on your side, because e^x isn't an addition or multiplication, so CKKS can't do it.",
                 formal: `${fmt(score)} → ${(p * 100).toFixed(1)}%`,
                 next: "Next: is it the same answer the plain model gives?",
+            },
+            eli1: {
+                what: `Score 0: 1 ÷ (1 + e⁰) = 1 ÷ 2 = 50%. Score 2: 1 ÷ (1 + e⁻²) = 1 ÷ ${(1 + Math.exp(-2)).toFixed(3)} = ${(100 / (1 + Math.exp(-2))).toFixed(1)}%. Score −2: ${(100 / (1 + Math.exp(2))).toFixed(1)}%.`,
+                why: `Yours, ${fmt(score, 2)}, gives ${(p * 100).toFixed(1)}%.`,
+                formal: "toy: 0 → 50%, 2 → 88.1%.",
+                next: "Next: comparison.",
             },
             what: `sigmoid(${fmt(score)}) = 1 / (1 + e^${fmt(-score)}) = ${fmt(p)} -- a ${(p * 100).toFixed(1)}% probability of "${resultLabel(result.model, 1)}".`,
             why: "The raw score can be any real number; the sigmoid maps it to a probability between 0 and 1. It isn't a polynomial, so it's applied after decryption, on your side -- the server only ever computed the linear part.",
@@ -377,10 +417,16 @@ function buildResultSteps(result) {
         ...(result.input_kind === "image" && result.characters ? [buildReadingStep(result)] : []),
         {
             eli5: {
-                what: `${many ? `${ch}: ` : ""}locked maths gave ${fmt(result.raw_score, 6)}, plain maths gave ${fmt(result.plaintext_equivalent_score, 6)}. Difference: ${diff.toExponential(2)}.`,
-                why: "CKKS rounds a tiny bit along the way, far too little to change any answer.",
+                what: `${many ? `${ch}: ` : ""}locked maths gave ${fmt(result.raw_score, 6)}, the same model on your plain numbers gave ${fmt(result.plaintext_equivalent_score, 6)}. Difference: ${diff.toExponential(2)}.`,
+                why: "The difference is CKKS's noise and rounding, divided by the huge scale: far too small to change any answer. (This comparison only exists because this demo runs both sides; in real use you wouldn't have the server's model to compare with.)",
                 formal: "locked score ≈ plain score.",
                 next: "Next: the final answer, side by side.",
+            },
+            eli1: {
+                what: `Toy: locked 0.353 vs plain 0.35, off by 0.003 because the toy scale is only ${TOY.delta}. Real: off by ${diff.toExponential(1)}, because the scale is 2^${result.ckks_params.global_scale_bits}.`,
+                why: "Bigger scale, smaller error.",
+                formal: "toy error 0.003; real ≈ 1e-9.",
+                next: "Next: the answers.",
             },
             what: `${many ? `${ch}: ` : ""}HE score (decrypted) ${fmt(result.raw_score, 6)} vs. plaintext score ${fmt(result.plaintext_equivalent_score, 6)} -- difference ${diff.toExponential(2)}.`,
             why: "CKKS is approximate: the encryption noise and fixed-point scale leave a tiny error in the result. It's far too small to move a score across the decision boundary, so the prediction is unaffected.",
@@ -401,7 +447,7 @@ function buildResultSteps(result) {
         {
             eli5: {
                 what: `${many ? `${ch}: the` : "The"} plain model says "${plainLabel}", the locked run says "${heLabel}": ${result.match ? "the same answer" : "DIFFERENT answers"}.`,
-                why: "The same answer means the calculation on locked data was right, even though the computer doing it never saw your input.",
+                why: "The same answer means the calculation on locked data was right, even though the computer doing it never saw your input or the result. Privacy cost nothing in correctness here; it costs time, as the Benchmarks show.",
                 formal: "plain answer = locked answer.",
                 next: "Next: how much slower locked maths is (Benchmarks).",
             },
@@ -464,8 +510,8 @@ function buildBenchmarksSteps() {
     }
     return rows.map((b, i) => ({
         eli5: {
-            what: `${b.model}: ${b.n_samples} samples took ${b.plaintext_time_sec.toFixed(3)} s on plain numbers and ${b.he_time_sec.toFixed(2)} s locked, about ${Math.round(b.slowdown_factor).toLocaleString()}× slower. The answers agreed ${(b.plain_vs_he_agreement * 100).toFixed(0)}% of the time.`,
-            why: "Locked numbers are huge formulas instead of single numbers, so every multiply and add costs far more. That's the price of privacy.",
+            what: `${b.model}: ${b.n_samples} samples took ${b.plaintext_time_sec.toFixed(3)} s on plain numbers and ${b.he_time_sec.toFixed(2)} s locked, about ${Math.round(b.slowdown_factor).toLocaleString()}× slower. Peak memory ${formatBytes(b.plaintext_peak_mem_bytes)} plain vs ${formatBytes(b.he_peak_mem_bytes)} locked. Same answer in ${(b.plain_vs_he_agreement * 100).toFixed(0)}% of samples.`,
+            why: "Each plain number becomes part of formulas with thousands of large coefficients, one locked multiply works on all of them, and every slide needs a key-switch, so locked maths costs orders of magnitude more time and memory. That is the price of privacy.",
             formal: `${Math.round(b.slowdown_factor).toLocaleString()}× slower, ${(b.plain_vs_he_agreement * 100).toFixed(0)}% same answers.`,
             next: i < rows.length - 1 ? "Next model." : "That's the whole pipeline. Pick another chapter, or try a new input.",
         },
@@ -478,32 +524,46 @@ function buildBenchmarksSteps() {
 }
 
 // Plain-words twin of one stylometric / tabular feature step (explain_level.js), from the real trace.
+// Plain description of each style number; `ab` = the [a, b] of "a / b" in the trace, when there is one.
 const STYLE_ELI5 = {
-    word_count: (v) => `Counted the words: ${fmt(v, 0)}.`,
-    char_count: (v) => `Counted every character, spaces included: ${fmt(v, 0)}.`,
-    avg_word_length: (v) => `Average word length: ${fmt(v, 2)} letters.`,
-    sentence_count: (v) => `Counted sentence endings (. ! ?): ${fmt(v, 0)}.`,
-    avg_sentence_length: (v) => `Average sentence length: ${fmt(v, 2)} words.`,
-    lexical_diversity: (v) => `How varied your words are: ${fmt(v, 2)} (1 = no word repeated).`,
-    punctuation_ratio: (v) => `Share of characters that are punctuation: ${(v * 100).toFixed(1)}%.`,
-    uppercase_ratio: (v) => `Share of characters that are capital letters: ${(v * 100).toFixed(1)}%.`,
+    word_count: (v) => `Split your text at the spaces and count the pieces: ${fmt(v, 0)} words.`,
+    char_count: (v) => `Count every character, spaces and punctuation included: ${fmt(v, 0)}.`,
+    avg_word_length: (v, ab) => `Average word length: all the letters in your words (${ab ? ab[0] : "?"}) ÷ the number of words (${ab ? ab[1] : "?"}) = ${fmt(v, 2)} letters.`,
+    sentence_count: (v) => `Count the sentence endings (. ! ?): ${fmt(v, 0)}.`,
+    avg_sentence_length: (v, ab) => `Average sentence length: words (${ab ? ab[0] : "?"}) ÷ sentences (${ab ? ab[1] : "?"}) = ${fmt(v, 2)} words.`,
+    lexical_diversity: (v, ab) => `Word variety: different words (${ab ? ab[0] : "?"}) ÷ all words (${ab ? ab[1] : "?"}) = ${fmt(v, 2)}. 1 means no word was repeated.`,
+    punctuation_ratio: (v, ab) => `Punctuation share: punctuation marks (${ab ? ab[0] : "?"}) ÷ all characters (${ab ? ab[1] : "?"}) = ${(v * 100).toFixed(1)}%.`,
+    uppercase_ratio: (v, ab) => `Capital-letter share: capitals (${ab ? ab[0] : "?"}) ÷ all characters (${ab ? ab[1] : "?"}) = ${(v * 100).toFixed(1)}%.`,
+};
+const STYLE_WHY = {
+    word_count: "Longer texts give the other numbers more to go on; AI answers also tend to have typical lengths.",
+    char_count: "Needed to turn counts of punctuation and capitals into shares, so long and short texts compare fairly.",
+    avg_word_length: "AI text tends to use longer, more formal words than casual human writing.",
+    sentence_count: "Needed for the average sentence length.",
+    avg_sentence_length: "AI text often has evenly long sentences; people mix short and long ones.",
+    lexical_diversity: "Repetition and variety differ between people and AI models.",
+    punctuation_ratio: "Punctuation habits (commas, exclamation marks) are a strong style signal.",
+    uppercase_ratio: "People often skip capitals in casual text; AI usually capitalises properly.",
 };
 
 function featureEli5(result, trace, idx) {
     const step = trace[idx], n = trace.length;
     const next = idx < n - 1 ? `Next: ${trace[idx + 1].name === "assemble_vector" ? "all of them lined up" : `"${trace[idx + 1].name}"`}.` : "Next chapter: the keys that will lock these numbers.";
     if (step.name === "assemble_vector") return {
-        what: `All ${result.feature_dim} numbers lined up in a fixed order. This list is exactly what gets locked and sent.`,
-        why: "The model expects every number in the same position it learned it in.",
+        what: `All ${result.feature_dim} numbers lined up in a fixed order: the list x. This list is exactly what gets locked and sent.`,
+        why: "The model learned one weight per position, so every number must sit in the same position it was trained in; a shifted number would be multiplied by the wrong weight.",
         formal: `x = list of ${result.feature_dim} numbers.`,
         next,
     };
-    if (STYLE_ELI5[step.name]) return {
-        what: STYLE_ELI5[step.name](step.value),
-        why: "Human and AI writing differ in style: sentence length, word variety, punctuation. The model sees only these 8 style numbers, never your actual words.",
-        formal: `${step.name} = ${fmt(step.value)}`,
-        next,
-    };
+    if (STYLE_ELI5[step.name]) {
+        const m = /= (\d+) \/ (\d+)/.exec(step.raw_computation || "");
+        return {
+            what: STYLE_ELI5[step.name](step.value, m ? [m[1], m[2]] : null),
+            why: `${STYLE_WHY[step.name] || ""} The model sees only these ${result.feature_dim} style numbers, never your actual words.`,
+            formal: `${step.name} = ${fmt(step.value)}`,
+            next,
+        };
+    }
     const raw = result.input && result.input.row ? result.input.row[step.name] : undefined;
     if (Array.isArray(step.value)) return {
         what: `"${step.name}" = ${raw} is turned into a row of yes/no switches, one per possible code, with only ${raw}'s switch on; then each switch is rescaled like every other column.`,
@@ -511,10 +571,26 @@ function featureEli5(result, trace, idx) {
         formal: `${raw} → one switch on`,
         next,
     };
+    const mu = step.mu, sd = step.sigma;
     return {
-        what: `"${step.name}" = ${raw}: compared with the training data it is ${step.value >= 0 ? "above" : "below"} average by ${fmt(Math.abs(step.value), 2)} typical spreads (rescaled value ${fmt(step.value)}).`,
-        why: "Rescaling puts every column on the same footing, so a big-number column (like an amount in DM) can't drown out a small one (like a rating from 1 to 4).",
+        what: mu === undefined
+            ? `"${step.name}" = ${raw}: compared with the training data it is ${step.value >= 0 ? "above" : "below"} average by ${fmt(Math.abs(step.value), 2)} typical spreads (rescaled value ${fmt(step.value)}).`
+            : `"${step.name}" = ${raw}. In the training data this column averages μ = ${fmt(mu, 2)} with a typical spread (standard deviation) σ = ${fmt(sd, 2)}. Rescaled: (${raw} − ${fmt(mu, 2)}) ÷ ${fmt(sd, 2)} = ${fmt(step.value)}, i.e. ${fmt(Math.abs(step.value), 2)} spreads ${step.value >= 0 ? "above" : "below"} average.`,
+        why: "Rescaling (\"standardizing\") puts every column on the same footing, so a big-number column (like an amount in DM) can't drown out a small one (like a rating from 1 to 4), and each weight's size reflects importance instead of units. μ and σ come from the training data and stay fixed.",
         formal: `${step.name}: ${raw} → ${fmt(step.value)}`,
         next,
+    };
+}
+
+// Toy-number twin of featureEli5 (ELI1): only the standardizing step gets its own; the rest fall back.
+function featureEli1(result, trace, idx) {
+    const step = trace[idx];
+    if (step.mu === undefined || Array.isArray(step.value)) return undefined;
+    const ages = [20, 30, 40], mean = 30, sd = Math.sqrt(ages.reduce((a, v) => a + (v - mean) ** 2, 0) / ages.length);
+    return {
+        what: `Toy: three people aged 20, 30 and 40. Average 30; typical spread √((10² + 0² + 10²) ÷ 3) = ${sd.toFixed(2)}. A 45-year-old becomes (45 − 30) ÷ ${sd.toFixed(2)} = ${((45 - mean) / sd).toFixed(2)}: "${((45 - mean) / sd).toFixed(2)} spreads above average".`,
+        why: `Your "${step.name}" goes through the same sum with the training data's average (${fmt(step.mu, 2)}) and spread (${fmt(step.sigma, 2)}).`,
+        formal: `toy: (45 − 30) ÷ ${sd.toFixed(2)} = ${((45 - mean) / sd).toFixed(2)}.`,
+        next: featureEli5(result, trace, idx).next,
     };
 }

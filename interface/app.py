@@ -3,7 +3,7 @@ import numpy as np
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from hecrypto.ckks_context import create_context
 from hecrypto.ckks_math import run_full_deep_dive
-from inference.he_infer import run_two_party_pipeline
+from inference.he_infer import encrypted_scores, run_two_party_pipeline
 from inference.model_registry import get_model, public_models
 
 app = Flask(__name__)
@@ -19,6 +19,16 @@ def _load_benchmarks():
             return json.load(f)
     except FileNotFoundError:
         return None
+
+
+def _pick(spec, scores, allowed):
+    """The class an HE score vector predicts: sign of the score for binary models, argmax (over the allowed
+    classes when a charset is chosen) for multiclass; the same rule run_two_party_pipeline applies."""
+    s = np.asarray(scores, dtype=float)
+    if spec["task"] == "binary":
+        return int(s[0] > 0)
+    ids = allowed or list(range(len(s)))
+    return int(ids[int(np.argmax(s[ids]))])
 
 
 def _plain_pred(spec, x, allowed):
@@ -101,8 +111,10 @@ def _run(spec, feats, passphrase):
 @app.route("/api/infer_text", methods=["POST"])
 def api_infer():
     """The whole pipeline on one input. A drawing with several characters gets one complete traced run per
-    character (own keys, ciphertexts and checks); the response is character 1's run plus `char_runs` for
-    the others, and every run carries the shared `characters` summary."""
+    character (own keys, ciphertexts and checks), one character per request (`char`, default 0) so every
+    response stays well under Vercel's 4.5 MB body limit (a run is ~1.7 MB). The `characters` summary covers
+    all of them: the traced character's own result, and for the others the same Enc(x)·Wᵀ + b computed
+    homomorphically without the trace."""
     payload = request.get_json(silent=True) or {}
     try:
         spec, inp, feats = _model_and_features(payload)
@@ -113,19 +125,32 @@ def api_infer():
     if spec["input_kind"] == "image":
         extra = {k: v for k, v in inp.items() if k == "charset"}
         singles = [{"images": [im], **extra} for im in (inp.get("images") or [inp.get("pixels")])]
-        runs = [_run(spec, spec["featurize"](one), passphrase) for one in singles]
     else:
-        singles, runs = [inp], [_run(spec, feats, passphrase)]
+        singles = [inp]
+    k = payload.get("char", 0)
+    if not isinstance(k, int) or isinstance(k, bool) or not 0 <= k < len(singles):
+        return jsonify({"error": f"char must be an integer in 0..{len(singles) - 1}"}), 400
+    run = _run(spec, spec["featurize"](singles[k]) if len(singles) > 1 or k else feats, passphrase)
 
     names = spec["class_names"]
-    characters = [{
-        "index": k, "he_pred": r["he_pred"], "plain_pred": r["plain_pred"],
-        "he_label": names[r["he_pred"]], "plain_label": names[r["plain_pred"]], "match": r["match"],
-        "scores": r["scores"], "max_abs_diff_vs_plain": max(abs(a - b) for a, b in zip(r["scores"], r["plain_scores"])),
-    } for k, r in enumerate(runs)]
-    for k, r in enumerate(runs):
-        r.update(input=inp, input_text=inp.get("text"), char_index=k, char_input=singles[k], characters=characters)
-    return jsonify({**runs[0], "char_runs": runs[1:]})
+    W, b = spec["weights"]()
+    summary_ctx = create_context(**CKKS_PARAMS) if len(singles) > 1 else None
+
+    def summary(j):
+        if j == k:
+            he, plain, he_pred, plain_pred = run["scores"], run["plain_scores"], run["he_pred"], run["plain_pred"]
+        else:
+            f = spec["featurize"](singles[j])
+            he = [float(v) for v in encrypted_scores(summary_ctx, f["x"], W, b)]
+            plain = [float(v) for v in spec["plain_scores"](f["x"])]
+            he_pred, plain_pred = _pick(spec, he, f.get("allowed")), _plain_pred(spec, f["x"], f.get("allowed"))
+        return {"index": j, "he_pred": he_pred, "plain_pred": plain_pred, "he_label": names[he_pred],
+                "plain_label": names[plain_pred], "match": he_pred == plain_pred, "scores": he,
+                "max_abs_diff_vs_plain": max(abs(a - c) for a, c in zip(he, plain))}
+
+    run.update(input=inp, input_text=inp.get("text"), char_index=k, char_input=singles[k],
+               characters=[summary(j) for j in range(len(singles))])
+    return jsonify(run)
 
 
 @app.route("/api/ckks_deep_dive", methods=["POST"])

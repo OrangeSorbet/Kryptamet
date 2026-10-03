@@ -3,7 +3,7 @@
 Roadmap, in order (rules.md #1). Each phase ends with a working, testable checkpoint (rules.md #8).
 Detail for each step lives in `docs/logs.md`, which is phase-tagged.
 
-**Status:** Phases 0–7 and 7B (7.10–7.15) done. Next: Phase 8, gated on the user sending the second PC's config.
+**Status:** Phases 0–7 and 7B done. Phase 7C (the course rewrite, from the user's issues.md) is in progress. Phase 8 stays gated on the second PC's config.
 
 ---
 
@@ -108,6 +108,55 @@ Every model (7), every chapter. One milestone at a time; ask before each.
     - Swapped in the backend events, every chapter's text (ELI5 + Advanced), the primers, the docs and the tests. "Transport → server" / "Transport ← client".
     - New `sequence_chart.js`: two lifelines, one arrow per network message with its real size, what each side holds. It replaces Key Setup's "Who holds which key" (key exchange highlighted) and sits in Transport step 1 (that leg highlighted).
 - [x] 7.14 Verify all 7 models × desktop/phone (every chapter, every step, both explanation levels, every character); update ARCHITECTURE / LIVE_UI_TRUTH / README.
+
+## Phase 7C — `/live` as a course on HE (user's issues.md, 2026-10-03)
+Goal: a reader with zero background understands every step, and why it happens, without ever getting stuck. ELI5:
+- plain words and analogies; every symbol labelled; every acronym and jargon word explained via dotted-underline hover definitions, used freely, even redundantly
+- each step says what / why / how (real values, every number traced to its source) / significance
+- no "browser did X" narration; checks stay as ✓ badges
+Three levels (navbar switch):
+- **ELI1:** toy numbers. Every hard idea is worked by hand with tiny values (e.g. RSA with p=5, q=11), then "the real run does exactly this with huge numbers".
+- **ELI5:** plain words, analogies, the real values.
+- **Advanced:** exact maths for practitioners.
+
+**Source links:** any number made in an earlier step is underlined and glowing.
+- Hover: a preview card (value, which step made it, how).
+- Click: jumps there and pulses the number.
+- A "↩ Back to step N.M" pill in the navbar returns, with a stack for chained jumps; Esc also works.
+- Backed by a per-run facts registry (value → chapter/step).
+
+Standard kept in memory: eli5-course-standard.
+- [x] 7C.1 **Fixes:**
+    - popups show the value as plain text with its meaning underneath
+    - the split-view graph has a fixed size (only the left half scales)
+    - "In one line" → "Significance"
+    - the 14 AES rounds get the shared ▶ ❚❚ ‹ › ↺ controls
+    - no needless inner scroll boxes (e.g. RSA-OAEP EM/DB)
+    - the S-box comes before the rounds
+    - the m(X) grid vs "all 8192 coefficients" mismatch is investigated and fixed
+- [x] 7C.2 **Restructure:**
+    - new chapter 0 "How HE works" (theory with toy numbers: locks, noise, why the same input encrypts differently, how maths survives encryption)
+    - each transport chapter in two halves: the sender seals (AES, then RSA) → wire → the receiver opens (RSA decrypt → AES key, AES-GCM decrypt → CKKS ciphertext)
+    - Decryption merged into Result, which starts with the real CKKS decryption
+    - must-say facts (from the walkthrough with the user):
+      - Key Setup: why a CKKS public key exists, and that symmetric encryption would also work here; that the server needs only the helper keys
+      - Result: the server's output stays locked; the server never sees the score; you decrypt once, at the end; softmax runs after decryption because e^x isn't add/multiply
+      - Encryption: why 2⁴⁰; m(X) = m₀ + m₁X + … + m₈₁₉₁X⁸¹⁹¹ (mod X⁸¹⁹² + 1); how the noise cancels (c0 + c1·s = m + small); why u and e exist
+    - the Deep-Dive is split into the chapters it explains: encode/keys/encrypt → Encryption, multiply/rotate/bias → Computation, decrypt/decode → Result. No separate chapter remains.
+    - third level ELI1 in the navbar switch (`eli1` twins; falls back to ELI5 until each chapter's rewrite adds them)
+    - source-link machinery: facts registry, glowing links, hover preview, jump + pulse, the back-pill stack
+- [x] 7C.3 Rewrite Feature Extraction + Key Setup as course text (ELI1 + ELI5 + Advanced): CKKS parameters, RSA p/q/λ/e/d with a toy example, ipad/opad, SHA-256 blocks/schedule/rounds, where every value comes from
+- [x] 7C.4 Rewrite Encryption: slots, scale, m(X), RNS, c0/c1 with every variable defined, the serialization fields
+- [x] 7C.5 Rewrite both Transport chapters: AES key schedule, counter mode, rounds, S-box, keystream, GHASH/tag, RSA-OAEP (EM, DB, MGF1)
+- [x] 7C.6 Rewrite Computation, Result, Benchmarks and the "Up close" parts (the former appendix, now split into Encryption/Computation/Result)
+- [ ] 7C.7 Verify all 7 models × both levels × desktop/phone; docs
+
+## Phase 7D — Deploy on Vercel (user request, 2026-10-03)
+- [x] Runtime-only `requirements.txt`; `index.py` entry point; `vercel.json` (maxDuration 300, build step, excludeFiles); `.vercelignore` (hides pyproject.toml/uv.lock and the large datasets)
+- [x] Static files to `public/static` at build time (`scripts/vercel_build.py`)
+- [x] Runtime data in git (small CSVs); handwriting samples precomputed (`scripts/build_samples.py` → `data/samples/word_samples.json`, registry fallback)
+- [x] 4.5 MB response limit: `/api/infer` traces one character per request (`char`); summary from untraced HE `encrypted_scores`; the frontend fetches other characters when their chip is picked
+- [ ] First real deploy by the user (Vercel account): check cold start, a run per model, and the CDN static path
 
 ## Phase 8 — GPU-accelerated encrypted CNN (after Phase 7)
 Target machine: the user's second PC with an RTX 5060 Ti (CUDA). TenSEAL/SEAL is CPU-only, so this needs a CUDA CKKS library.

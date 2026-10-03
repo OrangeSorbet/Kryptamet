@@ -14,6 +14,9 @@
 
 /* scene_fit.js sets --fit so each step fills ~90% of the free area. */
 #sceneContent.chapter-scene > * { zoom: var(--fit, 1); }
+/* Split view: the graph on the right keeps one size on every step; only the node's content scales. */
+#sceneContent.chapter-scene > .split-view { zoom: 1; }
+#sceneContent.chapter-scene > .split-view > .split-left { zoom: var(--fit, 1); }
 
 #sceneContent.chapter-scene > .scene-title { margin-top: auto; }
 #sceneContent.chapter-scene > :last-child { margin-bottom: auto; }

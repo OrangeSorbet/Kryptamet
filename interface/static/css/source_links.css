@@ -1,0 +1,34 @@
+/* Source links (js/source_links.js): a value made in an earlier step, clickable. */
+.src-link {
+    color: var(--color-primary-hover);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-shadow: 0 0 8px color-mix(in srgb, var(--color-primary-hover) 55%, transparent);
+    cursor: pointer;
+    border-radius: 3px;
+}
+.src-link:hover, .src-link:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+/* The value at its source, after a jump. */
+.src-pulse { animation: src-pulse 1.6s ease-out 2; border-radius: 4px; }
+@keyframes src-pulse {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary-hover) 80%, transparent); }
+    100% { box-shadow: 0 0 0 12px transparent; }
+}
+
+/* Navbar pill: back to where the jump started. */
+.src-back {
+    border-color: var(--color-primary-hover);
+    color: var(--color-primary-hover);
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The popup's plain-text "where it was made" line. */
+.formula-meaning.formula-plain { font-size: 12px; color: var(--color-text-muted); max-width: 320px; white-space: normal; }

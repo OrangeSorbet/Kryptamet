@@ -50,6 +50,10 @@ uv run python -m interface.cli                     # CLI: run inference or show 
 uv run python -m interface.app                     # Flask dev server; "/" redirects to "/live" (the teaching UI)
 ```
 
+Vercel deploy: `index.py` (entry point), `requirements.txt` (runtime-only deps; keep it in sync when a runtime
+import is added), `vercel.json`, `.vercelignore`, `scripts/vercel_build.py`. Responses must stay under 4.5 MB,
+which is why `/api/infer` traces one drawn character per request. See README "Deploy on Vercel".
+
 Every entry point that imports across top-level packages (`tests/`, `benchmarks/metrics.py`, `interface/app.py`,
 `interface/cli.py`) must be run with `python -m <dotted.path>` from the repo root, not `python path/to/file.py`
 directly — plain script invocation fails with `ModuleNotFoundError` since these packages import each other via

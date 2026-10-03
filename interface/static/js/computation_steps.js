@@ -69,15 +69,15 @@ function buildComputationSteps(result) {
     const computeEli5 = (ev, op) => {
         const a = ev.data_after || {};
         if (op === "compute_overview") return {
-            what: `The server now runs the model on your locked numbers. It has the model (${ov.k} row${ov.k > 1 ? "s" : ""} of ${ov.d} weights) and the locked package. It never has your numbers, the secret key or the answer.`,
-            why: "Each score is just: multiply every number by its weight, add them all up, add a fixed offset. CKKS can do exactly that while the numbers stay locked.",
-            formal: "score = sum of (weight × number) + offset",
+            what: `The server runs the model on your locked numbers. The model (logistic regression) is ${ov.k} score${ov.k > 1 ? "s" : ""}, one per possible answer: score = w₀·x₀ + w₁·x₁ + … + w${ov.d - 1}·x${ov.d - 1} + b. x is ${srcRef("feature_x", "your list of numbers")} (locked), each w is a weight the model learned in training (a plus sign pushes toward that answer, a minus away), and b is the bias, the score before any input. The server has W (${ov.k} × ${ov.d} weights), b and the locked package. It never has x, the secret key or the scores.`,
+            why: "A score like this is only multiplications and additions, exactly the two things CKKS can do on locked data. Turning scores into percentages needs eˣ, which CKKS can't do, so that step waits for you, after unlocking.",
+            formal: "score = w · x + b, for each answer",
             next: "Next: the one real locked calculation.",
         };
         if (op === "compute_general_form") return {
-            what: `The whole model ran on the locked package in one go (${fmt(a.he_elapsed_ms, 0)} ms) and produced a new locked package (${formatBytes(a.output_ciphertext_size)}) with the score${ov.k > 1 ? "s" : ""} inside. Your browser fingerprinted it: it is exactly what travels back.`,
-            why: "The server can't read its own result. The next steps replay the same sum with plain numbers, only to show what happened inside the lock.",
-            formal: "locked score = locked numbers · weights + offset",
+            what: `The whole model ran on the locked package in one operation, Enc(x)·Wᵀ + b, in ${fmt(a.he_elapsed_ms, 0)} ms. Inside: the locked slots are multiplied by the weights (plain numbers), the scale is brought back down by dividing by one ${result.ckks_params.global_scale_bits}-bit prime ("rescaling"), the slots are slid round and added to total them (using the rotation keys), and the bias is added. Out comes a new locked package of ${formatBytes(a.output_ciphertext_size)} holding the score${ov.k > 1 ? "s" : ""}, fingerprint ${srcRef("result_ct_sha", ksShort(a.output_ciphertext_sha256))}.`,
+            why: `Why it gives the right answer: unlocking is c₀ + c₁·s, only adds and multiplies, so multiplying or adding the locked parts does the same to the hidden numbers. Why rescale: x × w makes the scale 2^${result.ckks_params.global_scale_bits} × 2^${result.ckks_params.global_scale_bits}; dividing by a prime of about 2^${result.ckks_params.global_scale_bits} brings it back and uses up one prime. Why slide-and-add: locked slots can only be added position by position, never across, so sliding a copy is the only way to total them. The server can't read its own result; the next steps replay the sum in plain numbers only to show what happened inside.`,
+            formal: "locked scores = Enc(x) · Wᵀ + b",
             next: "Next: the biggest contributions, one by one (a plain replay).",
         };
         if (op === "weight_multiply") {
@@ -103,16 +103,44 @@ function buildComputationSteps(result) {
         };
         return {
             what: `Finally the model's fixed offset (${sign(a.bias)}) is added: score for "${a.row_class}" = ${fmt(a.score)}.`,
-            why: "The offset is the score an all-zero input would get. In the real locked run this number is still hidden; only the client will see it after unlocking.",
+            why: "The bias is the score an all-zero input would get. In the locked run the bias is first scaled to match the locked total (else it would be added in the wrong units). This replayed total is exactly what the locked score will unlock to, up to tiny noise; the server itself never sees it.",
             formal: `score = ${fmt(a.running_sum)} + ${fmt(a.bias)} = ${fmt(a.score)}`,
             next: "Next chapter: the locked result travels back to the client.",
         };
+    };
+
+    // Toy-number twins (ELI1) for the steps whose idea isn't already a small sum.
+    const computeEli1 = (op) => {
+        if (op === "compute_overview") return {
+            what: `Toy from "How HE works": score = ${TOY.w1} × x₁ + (${TOY.w2}) × x₂ + ${TOY.b}. With x₁ = ${TOY.x1.x} and x₂ = ${TOY.x2.x}: ${TOY.w1 * TOY.x1.x} − ${TOY.x2.x} + ${TOY.b} = ${(TOY.w1 * TOY.x1.x + TOY.w2 * TOY.x2.x + TOY.b).toFixed(2)}.`,
+            why: `Your real model does the same with ${ov.d} numbers${ov.k > 1 ? `, once for each of the ${ov.k} answers` : ""}.`,
+            formal: "toy: 3·x₁ − x₂ + 0.1.",
+            next: "Next: the locked version.",
+        };
+        if (op === "compute_general_form") {
+            const s = [2, 5, 1, 4], r2 = s.map((v, j) => v + s[(j + 2) % 4]), r1 = r2.map((v, j) => v + r2[(j + 1) % 4]);
+            return {
+                what: `Rescaling toy (Δ = 1000): 0.25 is stored as 250, weight 3 as 3000. Product 250 × 3000 = 750,000, at scale 1000 × 1000. Divide by 1000: 750, i.e. 0.75 at the normal scale. Slide-and-add toy: slots [${s.join(", ")}]; slide by 2 and add: [${r2.join(", ")}]; slide by 1 and add: [${r1.join(", ")}]. Every slot now holds the total ${s.reduce((a, v) => a + v, 0)}.`,
+                why: "Each slide halves how far apart the pieces still are, so 4 slots need 2 rounds and 128 need 7.",
+                formal: "toy: [2,5,1,4] → [3,9,3,9] → [12,12,12,12].",
+                next: "Next: the plain replay.",
+            };
+        }
+        if (op === "add_bias") return {
+            what: `Toy: the bias ${TOY.b} at scale Δ = ${TOY.delta} is ${TOY.bm}, added to c₀ only: c₀ + ${TOY.bm}. Unlocking then gives the hidden number + ${TOY.bm}, i.e. + ${TOY.b}.`,
+            why: "Adding a plain number only needs to touch c₀, because unlocking is c₀ + c₁·s.",
+            formal: `toy: c₀ + ${TOY.bm}.`,
+            next: "Next chapter: the result travels back.",
+        };
+        return null;
     };
 
     return events.map((ev) => {
         const step = { what: ev.description, why: ev.why, formal: ev.formal, next: ev.next_step };
         const op = ev.operation_name;
         step.eli5 = computeEli5(ev, op);
+        const toy = computeEli1(op);
+        if (toy) step.eli1 = toy;
         if (op === "compute_overview") {
             step.renderVisual = (el) => {
                 el.innerHTML = `${title("What the server computes")}<div class="scene-body">
@@ -127,6 +155,7 @@ function buildComputationSteps(result) {
             };
         } else if (op === "compute_general_form") {
             const d = ev.data_after;
+            step.facts = [{ id: "result_ct_sha", label: "SHA-256 fingerprint of the encrypted result the server computed", value: d.output_ciphertext_sha256 }];
             step.renderVisual = (el) => {
                 el.innerHTML = `${title("The real encrypted operation")}<div class="scene-body">
                     <div class="compute-current-line">Enc(x) · Wᵀ + b → Enc(score)</div>
@@ -134,7 +163,7 @@ function buildComputationSteps(result) {
                         { label: `input = the ciphertext unwrapped on leg 1 (SHA-256 ${d.input_ciphertext_sha256.slice(0, 12)}…)`, ok: d.input_ciphertext_sha256 === leg1.payload_sha256 && d.input_ciphertext_sha256 === encSha },
                         { label: "server context is public-only (is_private = false)", ok: d.is_private === false },
                     ])}
-                    <div class="ks-verify">${tpCheck("cmpOut", "browser: SHA-256 of the output ciphertext")}</div>
+                    <div class="ks-verify" data-fact-src="result_ct_sha">${tpCheck("cmpOut", "browser: SHA-256 of the output ciphertext")}</div>
                     <div class="ciphertext-box">${escapeHtml(d.output_ciphertext_b64)}</div>
                     <p class="step-text muted">Output: all ${d.output_ciphertext_size.toLocaleString()} bytes (${formatBytes(d.output_ciphertext_size)}), computed in ${fmt(d.he_elapsed_ms, 0)} ms. Weights ${d.weights_shape.join(" × ")}, server context SHA-256 ${escapeHtml(d.server_context_sha256.slice(0, 16))}…</p></div>`;
                 return encSha256(d.output_ciphertext_b64).then((s) => {
@@ -197,7 +226,7 @@ function buildComputationSteps(result) {
                     ${renderChecks([
                         { label: `browser: ${fmt(bias.running_sum)} + (${fmt(bias.bias)}) = ${fmt(score)}`, ok: close(score, bias.score) },
                         { label: `= the plaintext model's score ${fmt(result.plain_scores[bias.row])}`, ok: close(score, result.plain_scores[bias.row]) },
-                        { label: `≈ the decrypted HE score ${fmt(he, 6)} (Decryption chapter), off by ${Math.abs(he - score).toExponential(1)}`, ok: Math.abs(he - score) < 1e-2 },
+                        { label: `≈ the decrypted HE score ${fmt(he, 6)} (start of Result), off by ${Math.abs(he - score).toExponential(1)}`, ok: Math.abs(he - score) < 1e-2 },
                     ])}
                     ${waterfall(el, items.length - 1)}</div>`;
             };

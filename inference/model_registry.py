@@ -4,6 +4,7 @@ Thin composition: bundles come from models/saved/, featurization from data/featu
 Everything touching data/raw or a pickle is loaded lazily and cached, so importing never needs the data.
 """
 import functools
+import json
 import math
 import pickle
 
@@ -264,14 +265,22 @@ def _symptom_samples(class_names):
     return {"symptoms": names, "rows": rows}
 
 
-def _word_samples(load, words, framing):
+SAMPLES_FILE = "data/samples/word_samples.json"  # scripts/build_samples.py; used when data/raw is missing
+
+
+def _word_samples(load, words, framing, model_id):
     """Each sample word is made of real test-set images, the first test image of each character's class.
-    A letter with no class of its own (EMNIST balanced merges c/C, l/L, o/O, ...) uses its capital's class."""
+    A letter with no class of its own (EMNIST balanced merges c/C, l/L, o/O, ...) uses its capital's class.
+    Without the raw test set (a deploy), the same rows come precomputed from SAMPLES_FILE."""
     def samples(class_names):
         try:
             X, y = load(split="test")
         except OSError as exc:
-            return {**_missing_data(exc), "framing": framing}
+            try:
+                with open(SAMPLES_FILE) as f:
+                    return json.load(f)[model_id]
+            except (OSError, KeyError):
+                return {**_missing_data(exc), "framing": framing}
         rows = []
         for word in words:
             idx = [class_names.index(c if c in class_names else c.upper()) for c in word]
@@ -345,13 +354,13 @@ MODELS = {e["id"]: e for e in [
            "Pick the symptoms present from the 132 in the training table; every symptom you leave out counts "
            "as absent."),
     _entry("mnist_logreg", "MNIST digits -- 784 pixels", "mnist_logreg", "image",
-           [str(d) for d in range(10)], _image_featurize([str(d) for d in range(10)]), _word_samples(mnist.load, ["0", "123"], MNIST_FRAMING),
+           [str(d) for d in range(10)], _image_featurize([str(d) for d in range(10)]), _word_samples(mnist.load, ["0", "123"], MNIST_FRAMING, "mnist_logreg"),
            "Draw one or more digits in the strip, any size, with a gap between them. On run each one is cut out "
            "and framed like MNIST (scaled to fit 20×20, centred by its centre of mass) into 28×28 = 784 grayscale "
            "pixels, 0 = empty background, 255 = full ink; the framed images shown are exactly what is sent."),
     _entry("emnist_logreg", "EMNIST handwriting -- digits + letters", "emnist_logreg", "image",
            EMNIST_CLASS_NAMES, _image_featurize(EMNIST_CLASS_NAMES),
-           _word_samples(emnist.load, ["0", "123", "abcd", "hello"], EMNIST_FRAMING),
+           _word_samples(emnist.load, ["0", "123", "abcd", "hello"], EMNIST_FRAMING, "emnist_logreg"),
            "Draw digits and letters in the strip, with a gap between characters. On run each one is cut out and "
            "framed like EMNIST (scaled to fit 24×24, centred on its bounding box) into 784 pixels, 0 = empty "
            "background, 255 = full ink; the framed images shown are exactly what is sent. 47 classes: EMNIST "

@@ -1,4 +1,4 @@
-// The 10 real chapters in pipeline order. `requiresResult: false` (only
+// The 9 chapters in pipeline order. `requiresResult: false` (How HE works,
 // Benchmarks) means the chapter is reachable from the flowchart before
 // running any inference. `buildSteps` and `stepBands` are called once,
 // right after a run completes (see chapter_state.js). `summary` is the
@@ -20,9 +20,27 @@ function transportSummary(result, leg) {
         + (u.tamper_test.rejected ? " · tamper rejected" : " · TAMPER ACCEPTED");
 }
 
+// Joins step lists in order; each list's last step points at the next list's first.
+function joinSteps(...parts) {
+    const lists = parts.filter((p) => p.steps.length);
+    lists.slice(0, -1).forEach((p) => {
+        const last = p.steps[p.steps.length - 1];
+        last.next = p.then;
+        [last.eli5, last.eli1].forEach((t) => { if (t) t.next = p.then; });
+    });
+    return lists.flatMap((p) => p.steps);
+}
+
 const CHAPTERS = [
+    { id: "how_he", label: "How HE works", requiresResult: false,
+      buildSteps: () => buildHowHeSteps(),
+      summary: () => `toy numbers: lock, compute, unlock · ${TOY.dec(TOY.score) / TOY.delta} ≈ ${TOY.w1 * TOY.x1.x + TOY.w2 * TOY.x2.x + TOY.b}` },
     { id: "feature", label: "Feature Extraction", requiresResult: true,
-      buildSteps: (result) => buildFeatureSteps(result),
+      buildSteps: (result) => {
+          const steps = buildFeatureSteps(result);
+          steps[steps.length - 1].facts = [{ id: "feature_x", label: "Your feature vector x, the numbers that get locked", value: `${result.feature_dim.toLocaleString()} numbers` }];
+          return steps;
+      },
       summary: (result) => (result.model === "sms_spam"
           ? `${result.feature_dim.toLocaleString()}-dim TF-IDF vector`
           : result.input_kind === "image" ? `${drawnImages(result).length > 1 ? `character ${(result.char_index || 0) + 1} of ${drawnImages(result).length} · ` : ""}784 pixels, scaled to 0..1`
@@ -32,26 +50,27 @@ const CHAPTERS = [
       buildSteps: (result) => buildKeySteps(result),
       summary: (result) => `CKKS N=${result.ckks_params.poly_modulus_degree} · 2× RSA-${findEvent(result, "rsa_keygen_client").data_after.key_size} · PBKDF2 ${findEvent(result, "pbkdf2").data_after.iterations.toLocaleString()}×` },
     { id: "encrypt", label: "Encryption", requiresResult: true,
-      buildSteps: (result) => buildEncryptionSteps(result),
+      buildSteps: (result, dd) => joinSteps(
+          { steps: buildEncryptionSteps(result), then: "Next: the same lock up close, a small CKKS (N=256) where every number is visible." },
+          { steps: buildDeepDiveSteps(dd, result, "encrypt") }),
       summary: (result) => `→ ${formatBytes(findEvent(result, "ckks_encrypt").data_after.serialization.size_bytes)} ciphertext` },
-    { id: "deepdive", label: "CKKS Deep-Dive", requiresResult: true, requiresDeepDive: true,
-      buildSteps: (result, deepDive) => buildDeepDiveSteps(deepDive, result),
-      summary: (result, deepDive) => `N=${deepDive.params.N} · encrypted w·x+b · off by ${Math.abs(deepDive.decode.score - deepDive.decode.plaintext_score).toExponential(1)}` },
     { id: "transport_out", label: "Transport → server", requiresResult: true,
       buildSteps: (result) => buildTransportSteps(result, "leg1"),
       summary: (result) => transportSummary(result, "leg1") },
     { id: "compute", label: "Computation", requiresResult: true,
-      buildSteps: (result) => buildComputationSteps(result),
+      buildSteps: (result, dd) => joinSteps(
+          { steps: buildComputationSteps(result), then: "Next: the same computation up close (N=256), every number visible." },
+          { steps: buildDeepDiveSteps(dd, result, "compute") }),
       stepBands: (result) => buildComputationBands(result),
       summary: (result) => `Enc(x)·Wᵀ + b · ${findEvent(result, "load_plaintext").data_after.nonzero_count} non-zero terms` },
     { id: "transport_back", label: "Transport ← client", requiresResult: true,
       buildSteps: (result) => buildTransportSteps(result, "leg2"),
       summary: (result) => transportSummary(result, "leg2") },
-    { id: "decrypt", label: "Decryption", requiresResult: true,
-      buildSteps: (result) => buildDecryptionSteps(result),
-      summary: (result) => `score = ${result.raw_score.toFixed(4)}` },
     { id: "result", label: "Result", requiresResult: true,
-      buildSteps: (result) => buildResultSteps(result),
+      buildSteps: (result, dd) => joinSteps(
+          { steps: buildDecryptionSteps(result), then: "Next: the same unlock up close (N=256), every number visible." },
+          { steps: buildDeepDiveSteps(dd, result, "result"), then: "Next: what the score means." },
+          { steps: buildResultSteps(result) }),
       summary: (result) => (result.input_kind === "image" && result.characters
           ? `"${readingText(result, "he_label")}" · ${result.characters.every((c) => c.match) ? "match ✓" : "MISMATCH ✕"}`
           : `${resultLabel(result.model, result.he_pred)} · ${result.match ? "match ✓" : "MISMATCH ✕"}`) },

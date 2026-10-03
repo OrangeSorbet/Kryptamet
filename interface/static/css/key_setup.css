@@ -178,7 +178,6 @@
 .ks-matrix-trio .poly-label { display: flex; justify-content: center; gap: 6px; }
 
 /* SHA-256 rounds: 64 rows scroll inside a capped box */
-.ks-tall .byte-matrix-scroll { max-height: 330px; overflow-y: auto; }
 
 .ks-zoom-host { width: 100%; }
 .ks-u1 { margin-top: 0.75rem; word-break: break-all; }

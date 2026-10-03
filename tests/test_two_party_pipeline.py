@@ -126,31 +126,38 @@ def main():
 
 
 def check_multi_character():
-    """A 5-character drawing ("hello", real EMNIST test images) through /api/infer: every character gets its
-    own complete traced run; every decrypted class equals the plaintext model's. Then the same images read
-    as digits only."""
+    """A 5-character drawing ("hello", real EMNIST test images) through /api/infer, one character per request
+    (`char`): every character gets its own complete traced run, each response stays under Vercel's 4.5 MB
+    body limit, the summary agrees with each traced run, and every decrypted class equals the plaintext
+    model's. Then the same images read as digits only."""
     from interface.app import app
     from inference.model_registry import get_model
     m = get_model("emnist_logreg")
     images = m["samples"]()["rows"][-1]["input"]["images"]
     client = app.test_client()
     t0 = time.perf_counter()
-    r = client.post("/api/infer", json={"model": "emnist_logreg", "input": {"images": images}}).get_json()
-    runs = [r, *r["char_runs"]]
+    resps = [client.post("/api/infer", json={"model": "emnist_logreg", "input": {"images": images}, "char": k})
+             for k in range(5)]
+    assert all(len(x.data) < 4_500_000 for x in resps), [len(x.data) for x in resps]
+    runs = [x.get_json() for x in resps]
+    r = runs[0]
+    assert client.post("/api/infer", json={"model": "emnist_logreg", "input": {"images": images}, "char": 5}).status_code == 400
     assert len(runs) == 5 and [x["char_index"] for x in runs] == [0, 1, 2, 3, 4]
     W, b = m["weights"]()
     for k, run in enumerate(runs):
         x = m["featurize"]({"images": [images[k]]})["x"]
         assert run["char_input"]["images"] == [images[k]] and np.allclose(run["x"], x)
         assert run["he_pred"] == run["plain_pred"] == m["plain_predict"](x), (k, run["he_pred"], run["plain_pred"])
-        assert run["events"] and run["characters"] == r["characters"]
+        assert run["events"] and len(run["characters"]) == 5
+        assert all(c["he_pred"] == x["characters"][c["index"]]["he_pred"] for x in runs for c in run["characters"])
+        assert run["characters"][k]["he_pred"] == run["he_pred"]
         assert len({run["passphrase"] for run in runs}) == 5  # no passphrase given: each run drew its own
     reads = "".join(c["he_label"] for c in r["characters"])
     print(f"emnist 'hello' via /api/infer: reads {reads!r}, 5 traced runs in {time.perf_counter() - t0:.1f}s")
 
-    r = client.post("/api/infer", json={"model": "emnist_logreg", "input": {"images": images, "charset": "digits"},
-                                       "passphrase": "same for all"}).get_json()
-    runs = [r, *r["char_runs"]]
+    runs = [client.post("/api/infer", json={"model": "emnist_logreg", "input": {"images": images, "charset": "digits"},
+                                            "passphrase": "same for all", "char": k}).get_json() for k in range(5)]
+    r = runs[0]
     assert all(c["he_pred"] < 10 and c["match"] for c in r["characters"])
     assert {run["passphrase"] for run in runs} == {"same for all"}
     print(f"emnist 'hello' read as digits: {''.join(c['he_label'] for c in r['characters'])!r}")

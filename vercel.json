@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "python3 scripts/vercel_build.py",
+  "functions": {
+    "index.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{public/**,tests/**,docs/**,scripts/**,models/train/**,models/saved/*.pt,data/raw/emnist/**,data/raw/mnist/**,data/raw/human_vs_ai_text/**,data/raw/sms_spam/**,tooldata/**,src/**,UnProAIO.py,*.png,*.md}"
+    }
+  }
+}

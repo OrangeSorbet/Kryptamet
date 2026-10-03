@@ -56,10 +56,11 @@ on screen; a check still running is not counted.
 | Feature Extraction | MNIST: every x_i = float32(pixel_i / 255), exactly, all 784. Other models show the backend's traced computation. |
 | Key Setup | **Both RSA keys:** Fermat tests on p and q, p·q = n, λ(n) = lcm(p−1, q−1), gcd(e, λ) = 1, e·d ≡ 1 (mod λ), the CRT values. **HMAC/SHA-256:** the ipad/opad blocks, the SHA-256 message schedule and rounds (`sha256_check.js`). **PBKDF2:** the chain and XOR accumulator, then WebCrypto re-derives the AES key from the passphrase and salt. |
 | Encryption | **Packing and scaling:** the slot packing rule; Δ-rounding. **Polynomial:** m(X) evaluated at all 4096 slot roots gives x back (re-embedding). **RNS:** Miller–Rabin and q ≡ 1 (mod 2N) for each prime; all residues with BigInt. **Bytes:** the TenSEAL/SEAL/zstd header bytes, field by field; WebCrypto SHA-256 of the full ciphertext = the leg-1 payload (`encrypt_check.js`). **Sanity check** (a ✓ on step 2.7, not a protocol step): the client's one-off decryption of its fresh ciphertext. Noise and decoded slots are re-checked. |
-| CKKS Deep-Dive | **Exact mod 2⁶⁰:** b ≡ −a·s + e, c0 ≡ b·u + e1 + m, c1 ≡ a·u + e2, c·ŵ, the bias add, m′ ≡ c0 + c1·s. **Decryption:** decoding gives x and w back; after the multiply, the chunk sum and every rotation, the decrypted slots equal sums computed from plaintext x and w. **Rotations:** each Galois element = 5ᵏ mod 2N. **Final score:** equals the client's decode, the plaintext score and TenSEAL's score (`deep_dive_check.js`). |
+| "Up close" parts (Encryption, Computation, Result) | **Exact mod 2⁶⁰:** b ≡ −a·s + e, c0 ≡ b·u + e1 + m, c1 ≡ a·u + e2, c·ŵ, the bias add, m′ ≡ c0 + c1·s. **Decryption:** decoding gives x and w back; after the multiply, the chunk sum and every rotation, the decrypted slots equal sums computed from plaintext x and w. **Rotations:** each Galois element = 5ᵏ mod 2N. **Final score:** equals the client's decode, the plaintext score and TenSEAL's score (`deep_dive_check.js`). |
 | Transport → server / ← client | **AES-256-GCM, recomputed** (`aes_check.js`): the S-box, the key schedule, every stage of all 14 rounds, counters, keystream, the GHASH steps (GF(2¹²⁸) with BigInt), and the tag. **RSA-OAEP:** c^d mod n, then MGF1 unmasking (lHash, zero padding, 01 separator, key). **WebCrypto:** imports the private key, decrypts the AES key, AES-GCM-decrypts the full payload, and checks its SHA-256 = the ciphertext sent. **Tamper test:** the client's exact flipped ciphertext bit and flipped tag bit are both rejected. **Keys:** the leg-1 key = PBKDF2 output; the leg-2 key ≠ the leg-1 key. |
 | Computation | **Op:** input SHA-256 = the leg-1 unwrap; the server context holds no secret key. **Output:** WebCrypto SHA-256 of the full output ciphertext = the leg-2 payload. **Terms:** each term's x = the encrypted value, product and running sum recomputed; the smaller terms re-summed; zero count; bias sum = the plaintext score ≈ the decrypted HE score (`computation_steps.js`). |
-| Decryption, Result | The decrypted HE score vs the plaintext score and prediction (computed by the client, shown with the difference). |
+| Result | The decrypted HE score vs the plaintext score and prediction (computed by the client, shown with the difference). |
+| How HE works | No checks: toy numbers computed live from the toy formulas (q = 10007, Δ = 1000, s = 3), labelled as toy. |
 | Benchmarks | Saved measurements from `benchmarks/results.json` (`uv run python -m benchmarks.metrics`), not measured per request. |
 
 ## Explanation text
@@ -70,6 +71,11 @@ Each step's what/why/formal/next text is one of two kinds:
 
 There is no placeholder or example text. Fixed text exists only where the fact itself is fixed: glossary
 definitions, chapter intros, and the "why" of a mathematical step.
+
+**ELI1 toy numbers** are labelled as toys and computed in JS from small fixed inputs (e.g. RSA with p = 5,
+q = 11; the `TOY` CKKS with q = 10007). Where a toy can use a real value (the first byte of K, the first
+pixel, the S-box lookup of this run's state byte), it does. **Source links** point only at values a step
+declared in `step.facts`, so a link always lands on the step that produced the value.
 
 ## Limits, stated honestly
 

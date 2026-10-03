@@ -22,7 +22,7 @@ const scrubberIcon = (name) => `<svg width="12" height="12" viewBox="0 0 24 24" 
 const EXPLANATION_CELLS = [
     { key: "what", title: "What happened", short: "What" },
     { key: "why", title: "Why", short: "Why" },
-    { key: "formal", title: "Formal notation", eli5Title: "In one line", short: "Formal", mono: true },
+    { key: "formal", title: "Formal notation", eli5Title: "Significance", short: "Formal", mono: true },
     { key: "next", title: "What's next", short: "Next" },
 ];
 
@@ -110,12 +110,12 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
 
     // The four explanation cells at the current level (explain_level.js); re-run when the level changes.
     function renderText(step) {
-        const seen = new Set(), eli5 = window.explainLevel === "eli5";
+        const seen = new Set(), plain = !!levelTwin(step);
         EXPLANATION_CELLS.forEach((c) => {
             const el = textEls[c.key];
-            el.innerHTML = linkGlossaryTerms(levelText(step, c.key) || "", seen);
-            el.classList.toggle("explanation-mono", !!c.mono && !(eli5 && step.eli5));
-            el.previousElementSibling.textContent = eli5 && c.eli5Title && step.eli5 ? c.eli5Title : c.title;
+            el.innerHTML = linkExplanation(levelText(step, c.key) || "", seen);
+            el.classList.toggle("explanation-mono", !!c.mono && !plain);
+            el.previousElementSibling.textContent = plain && c.eli5Title ? c.eli5Title : c.title;
         });
     }
     const onLevel = () => renderText(steps[index] || {});

@@ -27,6 +27,12 @@ async function runPipeline(model, input, passphrase) {
     return r;
 }
 
+// One more character's complete traced run (a drawing's characters are traced one per request).
+async function fetchCharRun(model, input, k, passphrase) {
+    const r = await postJson("/api/infer", { model, input, char: k, passphrase: passphrase || "" });
+    return r.ok ? r.data : null;
+}
+
 async function fetchCkksDeepDive(model, input) {
     const r = await postJson("/api/ckks_deep_dive", { model, input });
     return r.ok ? r.data : null;

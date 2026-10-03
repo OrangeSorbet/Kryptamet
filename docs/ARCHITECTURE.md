@@ -146,16 +146,22 @@ Vanilla JS, no build step. The interaction model is modelled on the separate Sne
 Each box shows a proof badge: the browser checks that passed while you watched that chapter. Always dark.
 
 **Chapters** (`chapter_registry.js`):
-1. Feature Extraction
-2. Key Setup
-3. Encryption
-4. CKKS Deep-Dive
-5. Transport → server
-6. Computation
-7. Transport ← client
-8. Decryption
-9. Result
-10. Benchmarks
+1. How HE works: the whole scheme on toy numbers (`how_he_steps.js`, `TOY`; q = 10007, Δ = 1000, one
+   secret coefficient; every value computed live). It needs no run.
+2. Feature Extraction
+3. Key Setup
+4. Encryption, then "Up close": encode, keys, c0, c1 at N=256
+5. Transport → server: the client seals (AES-GCM, RSA-OAEP), the wire, then the server opens it (RSA private
+   key → AES key → AES-GCM → the CKKS ciphertext), then the tamper test.
+6. Computation, then "Up close": × w, chunk sum, 7 rotate-and-add rounds, + b
+7. Transport ← client (same shape, reversed)
+8. Result: the real CKKS decryption and sigmoid/softmax, "Up close" decrypt and decode, then the comparison
+   with the plaintext run.
+9. Benchmarks
+
+The from-scratch CKKS (`deep_dive_steps.js`, `buildDeepDiveSteps(dd, result, stage)`) has no chapter of its own:
+each step carries `stage` ("encrypt" / "compute" / "result") and `chapter_registry.js` appends each stage to its
+chapter with `joinSteps`, which re-points the last step's "next" text at the part that follows.
 
 One component per file (`interface/static/js/`, with CSS of the same name where it has its own styles):
 
@@ -163,22 +169,31 @@ One component per file (`interface/static/js/`, with CSS of the same name where 
   - `pipeline_api.js`: `runPipeline(model, input, passphrase)`, `fetchCkksDeepDive`, `fetchModels`,
     `inputSummary`, the global `pipelineResult`.
   - `chapter_state.js`: views, per-chapter step memory, done chapters, `goToNextChapter`, proof tallies.
-  - `chapter_registry.js`: `CHAPTERS` (id, label, `buildSteps`, `summary`, `stepBands`).
+  - `chapter_registry.js`: `CHAPTERS` (id, label, `buildSteps`, `summary`, `stepBands`), `joinSteps`.
+  - `source_links.js`: "where did this number come from" links.
+    - A step declares `facts: [{id, label, value}]`; `registerFacts` records each fact's chapter and step after
+      every run.
+    - Text points at a fact with `srcRef(id, text)` (explanations, rendered by `linkExplanation`) or
+      `srcLinkHtml(id, text)` (scene HTML). The source element carries `data-fact-src`.
+    - Hover previews the value and its step; click calls `chapter_state.js` `jumpToFact` (jump + pulse). The
+      navbar pill `#srcBackBtn` (and Esc) walks the jump stack back.
   - `flowchart.js`, `zoom_transition.js`, `minimap.js`, `intro_card.js` + `chapter_intros.js` (the per-chapter
     theory primers).
   - `scene_fit.js`: `fitSceneContent` zooms each step's content (`--fit`) to fill ~90% of the free height
     (≤1.6×, scale-up only); called by `chapter_state.js` on every step and again when it settles.
 - **Scrubber**
   - `scrubber.js`, `step_slider.js`, `speed_dial.js`, `glossary.js`.
-  - `explain_level.js`: the navbar ELI5 / Advanced switch.
+  - `explain_level.js`: the navbar ELI1 / ELI5 / Advanced switch.
     - `window.explainLevel`, default `eli5`, remembered as `kryptamet.level`.
-    - `levelText(obj, key)` picks the text; an `explainlevel` event makes the Scrubber and an open primer
-      redraw.
+    - `levelTwin(obj)` picks the plain twin: `eli1` (toy numbers) falls back to `eli5`, which falls back to the
+      advanced text. `levelText(obj, key)` picks the text; an `explainlevel` event makes the Scrubber and an
+      open primer redraw.
     - Every step carries `eli5: {what, why, formal, next}` beside its advanced text ("formal" is titled
-      "In one line" at ELI5).
+      "Significance" at ELI1/ELI5); hard steps also carry `eli1` with a toy-number calculation computed in code
+      (toys reuse `TOY` from `how_he_steps.js` where they can).
     - Primers in `chapter_intros.js` carry `eli5: {io, sections}`.
-    - All ELI5 text is built from the run's values: `featureEli5` (stylometric/tabular), `computeEli5`
-      (per compute event), and inline twins in every other step builder.
+    - All ELI5 text is built from the run's values: `featureEli5` / `featureEli1` (stylometric/tabular),
+      `computeEli5` / `computeEli1` (per compute event), and inline twins in every other step builder.
   - Two speeds: `window.stepSpeed` (Scrubber and step animations) and `window.gridSpeed` (poly grids), each
     saved to localStorage.
 - **Overview and input panels**

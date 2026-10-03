@@ -42,6 +42,7 @@ def featurize(raw_row, encoded, scaler, categorical_fields=()):
                 "name": field,
                 "raw_computation": f"({raw[i]:g} - {mu[i]:.4f}) / {sigma[i]:.4f} = {x[i]:.4f}",
                 "value": float(x[i]),
+                "raw": float(raw[i]), "mu": float(mu[i]), "sigma": float(sigma[i]),
                 "why": _SCALE_WHY,
                 "next": f"Becomes x[{i}] of the vector that gets encrypted.",
             })

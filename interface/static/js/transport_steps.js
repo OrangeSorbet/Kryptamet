@@ -14,7 +14,7 @@ const TP_LEGS = {
         wrap: "leg1_wrap", unwrap: "leg1_unwrap", from: "client", to: "server", recipientRsa: "rsa_keygen_server",
         payload: (r) => {
             const s = findEv(r, "ckks_encrypt").data_after.serialization;
-            return { sha: s.sha256, size: s.size_bytes, name: "Enc(x)", desc: "your CKKS-encrypted feature vector", origin: "Encryption" };
+            return { sha: s.sha256, size: s.size_bytes, name: "Enc(x)", desc: "your CKKS-encrypted feature vector", origin: "Encryption", fact: "ckks_ct_sha" };
         },
         inner: "the server computes on the CKKS ciphertext itself",
         next: "Next chapter: the server evaluates the model on Enc(x) without decrypting it.",
@@ -24,7 +24,7 @@ const TP_LEGS = {
         payload: (r) => {
             const d = findEv(r, "compute_general_form").data_after;
             const name = r.class_names.length > 2 ? "Enc(scores)" : "Enc(score)";
-            return { sha: d.output_ciphertext_sha256, size: d.output_ciphertext_size, name, desc: "the encrypted model output", origin: "Computation" };
+            return { sha: d.output_ciphertext_sha256, size: d.output_ciphertext_size, name, desc: "the encrypted model output", origin: "Computation", fact: "result_ct_sha" };
         },
         inner: "the client needs the CKKS ciphertext back to decrypt it",
         next: "Next chapter: the client decrypts the result with its CKKS secret key.",
@@ -97,30 +97,43 @@ function tpRoundStages(R) {
     return stages;
 }
 
-async function tpPlayRounds(host, k1, chk, skip) {
-    host.innerHTML = `<div class="tp-round-head"></div><div class="tp-stages"></div>
-        <div class="tp-round-list"><div class="tp-round-row tp-round-headrow"><span>round</span><span>state after AddRoundKey (block order)</span><span>browser</span></div></div>`;
+// The 14 AES rounds, one round per unit, on the shared reveal controls (▶ ❚❚ ‹ › ↺, speed): each round
+// shows its stage matrices (hover any cell for its formula) and adds its result to the list below.
+function tpPlayRounds(host, k1, chk, skip) {
+    host.innerHTML = `<div class="grid-ctl"></div><div class="tp-round-head"></div><div class="tp-stages"></div>
+        <div class="tp-round-list"><div class="tp-round-row tp-round-headrow"><span>round</span><span>state after AddRoundKey (block order)</span><span>check</span></div></div>`;
     const head = host.querySelector(".tp-round-head");
     const stagesEl = host.querySelector(".tp-stages");
     const list = host.querySelector(".tp-round-list");
-    for (const R of k1.rounds) {
-        if (!host.isConnected) return;
-        const rc = chk.rounds[R.round - 1];
-        const animate = !skip && R.round === 1;
-        head.innerHTML = `Round <strong>${R.round}</strong> of 14${R.round === 14 ? " (no MixColumns in the last round)" : ""} ${ksBadge(rc.ok, "browser recomputed every matrix", "browser recomputation differs")}`;
+    const showRound = (u) => {
+        const R = k1.rounds[u], rc = chk.rounds[u];
+        head.innerHTML = `Round <strong>${R.round}</strong> of ${k1.rounds.length}${R.round === 14 ? " (no MixColumns in the last round)" : ""} ${ksBadge(rc.ok, "every matrix recomputed", "recomputation differs")}`;
         stagesEl.innerHTML = "";
-        for (const st of tpRoundStages(R)) {
+        tpRoundStages(R).forEach((st) => {
             const box = document.createElement("div");
             box.className = "tp-stage";
             box.innerHTML = `<div class="poly-label">${escapeHtml(st.label)}</div><div></div>`;
             stagesEl.appendChild(box);
-            const p = renderByteMatrix(box.lastElementChild, st.cells.flat(), { cols: 4, skipAnimation: !animate, equation: st.eq, cellClass: st.cls });
-            if (animate) await p;
-        }
-        list.insertAdjacentHTML("beforeend", `<div class="tp-round-row"><span>r=${R.round}</span><span>${tpBlockHex(R.after_add_round_key)}</span><span class="${rc.ok ? "tp-ok" : "tp-bad"}">${rc.ok ? "✓" : "✕"}</span></div>`);
-        list.scrollTop = list.scrollHeight;
-        if (!skip && R.round < 14) await ksPause(R.round === 1 ? 1400 : 800);
-    }
+            renderByteMatrix(box.lastElementChild, st.cells.flat(), { cols: 4, skipAnimation: true, equation: st.eq, cellClass: st.cls });
+        });
+    };
+    const ctrl = createRevealController({
+        count: k1.rounds.length,
+        delay: (u) => gridRevealDelay(u, 1, 2, 6000),
+        show: (u) => {
+            const R = k1.rounds[u], rc = chk.rounds[u];
+            list.insertAdjacentHTML("beforeend", `<div class="tp-round-row" data-r="${u}"><span>r=${R.round}</span><span>${tpBlockHex(R.after_add_round_key)}</span><span class="${rc.ok ? "tp-ok" : "tp-bad"}">${rc.ok ? "✓" : "✕"}</span></div>`);
+        },
+        point: showRound,
+        clear: () => { list.querySelectorAll(".tp-round-row[data-r]").forEach((r) => r.remove()); },
+        finish: () => {},
+        alive: () => host.isConnected,
+        skip,
+    });
+    createGridControls(host.querySelector(".grid-ctl"), ctrl);
+    ctrl.start();
+    if (skip) showRound(k1.rounds.length - 1);
+    return ctrl.done;
 }
 
 function buildTransportSteps(result, leg) {
@@ -151,11 +164,11 @@ function buildTransportSteps(result, leg) {
         const same = w.aes_key_hex === pb.derived_key_hex;
         keyStep = {
             eli5: {
-                what: `This trip's AES key is the one PBKDF2 made from the passphrase in Key Setup. Your browser compared the two: ${same ? "identical" : "DIFFERENT"}.`,
-                why: "The server never learns the passphrase. It receives this key inside an RSA envelope (step 4) that only it can open.",
+                what: `This trip's AES key is ${srcRef("pbkdf2_key", ksShort(pb.derived_key_hex))}: the 32 bytes PBKDF2 made from your passphrase and the ${srcRef("pbkdf2_salt", "salt")} in Key Setup. ${same ? "✓ identical" : "✕ DIFFERENT"}.`,
+                why: "AES needs both sides to hold the same key, but you can't just send it in the open. So the key travels inside an RSA envelope (step 4) that only the server can open; the server never learns the passphrase itself.",
                 formal: "trip key = the PBKDF2 key.",
             },
-            what: `The AES-256 key for this trip is the PBKDF2 key from Key Setup: ${w.aes_key_hex}. Compared in your browser with the Key Setup value: ${same ? "identical ✓" : "DIFFERENT ✕"}.`,
+            what: `The AES-256 key for this trip is the PBKDF2 key from Key Setup: ${srcRef("pbkdf2_key", w.aes_key_hex)}. Compared in your browser with the Key Setup value: ${same ? "identical ✓" : "DIFFERENT ✕"}.`,
             why: "The client and the server never meet to agree on a key. The client derives it from the passphrase; the RSA envelope (step 4) is how the server gets it without ever learning the passphrase.",
             formal: `k = PBKDF2-HMAC-SHA256(P, salt, ${pb.iterations.toLocaleString()}, 32) = ${w.aes_key_hex}`,
             checks: [{ label: "k = Key Setup's PBKDF2 output T", ok: same }],
@@ -166,8 +179,8 @@ function buildTransportSteps(result, leg) {
         const fresh = w.aes_key_hex === kEv.data_after.aes_key_hex && w.aes_key_hex !== leg1Key;
         keyStep = {
             eli5: {
-                what: `For the way back, the server made a brand-new random key instead of reusing the first one. Your browser checked it is new: ${fresh ? "yes" : "NO"}.`,
-                why: "A fresh key per message means one leaked key exposes only one message.",
+                what: `For the way back, the server made a brand-new key: 32 random bytes from its operating system, ${ksShort(w.aes_key_hex)}. ${fresh ? "✓ different from the first trip's key" : "✕ NOT new"}.`,
+                why: "The server never learned your passphrase, so it can't rebuild the first key. A fresh key per message is safer anyway: one leaked key exposes only one message, and reusing a key with the same counter start would let attackers XOR two messages together.",
                 formal: "return key = 32 fresh random bytes.",
             },
             what: `${kEv.description} Browser check: it is the key this trip uses, and it differs from the leg-1 key: ${fresh ? "✓" : "✕"}.`,
@@ -183,8 +196,8 @@ function buildTransportSteps(result, leg) {
     const steps = [
         {
             eli5: {
-                what: `${legNo === 1 ? "Your input's CKKS ciphertext" : "The CKKS result (still encrypted)"} is ${size} bytes. AES encrypts it into the AES-sealed ${legNo === 1 ? "ciphertext" : "result"}; the AES key is RSA-encrypted with the ${L.to}'s public key into the RSA-wrapped AES key. Both travel to the ${L.to}, which unwraps the AES key with its private key, opens the AES layer, and gets the CKKS ${legNo === 1 ? "ciphertext" : "result"} back, still CKKS-encrypted.`,
-                why: "CKKS already hides the numbers, but it doesn't notice if someone changes bytes on the way. The seal makes any change obvious, and the RSA lock means only the right computer can unwrap it.",
+                what: `${legNo === 1 ? "Your CKKS ciphertext" : "The CKKS result (still locked)"}, ${size} bytes, travels from the ${L.from} to the ${L.to} in two layers. AES (Advanced Encryption Standard) scrambles the bytes and adds a 16-byte seal; RSA locks the 32-byte AES key with the ${L.to}'s public key. The ${L.to} opens RSA with its private key, gets the AES key, checks the seal, unscrambles, and has the CKKS ${legNo === 1 ? "ciphertext" : "result"} back, still CKKS-locked.`,
+                why: "CKKS hides the numbers but can't notice changes: flipped bits would silently give a wrong answer. AES-GCM (Galois/Counter Mode) makes any change detectable and keeps strangers out. Why two tools: AES is fast but needs a shared key; RSA needs no shared secret but is slow and fits only small data. So AES locks the big package and RSA locks only the small AES key (\"hybrid encryption\").",
                 formal: legNo === 1 ? "send AES(CKKS ciphertext) + RSA_server-public(AES key)" : "send AES′(CKKS result) + RSA_client-public(AES′ key)",
                 next: "Next: how AES scrambles the bytes, as a graph.",
             },
@@ -223,10 +236,16 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `AES stretches the 32-byte key into 15 smaller round keys, one for each round of scrambling. Your browser stretched it too: ${chk.wordsOk && chk.roundKeysOk ? "same round keys" : "DIFFERENT"}.`,
-                why: "Using a different key piece each round means every bit of the key affects the result in many different ways.",
-                formal: "32-byte key → 15 round keys.",
+                what: (() => { const kx = t.key_expansion, d0 = kx.derivations[0]; return `AES stretches the 32-byte key into 60 words of 4 bytes (15 round keys of 16 bytes, one per round plus one at the start). The key itself gives words w0-w7. Each new word = the word before it ⊕ the word 8 places back; every 8th word is first rotated, byte-swapped and nudged by a round constant. Example: w8 from w7 = ${d0.prev}: rotate → ${d0.after_rotword}, swap bytes → ${d0.after_subword}, ⊕ constant → ${d0.after_rcon}, ⊕ w0 = ${kx.words[8]}. ${chk.wordsOk && chk.roundKeysOk ? "✓" : "✕"} all 60 recomputed.`; })(),
+                why: "Each round mixes in a different key piece, so every key bit affects the result many times in many ways. The rotations, byte swaps and constants make the round keys look unrelated to each other, so learning one round key doesn't reveal the rest.",
+                formal: "32-byte key → 60 words → 15 round keys.",
                 next: "Next: 2.3, the counter numbers AES will scramble.",
+            },
+            eli1: {
+                what: "Toy with 4-bit words: w0 = 1010, w1 = 0110. Rule: next word = (word before, rotated one place left) ⊕ (word two back). w1 rotated = 1100; 1100 ⊕ 1010 = 0110 = w2.",
+                why: "The real schedule does this with 32-bit words, looking 8 words back, plus a byte swap and a constant every 8th word.",
+                formal: "toy: rot(0110) ⊕ 1010 = 0110.",
+                next: "Next: the counters.",
             },
             what: `The 32-byte key becomes 60 four-byte words w₀…w₅₉ = 15 round keys K₀…K₁₄ (one to start, one per round). Your browser re-ran the expansion: all 60 words ${chk.wordsOk ? "match ✓" : "DIFFER ✕"}, all 15 round keys ${chk.roundKeysOk ? "match ✓" : "DIFFER ✕"}.`,
             why: "AES never reuses the raw key in every round. Each round gets its own 16 bytes, derived from earlier words through the S-box and a round constant, so every key bit influences every round differently.",
@@ -238,7 +257,7 @@ function buildTransportSteps(result, leg) {
                 el.innerHTML = `${title("AES-256 key schedule")}
                     <div class="scene-body">
                         <div class="vector-caption">60 words, one row per round key (hover a word for how it was made). ${ksBadge(chk.wordsOk && chk.roundKeysOk, "browser recomputation matches", "browser recomputation differs")}</div>
-                        <div id="tpSchedule" class="ks-tall"></div>
+                        <div id="tpSchedule"></div>
                         <div class="ks-legend"><span class="bm-seg-key">the key itself (w₀–w₇)</span><span class="bm-seg-salt">RotWord + SubWord + Rcon</span><span class="bm-seg-int">SubWord</span><span>w_{i−8} ⊕ w_{i−1}</span></div>
                     </div>`;
                 return renderByteMatrix(el.querySelector("#tpSchedule"), words, {
@@ -264,10 +283,16 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `AES doesn't scramble your bytes directly; it scrambles a counter (a random starting number + 1, 2, 3, …), one per 16-byte block, ${nBlocks.toLocaleString()} blocks here.`,
-                why: "A fresh random start (the nonce) for every message means the same key never makes the same scramble twice.",
-                formal: "counter i = random start + i.",
+                what: `AES never scrambles your data directly. It scrambles counters: a random 12-byte start (the nonce, "number used once", ${w.nonce_hex}) followed by a 4-byte count. Count 1 (J0) is kept for the seal; counts 2, 3, … are used for the ${nBlocks.toLocaleString()} blocks of 16 bytes (${size} bytes ÷ 16, rounded up).`,
+                why: "Scrambling counters makes a stream of random-looking bytes as long as needed, and every 16-byte block can be done in parallel. The nonce must never repeat with the same key: two messages with the same keystream could be XORed against each other to leak both.",
+                formal: "counter i = nonce ‖ (i as 4 bytes).",
                 next: "Next: 2.4, inside one AES scramble.",
+            },
+            eli1: {
+                what: `Toy: start S = 500, counters 501, 502, 503, …. Real: ${w.nonce_hex} followed by 00000001, 00000002, 00000003, ….`,
+                why: "Only the last 4 bytes count up; the random start makes every message's counters different.",
+                formal: "toy: 500 + i.",
+                next: "Next: one scramble.",
             },
             what: `Nonce: 12 random bytes ${t.nonce_hex}. J₀ = nonce ‖ 00000001. The payload's ${nBlocks.toLocaleString()} 16-byte blocks use counters J₀+1 … J₀+${nBlocks.toLocaleString()}; AES_K(J₀) itself is kept for the tag. Browser recomputed the first ${chk.blocks.length} counters: ${chk.blocks.every((b) => b.counterOk) ? "✓" : "✕"}.`,
             why: "GCM turns AES into a stream cipher: AES encrypts counters, never your data directly. A fresh random nonce per message means the same key never produces the same keystream twice; reusing one would leak the XOR of two messages.",
@@ -295,9 +320,9 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `Counter mode in one picture: each counter is scrambled by AES into 16 random-looking bytes (the keystream), and those are XORed with 16 bytes of your package. ${nBlocks.toLocaleString()} blocks, all the same way.`,
-                why: "XOR with random-looking bytes hides the data, and XOR again with the same bytes brings it back. Steps 2.1-2.7 walk through the boxes.",
-                formal: "locked block = data block ⊕ AES(counter).",
+                what: `Counter mode in one picture: AES scrambles each counter with the key into 16 random-looking bytes (the keystream), and those are XORed with the next 16 bytes of your package. ${nBlocks.toLocaleString()} blocks, all the same way. Each box is one stage, with this run's real value.`,
+                why: "XOR with random-looking bytes hides the data; XOR again with the same bytes brings it back, because x ⊕ k ⊕ k = x. So only someone who can rebuild the keystream (who has the key) can undo it. Steps 2.1-2.7 walk through the boxes.",
+                formal: "locked block = data block ⊕ AES_key(counter).",
                 next: "Next: 2.1, the key.",
             },
             what: `Counter mode, block 1: counter 1 → AES_K → keystream ${ksShort(chk.ks1Hex)}, XORed with the first 16 bytes of ${pay.name} → C₁ = ${ksShort(t.blocks[0].ciphertext_hex)}. The other ${(nBlocks - 1).toLocaleString()} blocks work the same way with the next counters.`,
@@ -311,15 +336,21 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `AES arranges the 16 counter bytes in a 4×4 grid and mixes in the first round key (XOR). Your browser checked both grids.`,
-                why: "Everything AES does is 14 rounds of shuffling this one grid.",
-                formal: "grid = counter ⊕ round key 0.",
-                next: "Next: 2.5, the 14 rounds.",
+                what: (() => { const s0 = k1.input_state[0][0], r0 = k1.round_key_0[0][0], a0 = k1.after_initial_add_round_key[0][0]; return `AES writes the 16 counter bytes into a 4×4 grid (column by column) called the state, then XORs round key 0 into it, byte by byte. First byte: 0x${s0} ⊕ 0x${r0} = 0x${a0}. ✓ both grids recomputed.`; })(),
+                why: "Everything AES does is 14 rounds of reshaping this one grid. Mixing the key in before the first round means even round 1 already depends on the key.",
+                formal: "state = counter ⊕ round key 0.",
+                next: "Next: 2.5, the byte-swap table every round uses.",
+            },
+            eli1: {
+                what: (() => { const s0 = parseInt(k1.input_state[0][0], 16), r0 = parseInt(k1.round_key_0[0][0], 16), b = (v) => v.toString(2).padStart(8, "0"); return `In bits: ${b(s0)} ⊕ ${b(r0)} = ${b(s0 ^ r0)} (= 0x${(s0 ^ r0).toString(16).padStart(2, "0")}). Same bits give 0, different bits give 1.`; })(),
+                why: "All 16 bytes get the same treatment, each with its own key byte.",
+                formal: "bitwise XOR.",
+                next: "Next: the swap table.",
             },
             what: `Inside AES_K(counter 1): the 16 counter bytes fill a 4×4 state column by column, and AddRoundKey XORs round key K₀ (the first 16 key bytes) into it. Browser: input state ${chk.inputOk ? "✓" : "✕"}, K₀ ⊕ state ${chk.initOk ? "✓" : "✕"}.`,
             why: "AES works on a 4×4 grid of bytes. Everything that follows is 14 rounds of the same four operations on this grid.",
             formal: "s[r][c] = ctr₁[r + 4c]; s ← s ⊕ K₀",
-            next: "Next: 2.5, the 14 rounds, matrix by matrix.",
+            next: "Next: 2.5, the S-box table SubBytes looks bytes up in.",
             renderVisual: (el) => {
                 el.innerHTML = `${title("Inside AES: the state matrix")}<div class="scene-body"></div>`;
                 const build = (inner, skip) => {
@@ -340,15 +371,21 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `14 rounds, each doing four things to the grid: swap every byte via a table, slide the rows, mix the columns, add the round key. Your browser redid every one: ${chk.roundsOk ? "identical" : "DIFFERENT"}.`,
-                why: "After 14 rounds, every output byte depends on every key byte and every input byte, so there is no shortcut to undo it without the key.",
-                formal: "14 × (swap, slide, mix, add key).",
-                next: "Next: 2.6, the byte-swap table.",
+                what: (() => { const R = k1.rounds[0]; return `14 rounds, each with four moves on the grid: SubBytes (replace every byte via the S-box table), ShiftRows (row r slides left by r places), MixColumns (each column's 4 bytes are blended into 4 new ones), AddRoundKey (XOR that round's key). Round 1, first byte: 0x${R.start[0][0]} → S-box → 0x${R.after_sub_bytes[0][0]} → … → 0x${R.after_add_round_key[0][0]}. The last round skips MixColumns. Result: keystream block ${ksShort(k1.ciphertext_hex)}. ${chk.roundsOk ? "✓" : "✕"} every round recomputed.`; })(),
+                why: "Each move does one job. SubBytes makes it non-linear (no algebra shortcut), ShiftRows and MixColumns spread every byte over the whole grid, AddRoundKey ties it to the key. After 14 rounds every output byte depends on every input byte and every key byte.",
+                formal: "14 × (SubBytes, ShiftRows, MixColumns, AddRoundKey).",
+                next: "Next: 2.7, the scrambled counters meet your data.",
+            },
+            eli1: {
+                what: "ShiftRows on a toy grid: rows (a b c d), (e f g h), (i j k l), (m n o p) become (a b c d), (f g h e), (k l i j), (p m n o): row 0 stays, row 1 slides 1, row 2 slides 2, row 3 slides 3.",
+                why: "After sliding, each column holds one byte from every original column, so MixColumns then blends bytes that came from everywhere.",
+                formal: "toy: row r slides left r places.",
+                next: "Next: XOR with your data.",
             },
             what: `14 rounds, each SubBytes → ShiftRows → MixColumns (skipped in round 14) → AddRoundKey with K_r. Your browser recomputed all ${k1.rounds.length * 4 - 1} stage matrices, each from its own previous result: ${chk.roundsOk ? "all match ✓" : "MISMATCH ✕"}. Output = keystream block 1 = ${chk.ks1Hex} ${chk.ks1Ok ? "✓" : "✕"}.`,
             why: "SubBytes is the only non-linear step: it breaks any algebraic shortcut. ShiftRows and MixColumns spread each byte across the whole grid, and AddRoundKey mixes the key in. After 14 rounds every output bit depends on every key bit and every input bit.",
             formal: "s ← ARK_r(MC(SR(SB(s)))), r = 1…13; s ← ARK_14(SR(SB(s))); MC column: [2 3 1 1; 1 2 3 1; 1 1 2 3; 3 1 1 2] over GF(2⁸)",
-            next: "Next: 2.6, the S-box table SubBytes looks bytes up in.",
+            next: "Next: 2.7, the keystream meets the payload.",
             renderVisual: (el) => {
                 el.innerHTML = `${title("Inside AES: 14 rounds")}<div class="scene-body">${aesCrumbs}<div class="tp-rounds"></div></div>`;
                 return tpPlayRounds(el.querySelector(".tp-rounds"), k1, chk, ksSkip());
@@ -356,15 +393,21 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `The byte-swap table: each of the 256 possible bytes has a fixed replacement. Your browser built the table from its maths definition and it matches: ${chk.sboxOk ? "yes" : "NO"}.`,
-                why: "This table is the only 'non-straight-line' part of AES, and that is what stops clever algebra from undoing it.",
-                formal: "byte → its replacement in the table.",
-                next: "Next: 2.7, the scrambled counters meet your data.",
+                what: (() => { const v = k1.after_initial_add_round_key[0][0]; return `The S-box ("substitution box"): a fixed table that replaces each of the 256 possible byte values with another. Byte 0x${v} is looked up at row ${v[0]}, column ${v[1]}: 0x${t.sbox[parseInt(v[0], 16)][parseInt(v[1], 16)]}. ${chk.sboxOk ? "✓" : "✕"} table rebuilt from its definition.`; })(),
+                why: "Every other AES step is \"straight-line\" maths (XOR, shifts, mixing), which clever algebra could untangle. The S-box is built from division in a special 256-number arithmetic, followed by a bit shuffle: a non-straight-line step that blocks those shortcuts. It is fixed and public; the secrecy is only in the key.",
+                formal: "byte xy → table[x][y].",
+                next: "Next: 2.6, the 14 rounds that use it.",
+            },
+            eli1: {
+                what: (() => { const v = k1.after_initial_add_round_key[0][0]; return `A byte in hex is 2 digits, like ${v}. First digit (${v[0]}) = row, second (${v[1]}) = column. Row ${v[0]}, column ${v[1]} of the table holds ${t.sbox[parseInt(v[0], 16)][parseInt(v[1], 16)]}, so ${v} becomes ${t.sbox[parseInt(v[0], 16)][parseInt(v[1], 16)]}.`; })(),
+                why: "Like a secret-decoder table, except everyone has the same table.",
+                formal: "lookup, row then column.",
+                next: "Next: the rounds.",
             },
             what: `SubBytes' lookup table: 256 entries, S(x) = A·x⁻¹ ⊕ 0x63 in GF(2⁸). Your browser built it from that definition: all 256 ${chk.sboxOk ? "match ✓" : "DIFFER ✕"}. Highlighted: the 16 entries round 1 looked up.`,
             why: "A table built from field inversion has no simple equation linking input bits to output bits. That non-linearity is what defeats linear and differential cryptanalysis.",
             formal: "S(x) = A · x^254 ⊕ 0x63 over GF(2⁸) mod x⁸ + x⁴ + x³ + x + 1 (0 ↦ 0x63)",
-            next: "Next: 2.7, the keystream meets the payload.",
+            next: "Next: 2.6, the 14 rounds, matrix by matrix.",
             renderVisual: (el) => {
                 const cells = t.sbox.flat();
                 const used = new Set(k1.rounds[0].start.flat().map((h) => parseInt(h, 16)));
@@ -385,10 +428,16 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `Each 16-byte piece of the package is XORed with its scrambled counter. Your browser did the first blocks itself: ${chk.blocks.every((b) => b.keystreamOk && b.xorOk) ? "same bytes" : "DIFFERENT"}.`,
-                why: "That XOR is the actual hiding. The output is exactly as long as the input, with no padding.",
-                formal: "locked bytes = data ⊕ scrambled counters.",
+                what: (() => { const b = t.blocks[0]; return `Each 16-byte block of your package is XORed with its scrambled counter. Block 1: data ${ksShort(b.plaintext_hex)} ⊕ keystream ${ksShort(b.keystream_hex)} = ${ksShort(b.ciphertext_hex)}. ${chk.blocks.every((x) => x.keystreamOk && x.xorOk) ? "✓" : "✕"} first blocks recomputed.`; })(),
+                why: "That XOR is the actual hiding: without the key the keystream is unpredictable, so the result looks random. The output is exactly as long as the input (no padding), because XOR works byte by byte.",
+                formal: "locked bytes = data ⊕ keystream.",
                 next: "Next: 3, the seal that detects tampering.",
+            },
+            eli1: {
+                what: (() => { const b = t.blocks[0], P = parseInt(b.plaintext_hex.slice(0, 2), 16), K = parseInt(b.keystream_hex.slice(0, 2), 16), s = (v) => v.toString(2).padStart(8, "0"); return `First byte: ${s(P)} ⊕ ${s(K)} = ${s(P ^ K)}. Undo: ${s(P ^ K)} ⊕ ${s(K)} = ${s(P)}, the original.`; })(),
+                why: "XOR twice with the same keystream byte always gives the original back.",
+                formal: "(p ⊕ k) ⊕ k = p.",
+                next: "Next: the seal.",
             },
             what: `P_i ⊕ keystream_i = C_i for blocks 1–${t.blocks.length}. Your browser ran AES_K on each counter itself: keystreams ${chk.blocks.every((b) => b.keystreamOk) ? "✓" : "✕"}, XORs ${chk.blocks.every((b) => b.xorOk) ? "✓" : "✕"}, and these ${t.blocks.length * 16} bytes are the start of the real ${w.aes_ciphertext_size.toLocaleString()}-byte ciphertext (checked below).`,
             why: `That XOR is the entire encryption. P₁ is the first 16 bytes of the serialized CKKS ciphertext from the ${pay.origin} chapter; after the XOR they look random to anyone without K.`,
@@ -423,10 +472,16 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `The seal (tag): a 16-byte checksum computed from the header, every locked byte and the length, using a secret value only the key holder can make. Your browser recomputed the seal: ${chk.tagOk ? "identical" : "DIFFERENT"}.`,
-                why: "Changing even one bit anywhere changes the seal, and nobody without the key can forge a matching one, so tampering is always caught.",
-                formal: "seal = checksum(header, locked bytes, length) under the key.",
+                what: `The seal (tag), GHASH: a secret value H = AES_key(all zeros) = ${ksShort(t.h_hex)} is made from the key. Then a running total X starts at 0, and for each 16-byte block (${g.aad_blocks} of header, ${g.ciphertext_blocks.toLocaleString()} of locked bytes, 1 of lengths): X = (X ⊕ block) × H, in a special 128-bit arithmetic. That's ${g.multiplications.toLocaleString()} multiplications. Finally tag = X ⊕ AES_key(J0) = ${t.tag_hex}. ${chk.tagOk ? "✓" : "✕"} recomputed.`,
+                why: "Every block passes through the total, so changing any bit anywhere changes the tag. Only the key holder knows H and AES_key(J0), so nobody else can compute a matching tag for altered data. Including the header and lengths means those can't be swapped or cut either.",
+                formal: "tag = GHASH_H(header, locked bytes, lengths) ⊕ AES_key(J0).",
                 next: "Next: 4, locking the AES key itself.",
+            },
+            eli1: {
+                what: (() => { const H = 5, q = 11, run = (bs) => bs.reduce((x, b) => ((x + b) * H) % q, 0); return `Toy checksum with secret H = 5, keep remainders mod 11, blocks 3, 1, 4: X = (0 + 3)×5 = 15 → 4; (4 + 1)×5 = 25 → 3; (3 + 4)×5 = 35 → 2. Tag = ${run([3, 1, 4])}. Change block 2 to 2: tag = ${run([3, 2, 4])}.`; })(),
+                why: "Without knowing H, nobody can predict the new tag for changed blocks. The real GHASH uses 128-bit blocks and its own multiplication, but the running-total idea is the same.",
+                formal: "toy: X = (X + block) × H mod 11.",
+                next: "Next: locking the key.",
             },
             what: `H = AES_K(0¹²⁸) = ${t.h_hex}. GHASH folds the ${g.aad_blocks} header blocks, all ${g.ciphertext_blocks.toLocaleString()} ciphertext blocks and 1 length block into S with X ← (X ⊕ block)·H in GF(2¹²⁸): ${g.multiplications.toLocaleString()} multiplications, ${g.elapsed_ms.toFixed(0)} ms in Python. Tag = AES_K(J₀) ⊕ S = ${t.tag_hex}. Browser (BigInt): H ${chk.hOk ? "✓" : "✕"}, shown multiplications ${chk.ghashOk ? "✓" : "✕"}, length block ${chk.lenOk ? "✓" : "✕"}, AES_K(J₀) ${chk.ekj0Ok ? "✓" : "✕"}, tag ${chk.tagOk ? "✓" : "✕"}.`,
             why: "The tag is a fingerprint of the header and every ciphertext byte that only the key holder can compute. The receiver recomputes it before decrypting anything: one changed bit anywhere gives a different tag, and the message is rejected.",
@@ -455,23 +510,88 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `The AES key itself is locked with the ${L.to}'s public RSA lock (${w.encrypted_aes_key_size} bytes). To show what's inside, your browser opens it with the ${L.to}'s private key and finds the AES key.`,
-                why: "Only the ${L.to} has the matching private key, so only it can get the AES key and unwrap the package.",
-                formal: "locked key = RSA(AES key, padded with randomness).",
+                what: `The ${L.from} locks the 32-byte AES key with the ${L.to}'s public RSA key (${srcRef(L.to === "server" ? "rsa_n_server" : "rsa_n_client", "n")}, e = ${rsa.e}). First OAEP padding (Optimal Asymmetric Encryption Padding) builds a 256-byte block: DB = fingerprint of an empty label ‖ zeros ‖ 01 ‖ the key; a random 32-byte seed masks DB, and DB masks the seed (MGF1, a SHA-256-based mask generator); EM = 00 ‖ masked seed ‖ masked DB. Then c = EM^e mod n: ${w.encrypted_aes_key_size} bytes.`,
+                why: `Plain RSA on the bare key would give the same output every time and has known attacks. The random seed makes every envelope different; the fixed structure inside lets the receiver detect a damaged or forged envelope. Only the ${L.to}'s private key d undoes ^e.`,
+                formal: "c = OAEP(AES key, random seed)^e mod n.",
                 next: "Next: 5, the envelope on the wire.",
             },
-            what: `The AES key is sealed with RSA-OAEP under the ${L.to}'s public key (n: ${rsa.bit_lengths.n} bits, e = ${rsa.e}), giving ${w.encrypted_aes_key_size} bytes. To show what is inside, your browser opens it with the ${L.to}'s private key d (c^d mod n in BigInt) and undoes the OAEP padding step by step.`,
-            why: "RSA only encrypts a number smaller than n, and it is slow, so it carries just the 32-byte AES key. OAEP mixes in a random seed first, so sealing the same key twice gives different envelopes, and a damaged envelope is detected when it is opened.",
-            formal: "EM = c^d mod n = 00 ‖ maskedSeed ‖ maskedDB; seed = maskedSeed ⊕ MGF1(maskedDB, 32); DB = maskedDB ⊕ MGF1(seed, 223) = SHA-256(\"\") ‖ 00…00 ‖ 01 ‖ k",
+            eli1: {
+                what: `Toy with the server pair from Key Setup (n = 91, e = 5): message 2, padded with a random digit r as 10·r + 2. r = 1: 12⁵ mod 91 = ${Number(12n ** 5n % 91n)}. r = 4: 42⁵ mod 91 = ${Number(42n ** 5n % 91n)}. Same message, different envelopes.`,
+                why: "That's what the random seed in OAEP does, with a much more careful layout.",
+                formal: `toy: 2 → ${Number(12n ** 5n % 91n)} or ${Number(42n ** 5n % 91n)}.`,
+                next: "Next: the wire.",
+            },
+            what: `The ${L.from} seals the 32-byte AES key with RSA-OAEP under the ${L.to}'s public key (n: ${rsa.bit_lengths.n} bits, e = ${rsa.e}): EM = 00 ‖ maskedSeed ‖ maskedDB, c = EM^e mod n, ${w.encrypted_aes_key_size} bytes.`,
+            why: "RSA only encrypts a number smaller than n, and it is slow, so it carries just the 32-byte AES key (hybrid encryption). OAEP mixes in a random seed first, so sealing the same key twice gives different envelopes, and a damaged envelope is detected when it is opened.",
+            formal: "DB = SHA-256(\"\") ‖ 00…00 ‖ 01 ‖ k; seed random; maskedDB = DB ⊕ MGF1(seed); maskedSeed = seed ⊕ MGF1(maskedDB); c = (00 ‖ maskedSeed ‖ maskedDB)^e mod n",
             next: "Next: the packet on the wire.",
             renderVisual: (el) => {
-                el.innerHTML = `${title("RSA-OAEP key envelope")}
+                el.innerHTML = `${title(`${from} seals the AES key (RSA-OAEP)`)}
+                    <div class="scene-body">
+                        <div class="vector-caption">the ${escapeHtml(L.to)}'s public key: n (${rsa.bit_lengths.n} bits), e = ${rsa.e}</div>
+                        <div class="bignum-box">${srcLinkHtml(L.to === "server" ? "rsa_n_server" : "rsa_n_client", rsa.n)}</div>
+                        <div class="vector-caption">c = the sealed AES key that travels (${w.encrypted_aes_key_size} bytes, base64):</div>
+                        <div class="bignum-box">${escapeHtml(w.encrypted_aes_key_b64)}</div>
+                    </div>`;
+            },
+        },
+        {
+            eli5: {
+                what: `This is everything that actually travels: a readable header ("${w.aad_utf8}", ${t.aad_len} bytes), the RSA-locked AES key (${w.encrypted_aes_key_size} B), the nonce (${w.nonce_size} B), ${w.aes_ciphertext_size.toLocaleString()} locked bytes and the ${w.tag_size}-byte tag. Total ${(t.aad_len + w.encrypted_aes_key_size + w.nonce_size + w.aes_ciphertext_size + w.tag_size).toLocaleString()} bytes.`,
+                why: `Anyone watching the network sees all of this. The nonce and header aren't secret; they're needed to unlock and are covered by the tag, so they can't be changed. Without the ${L.to}'s private key the rest is useless.`,
+                formal: "envelope = (header, locked key, nonce, locked bytes, tag).",
+                next: `Next: 6, the ${L.to} opens the AES key with its private key.`,
+            },
+            what: wrapEv.description,
+            why: `Everything the ${L.to} needs travels together. Only the header is readable on the wire, and the tag covers it too, so it cannot be swapped. Total on the wire: ${(w.encrypted_aes_key_size + w.nonce_size + w.aes_ciphertext_size + w.tag_size).toLocaleString()} bytes plus the ${t.aad_len}-byte header.`,
+            formal: wrapEv.formal,
+            next: `Next: the ${L.to} opens the RSA envelope.`,
+            renderVisual: (el) => {
+                const field = (name, bytes, note) => `<div class="tp-field"><span class="tp-field-name">${escapeHtml(name)}</span><span class="tp-field-size">${bytes}</span><span class="tp-field-note">${escapeHtml(note)}</span></div>`;
+                el.innerHTML = `${title(`On the wire: ${from} → ${to}`)}
+                    <div class="scene-body">
+                        <div class="transport-track">
+                            <span class="transport-endpoint">${escapeHtml(from)}</span>
+                            <div class="transport-packet ${ksSkip() ? "transport-packet-arrived" : "transport-packet-outbound"}"></div>
+                            <span class="transport-endpoint">${escapeHtml(to)}</span>
+                        </div>
+                        <div class="tp-fields ${ksRevealClass()}">
+                            ${field("header (AAD)", `${t.aad_len} B`, `"${w.aad_utf8}", readable, covered by the tag`)}
+                            ${field("RSA-OAEP(k)", `${w.encrypted_aes_key_size} B`, `sealed for the ${L.to} · pk sha256 ${ksShort(w.recipient_public_key_der_sha256)}`)}
+                            ${field("nonce", `${w.nonce_size} B`, w.nonce_hex)}
+                            ${field("ciphertext", `${w.aes_ciphertext_size.toLocaleString()} B`, `sha256 ${ksShort(w.aes_ciphertext_sha256)}`)}
+                            ${field("tag", `${w.tag_size} B`, w.tag_hex)}
+                        </div>
+                        <div class="vector-caption">The full ciphertext, exactly as sent (base64):</div>
+                        <div class="ciphertext-box">${escapeHtml(w.aes_ciphertext_b64)}</div>
+                    </div>`;
+            },
+        },
+        {
+            eli5: {
+                what: `The ${L.to} computes EM = c^d mod n with its private key d. Then it undoes the masks in reverse: seed = masked seed ⊕ MGF1(masked DB), DB = masked DB ⊕ MGF1(seed). DB must start with the fingerprint of an empty label, then zeros, then 01; the last 32 bytes are the AES key.`,
+                why: "e and d undo each other (e·d leaves remainder 1 mod λ(n)), so (key^e)^d gives the padded block back. If anything is wrong (another key, a changed byte), the fixed structure won't appear and the envelope is refused before the key is used.",
+                formal: "EM = c^d mod n → unmask → AES key.",
+                next: "Next: 7, the AES key opens the package.",
+            },
+            eli1: {
+                what: `Toy: envelope ${Number(12n ** 5n % 91n)}, private d = 5: ${Number(12n ** 5n % 91n)}⁵ mod 91 = ${Number((12n ** 5n % 91n) ** 5n % 91n)}. Drop the pad digit (1): message 2.`,
+                why: "Unlocking with d gives the padded block; removing the known structure leaves the key.",
+                formal: `toy: ${Number(12n ** 5n % 91n)}⁵ mod 91 = 12 → 2.`,
+                next: "Next: open the package.",
+            },
+            what: `The ${L.to} computes EM = c^d mod n with its private exponent d, then undoes OAEP: seed = maskedSeed ⊕ MGF1(maskedDB, 32), DB = maskedDB ⊕ MGF1(seed, 223), checks lHash, the zero run and the 01 separator, and takes the last 32 bytes as the AES key. Your browser does the same in BigInt.`,
+            why: "e·d ≡ 1 (mod λ(n)), so (k^e)^d ≡ k (mod n). The OAEP structure checks reject a wrong key or a modified envelope before the AES key is used.",
+            formal: "EM = c^d mod n = 00 ‖ maskedSeed ‖ maskedDB; seed = maskedSeed ⊕ MGF1(maskedDB, 32); DB = maskedDB ⊕ MGF1(seed, 223) = SHA-256(\"\") ‖ 00…00 ‖ 01 ‖ k",
+            next: "Next: AES-GCM decrypts the payload with k.",
+            renderVisual: (el) => {
+                el.innerHTML = `${title(`${to} opens the AES key (RSA private key)`)}
                     <div class="scene-body">
                         <div class="vector-caption">c = what travels (${w.encrypted_aes_key_size} bytes, base64):</div>
                         <div class="bignum-box">${escapeHtml(w.encrypted_aes_key_b64)}</div>
                         <div class="ks-verify" id="tpOaepChecks">${tpCheck("tpOaepRsa", "browser: c^d mod n running")}</div>
-                        <div class="tp-oaep"><div><div class="poly-label">EM = c^d mod n (256 bytes)</div><div id="tpEm" class="ks-tall"></div></div>
-                            <div><div class="poly-label">DB after unmasking (223 bytes)</div><div id="tpDb" class="ks-tall"></div></div></div>
+                        <div class="tp-oaep"><div><div class="poly-label">EM = c^d mod n (256 bytes)</div><div id="tpEm"></div></div>
+                            <div><div class="poly-label">DB after unmasking (223 bytes)</div><div id="tpDb"></div></div></div>
                         <div class="ks-legend"><span class="bm-seg-one">00</span><span class="bm-seg-salt">masked seed / seed</span><span class="bm-seg-msg">lHash = SHA-256("")</span><span class="bm-seg-zero">zero padding</span><span class="bm-seg-int">01 separator</span><span class="bm-seg-key">the AES key</span></div>
                     </div>`;
                 return oaepOpen(w.encrypted_aes_key_b64, rsa).then((o) => {
@@ -500,42 +620,10 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `This is everything that actually travels: the locked AES key, the counter start, ${w.aes_ciphertext_size.toLocaleString()} locked bytes and the 16-byte seal.`,
-                why: "Anyone watching the network sees only this. Without the ${L.to}'s private key it is useless to them.",
-                formal: "envelope = (locked key, nonce, locked bytes, seal).",
-                next: `Next: 6, the ${L.to} opens it, and your browser does too.`,
-            },
-            what: wrapEv.description,
-            why: `Everything the ${L.to} needs travels together. Only the header is readable on the wire, and the tag covers it too, so it cannot be swapped. Total on the wire: ${(w.encrypted_aes_key_size + w.nonce_size + w.aes_ciphertext_size + w.tag_size).toLocaleString()} bytes plus the ${t.aad_len}-byte header.`,
-            formal: wrapEv.formal,
-            next: `Next: the ${L.to} unwraps it, and your browser does too.`,
-            renderVisual: (el) => {
-                const field = (name, bytes, note) => `<div class="tp-field"><span class="tp-field-name">${escapeHtml(name)}</span><span class="tp-field-size">${bytes}</span><span class="tp-field-note">${escapeHtml(note)}</span></div>`;
-                el.innerHTML = `${title(`On the wire: ${from} → ${to}`)}
-                    <div class="scene-body">
-                        <div class="transport-track">
-                            <span class="transport-endpoint">${escapeHtml(from)}</span>
-                            <div class="transport-packet ${ksSkip() ? "transport-packet-arrived" : "transport-packet-outbound"}"></div>
-                            <span class="transport-endpoint">${escapeHtml(to)}</span>
-                        </div>
-                        <div class="tp-fields ${ksRevealClass()}">
-                            ${field("header (AAD)", `${t.aad_len} B`, `"${w.aad_utf8}", readable, covered by the tag`)}
-                            ${field("RSA-OAEP(k)", `${w.encrypted_aes_key_size} B`, `sealed for the ${L.to} · pk sha256 ${ksShort(w.recipient_public_key_der_sha256)}`)}
-                            ${field("nonce", `${w.nonce_size} B`, w.nonce_hex)}
-                            ${field("ciphertext", `${w.aes_ciphertext_size.toLocaleString()} B`, `sha256 ${ksShort(w.aes_ciphertext_sha256)}`)}
-                            ${field("tag", `${w.tag_size} B`, w.tag_hex)}
-                        </div>
-                        <div class="vector-caption">The full ciphertext, exactly as sent (base64):</div>
-                        <div class="ciphertext-box">${escapeHtml(w.aes_ciphertext_b64)}</div>
-                    </div>`;
-            },
-        },
-        {
-            eli5: {
-                what: `The ${L.to} unlocks the AES key with its private key, checks the seal and unlocks the bytes. Your browser does the same on its own and compares fingerprints: the package arrived unchanged.`,
-                why: "Two independent unwraps giving the same fingerprint as before the trip prove nothing was changed or lost.",
-                formal: "open key → check seal → unlock bytes → same fingerprint.",
-                next: "Next: 7, proof that the seal catches tampering.",
+                what: `With that AES key the ${L.to} first recomputes the tag over the header and the locked bytes and compares it with the tag that arrived (${ksShort(u.tag_hex)}). Only if they match does it rebuild the same counters and keystream and XOR them away. Out comes the CKKS ${legNo === 1 ? "ciphertext" : "result"}, ${u.size_bytes.toLocaleString()} bytes, still locked by CKKS.`,
+                why: `Checking the tag first means tampered bytes are never used. XOR undoes itself, so the same keystream turns the bytes back. The SHA-256 fingerprint after the trip equals the one from ${srcRef(pay.fact, pay.origin)}, so not one byte changed.`,
+                formal: "check tag → unscramble → CKKS bytes, unchanged.",
+                next: "Next: 8, proof that the seal catches tampering.",
             },
             what: unwrapEv.description,
             why: `The ${L.to}'s private key opens the envelope, then AES-GCM recomputes the tag over the header and ciphertext and releases the plaintext only if it matches. Your browser repeats the whole unwrap with WebCrypto, independent of Python, on the exact bytes sent.`,
@@ -543,7 +631,7 @@ function buildTransportSteps(result, leg) {
             next: "Next: proof that the tag really catches tampering.",
             renderVisual: (el) => {
                 const arrivedOk = u.integrity_preserved && u.tag_verified;
-                el.innerHTML = `${title(`${to} unwraps`)}
+                el.innerHTML = `${title(`${to} opens the payload (AES-GCM) → CKKS ciphertext`)}
                     <div class="scene-body">
                         <div class="transport-track">
                             <span class="transport-endpoint">${escapeHtml(from)}</span>
@@ -566,7 +654,7 @@ function buildTransportSteps(result, leg) {
                         </div>
                         <div class="tp-table">
                             <div class="tp-row tp-row3 tp-headrow"><span>where</span><span>SHA-256 of ${escapeHtml(pay.name)}</span><span></span></div>
-                            <div class="tp-row tp-row3"><span>${escapeHtml(pay.origin)} chapter</span><span>${escapeHtml(pay.sha)}</span><span></span></div>
+                            <div class="tp-row tp-row3"><span>${escapeHtml(pay.origin)} chapter</span><span>${srcLinkHtml(pay.fact, pay.sha)}</span><span></span></div>
                             <div class="tp-row tp-row3"><span>sent (${escapeHtml(L.from)})</span><span>${escapeHtml(u.sent_payload_sha256)}</span><span class="${u.sent_payload_sha256 === pay.sha ? "tp-ok" : "tp-bad"}">${u.sent_payload_sha256 === pay.sha ? "✓" : "✕"}</span></div>
                             <div class="tp-row tp-row3"><span>received (${escapeHtml(L.to)})</span><span>${escapeHtml(u.payload_sha256)}</span><span class="${u.payload_sha256 === pay.sha ? "tp-ok" : "tp-bad"}">${u.payload_sha256 === pay.sha ? "✓" : "✕"}</span></div>
                             <div class="tp-row tp-row3"><span>your browser</span><span id="tpBShaVal">…</span><span id="tpBShaOk"></span></div>
@@ -587,8 +675,8 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: `Tamper test: one bit of the locked bytes was flipped, then one bit of the seal. Unwrapping ${tamper.rejected ? "refused both" : "DID NOT refuse"}.`,
-                why: "This shows the seal works on this exact package, not just in theory.",
+                what: `Tamper test on this exact package: bit ${tamper.bit} of locked byte ${tamper.flipped_byte_index.toLocaleString()} was flipped (0x${tamper.byte_before} → 0x${tamper.byte_after}), and separately one bit of the tag. Unlocking ${tamper.rejected && tamper.tag_flip.rejected ? "refused both" : "DID NOT refuse"}.`,
+                why: "Without the tag, a flipped bit would turn into a silently wrong CKKS ciphertext and a wrong answer nobody notices. With it, the recomputed tag no longer matches and nothing is used. This shows the seal working on this real package, not just in theory.",
                 formal: "one flipped bit → rejected.",
                 next: L.next,
             },
@@ -632,8 +720,8 @@ function buildTransportSteps(result, leg) {
         node(2, ["key"], ["key"], []),                                      // 2.2 key schedule
         node(3, ["nonce", "j0", "ctr"], ["key"], [["nonce>j0"], ["j0>ctr"]]),  // 2.3 nonce, J0, counters
         node(5, ["aes"], ctr, [["ctr>aes", "key>aes"]]),                    // 2.4 inside AES
-        node(6, ["aes"], [...ctr, "aes"], []),                              // 2.5 14 rounds
-        node(7, ["aes"], [...ctr, "aes"], []),                              // 2.6 S-box
+        node(7, ["aes"], [...ctr, "aes"], []),                              // 2.5 S-box (the rounds use it)
+        node(6, ["aes"], [...ctr, "aes"], []),                              // 2.6 14 rounds
         node(8, ["ks", "xor", "p", "c"], [...ctr, "aes"], [["aes>ks"], ["ks>xor", "p>xor"], ["xor>c"]]),  // 2.7 keystream ⊕ payload
         ...steps.slice(9),                                                  // 3-7: tag, RSA-OAEP, wire, unwrap, tamper
     ];

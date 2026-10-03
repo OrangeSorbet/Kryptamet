@@ -39,8 +39,9 @@ function renderByteMatrix(containerEl, cells, options) {
     const bar = make("grid-ctl");
     const scroller = make("byte-matrix-scroll");
     const grid = make("byte-matrix");
-    const width = Math.max(2, ...cells.map((c) => String(c).length));
-    grid.style.gridTemplateColumns = `${o.rowLabels ? "auto " : ""}repeat(${cols}, minmax(${width + 1.6}ch, 1fr))`;
+    // Each column as wide as its own widest value, so one long number doesn't widen every column.
+    const colWidth = (c) => Math.max(2, ...cells.filter((_, i) => i % cols === c).map((v) => String(v).length));
+    grid.style.gridTemplateColumns = `${o.rowLabels ? "auto " : ""}${Array.from({ length: cols }, (_, c) => `minmax(${colWidth(c) + 1.6}ch, auto)`).join(" ")}`;
 
     if (o.colLabels) {
         if (o.rowLabels) grid.appendChild(make("bm-label"));
@@ -97,7 +98,7 @@ function renderByteMatrix(containerEl, cells, options) {
     });
     attachFormulaHover(grid, ".bm-cell", (cell) => {
         const i = +cell.dataset.i, u = unitOf(i);
-        return u < shown ? { tex: eqOf(u), note: noteOf(i) || `= ${cells[i]}` } : null;
+        return u < shown ? { tex: eqOf(u), note: noteOf(i) || String(cells[i]) } : null;
     });
     if (!o.skipAnimation) createGridControls(bar, ctrl);
     return ctrl.start().done;

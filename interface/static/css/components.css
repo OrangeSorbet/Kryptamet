@@ -302,7 +302,10 @@ table.benchmark-table th, table.benchmark-table td {
     overflow-wrap: anywhere;
 }
 .formula-pop[hidden] { display: none; }
-.formula-note { margin-top: 3px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-text-muted); }
+/* The value first, in plain text; what it is / how it is made just below it. */
+.formula-value { font-family: var(--font-mono); font-size: 14px; color: var(--color-text); }
+.formula-meaning { margin-top: 4px; font-size: 13px; color: var(--color-warning); }
+.formula-value + .formula-meaning { padding-top: 4px; border-top: 1px solid var(--color-border); }
 
 /* Hoverable cells outside the grid components. */
 .enc-slot:hover, .recover-val:hover, .uchain-u:hover, .uchain-t:hover, .sym-flag:hover {

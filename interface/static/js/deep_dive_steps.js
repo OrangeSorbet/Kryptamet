@@ -1,17 +1,20 @@
-// CKKS Deep-Dive chapter: the whole encrypted score w·x + b re-run with the
-// small from-scratch CKKS in hecrypto/ckks_math.py (N=256, Q=2^60, Δ=2^25),
-// in pipeline order: encode, keys, encrypt, then the evaluation the server
-// runs (× w, chunk sum, 7 rotate-and-add rounds, + b), then decrypt and
-// decode. Every polynomial relation and every decrypted slot is re-checked
-// by the browser (deep_dive_check.js). Grids: poly_grid.js + grid_controls.js.
-function buildDeepDiveSteps(dd, result) {
+// "Up close" steps: the whole encrypted score w·x + b re-run with the small
+// from-scratch CKKS in hecrypto/ckks_math.py (N=256, Q=2^60, Δ=2^25), with
+// every number visible. Not a chapter of its own: each stage is appended to
+// the chapter it explains (chapter_registry.js), via `stage`:
+//   "encrypt"  encode, keys, c0, c1                      → Encryption
+//   "compute"  × w, chunk sum, 7 rotate-and-add, + b     → Computation
+//   "result"   decrypt, decode                           → Result
+// Every polynomial relation and every decrypted slot is re-checked by the
+// browser (deep_dive_check.js). Grids: poly_grid.js + grid_controls.js.
+function buildDeepDiveSteps(dd, result, stage) {
     if (!dd) return [];
     const P = dd.params, C = ddChecks(dd), ev = dd.evaluate;
     const base = P.shown_chunk * P.slots;
     const names = (result && result.feature_names) || [];
     const tenScore = result && result.scores ? result.scores[dd.row] : null;
     const skip = () => !!window.sceneAlreadyVisited;
-    const title = (s) => `<div class="scene-title">CKKS · ${escapeHtml(s)}</div>`;
+    const title = (s) => `<div class="scene-title">Up close (N=${P.N}) · ${escapeHtml(s)}</div>`;
     const e1 = (v) => v.toExponential(1);
     const ms = (r) => `${Math.max(1, Math.round(r.ms))} ms`;
     const slotOk = (err) => err < 1e-2;
@@ -54,10 +57,10 @@ function buildDeepDiveSteps(dd, result) {
     const steps = [
         {
             eli5: {
-                what: `A small, from-scratch version of CKKS with every number visible (TenSEAL hides them). Your numbers are packed into a formula with ${P.N} coefficients.`,
-                why: "Same idea as the Encryption chapter, but small enough to show every single number and check it in your browser.",
-                formal: `your numbers → one formula, ${P.N} coefficients.`,
-                next: "Next: the secret key.",
+                what: `Up close: the real library (TenSEAL) hides its inner numbers, so here the same encryption runs on a small hand-built CKKS where you can see every one: N = ${P.N} coefficients instead of 8192, ${P.slots} slots, one modulus q = 2^60, scale Δ = 2^${Math.log2(P.scale)}. Your numbers go into the slots, then into a formula m(X) exactly like step 2.3.`,
+                why: "Same formulas, smaller sizes: small enough to show every coefficient in a grid and recheck each one. Smaller N is not secure; it is only for looking inside.",
+                formal: `your numbers → m(X), ${P.N} coefficients.`,
+                next: "Next: the secret key s.",
             },
             what: `${chunkLine}${rowLine} Those ${P.slots} slots are encoded into m(X): ${P.N} integer coefficients, Δ = 2^${Math.log2(P.scale)}.`,
             why: "CKKS encrypts polynomials, not numbers. The inverse canonical embedding finds the integer polynomial whose values at the slot roots are your numbers times Δ, so the rounding error is ~1/Δ.",
@@ -73,10 +76,10 @@ function buildDeepDiveSteps(dd, result) {
         },
         {
             eli5: {
-                what: `The secret key is a formula whose ${P.N} coefficients are just −1, 0 or +1, chosen at random.`,
-                why: "Everything else is built from it, and only it can unlock. It stays with the client.",
-                formal: "secret key = random −1 / 0 / +1 coefficients.",
-                next: "Next: the public key built from it.",
+                what: (() => { const c = C.secret().counts; return `The secret key s is a formula with ${P.N} coefficients, each picked at random from −1, 0 or +1 (here ${c["-1"]} × −1, ${c[0]} × 0, ${c[1]} × +1).`; })(),
+                why: "Small coefficients keep the noise small when s multiplies things during unlocking. Randomness makes s impossible to guess: there are 3^256 possible keys even at this toy size. Everything else is built from s, and only s unlocks; it stays with you.",
+                formal: "s = random formula, coefficients −1 / 0 / +1.",
+                next: "Next: the public key built from s.",
             },
             what: (() => { const c = C.secret().counts; return `The secret key s(X): ${P.N} coefficients drawn from {−1, 0, 1} (here ${c["-1"]}× −1, ${c[0]}× 0, ${c[1]}× +1).`; })(),
             why: "Everything else is derived from s: the public key hides it, and only s can undo the encryption. It stays with the client (the data owner).",
@@ -89,10 +92,10 @@ function buildDeepDiveSteps(dd, result) {
         },
         {
             eli5: {
-                what: `The public key is two formulas: a (pure random) and b, which is a mixed with the secret key plus a little noise. Your browser redid the mixing (${(P.N * P.N).toLocaleString()} multiplications) and got exactly b.`,
-                why: "b looks random, so the public key can be handed to anyone; pulling the secret key back out of it is a famously hard problem.",
-                formal: "b = −a × secret + small noise.",
-                next: "Next: locking your formula, part 1.",
+                what: "The public key is two formulas: a, completely random (each coefficient anywhere from 0 to 2^60), and b = −a·s + e, where e is a small random noise formula. (Step 2.5 called them pk₁ = a and pk₀ = b.)",
+                why: "b + a·s = e is small: that's the hidden link unlocking relies on later. To everyone else b looks random, because the noise e hides s; finding s from (a, b) is the Ring-LWE problem nobody can solve.",
+                formal: "public key = (b, a), b = −a·s + e.",
+                next: "Next: locking, part 1 (c0).",
             },
             what: `The public key (b, a): a is uniform mod q = 2^60, e is small Gaussian error, b = −a·s + e. Your browser recomputes −a·s + e with ${P.N * P.N} BigInt products and compares every coefficient of b.`,
             why: "b looks uniformly random, so (a, b) can be given to anyone. Recovering s from it is the Ring-LWE problem.",
@@ -114,10 +117,10 @@ function buildDeepDiveSteps(dd, result) {
         },
         {
             eli5: {
-                what: "Part 1 of the lock: your formula is hidden under b times a fresh random formula, plus a little noise. Your browser redid it exactly.",
-                why: "The random part changes every time, so locking the same numbers twice looks completely different.",
-                formal: "c0 = b × random + noise + your formula.",
-                next: "Next: part 2 of the lock.",
+                what: "c0 = b·u + e1 + m: your formula m, hidden under b times a fresh random formula u (coefficients −1, 0, +1), plus a little noise e1.",
+                why: "Without s, b·u looks completely random, so it covers m like a mask. u is new every time, so locking the same numbers twice gives unrelated packages.",
+                formal: "c0 = b·u + e1 + m.",
+                next: "Next: locking, part 2 (c1).",
             },
             what: "c0 = b·u + e1 + m (mod q), with a fresh ternary u and fresh error e1. The browser recomputes it from b, u, e1 and m and compares every coefficient exactly.",
             why: "The mask b·u looks random without s, so c0 hides m. The fresh u makes two encryptions of the same x look unrelated.",
@@ -132,15 +135,15 @@ function buildDeepDiveSteps(dd, result) {
         },
         {
             eli5: {
-                what: (() => { const f = C.fresh(); return `Part 2: c1 = a × the same random formula + noise. Together (c0, c1) are the locked package. Your browser unlocked it right away and got your numbers back (off by ${e1(f.err)}).`; })(),
-                why: "c1 carries just enough information for the secret key to cancel the hiding later.",
-                formal: "locked = (c0, c1).",
-                next: "Next: the server starts computing on the locked package.",
+                what: (() => { const f = C.fresh(); return `c1 = a·u + e2, with the same u and new noise e2. The pair (c0, c1) is the locked package. Unlocked right away as a test: c0 + c1·s gives your numbers back, off by ${e1(f.err)}.`; })(),
+                why: "c1 carries u in a form s can use. Unlocking: c0 + c1·s = (−a·s + e)·u + e1 + m + (a·u + e2)·s = m + e·u + e1 + e2·s. The a·u·s parts cancel exactly; only m and small noise remain.",
+                formal: "c0 + c1·s = m + small noise.",
+                next: "Next chapter: the locked package travels to the server.",
             },
             what: (() => { const f = C.fresh(); return `c1 = a·u + e2 (mod q). (c0, c1) is the ciphertext. Decrypting it right now in the browser gives x back with max error ${e1(f.err)} over all ${P.slots} slots.`; })(),
             why: "c1 carries the u that s needs to cancel the mask: c0 + c1·s = m + small noise, because b + a·s = e is small.",
             formal: "c1 = a·u + e2 (mod q);  c0 + c1·s = m + e·u + e1 + e2·s",
-            next: "Next: the evaluation. The weights are encoded as a plaintext polynomial.",
+            next: "Next chapter: Transport → server.",
             renderVisual: (el) => {
                 const r = C.c1(), f = C.fresh();
                 el.innerHTML = `${title("Encrypt: c1")}${renderChecks([
@@ -153,10 +156,10 @@ function buildDeepDiveSteps(dd, result) {
         },
         {
             eli5: {
-                what: `Now the server works, holding only the locked package. First it packs the model's weights into a formula the same way.`,
-                why: "The weights aren't secret, so they stay unlocked; multiplying a locked package by an unlocked formula is cheap.",
+                what: `Up close (N = ${P.N}): the server first turns the model's weights w into a formula ŵ(X) the same way your numbers became m(X): put them in slots, multiply by Δ, convert. It is not locked.`,
+                why: "Locked slots can only be multiplied slot by slot with something in the same slot layout, so the weights must be encoded exactly like your numbers. They belong to the server and aren't secret, so they stay unlocked; multiplying locked × unlocked is much cheaper than locked × locked.",
                 formal: "weights → formula ŵ.",
-                next: "Next: multiply the locked package by the weights.",
+                next: "Next: multiply the locked package by ŵ.",
             },
             what: `Evaluation starts. The server has only the ciphertext and the public keys. The model's weights for the same ${P.slots} features are encoded like x, into ŵ(X).`,
             why: "The weights are not secret from the server, so they stay plaintext. Multiplying a ciphertext by a plaintext polynomial is much cheaper than by another ciphertext.",
@@ -171,9 +174,9 @@ function buildDeepDiveSteps(dd, result) {
         },
         {
             eli5: {
-                what: (() => { const r = C.mul(); return `Both halves of the locked package are multiplied by the weights. Inside, every slot now holds number × weight. Your browser unlocked a copy to check: right within ${e1(r.err)}.`; })(),
-                why: "This is the magic of CKKS: multiplying the locked package multiplies the hidden numbers too.",
-                formal: "locked × weights = lock(number × weight).",
+                what: (() => { const r = C.mul(); return `Both halves are multiplied by ŵ: (c0·ŵ, c1·ŵ). Every slot now holds number × weight, still locked, and the scale is now Δ × Δ = 2^${2 * Math.log2(P.scale)}. ✓ unlocked copy matches the plain products within ${e1(r.err)}.`; })(),
+                why: "Unlocking is c0 + c1·s; multiply both halves by ŵ and you get ŵ·(c0 + c1·s) = ŵ·m + noise·ŵ. Multiplying formulas multiplies their slot values one by one. (The real run then rescales; this small version keeps one modulus and simply carries the Δ² scale to the end.)",
+                formal: "locked × ŵ = lock(number × weight).",
                 next: "Next: add the pieces together.",
             },
             what: (() => { const r = C.mul(); return `(c0, c1) · ŵ: both halves multiplied by ŵ. Slot j now holds x_j·w_j at scale Δ² = 2^${2 * Math.log2(P.scale)}. Browser: decrypted slots match x_j·w_j within ${e1(r.err)}.`; })(),
@@ -195,8 +198,8 @@ function buildDeepDiveSteps(dd, result) {
     if (P.n_chunks > 1) {
         steps.push({
             eli5: {
-                what: `Your numbers needed ${P.n_chunks} packages; their products are added package to package.`,
-                why: "Adding locked packages adds the hidden numbers, slot by slot.",
+                what: `Your ${dd.original_vector.length} numbers needed ${P.n_chunks} packages of ${P.slots} slots; their products are added package to package.`,
+                why: "Adding locked packages adds the hidden numbers slot by slot (unlocking is linear). After this, slot j holds the sum of every product that landed in slot j.",
                 formal: "sum of the locked pieces.",
                 next: "Next: slide-and-add to total every slot.",
             },
@@ -218,8 +221,8 @@ function buildDeepDiveSteps(dd, result) {
         const span = 2 ** (r + 1);
         steps.push({
             eli5: {
-                what: (() => { const g = got(); return `Slide-and-add round ${r + 1} of ${ev.rotations.length}: the locked slots slide over by ${rot.step} and are added to themselves. Each slot now holds a total of ${span} products; slot 0 = ${fmt(g.slots[0])}.`; })(),
-                why: "A dot product needs every product added up. Sliding by 64, 32, … 1 and adding each time totals all of them in just 7 rounds, all while locked.",
+                what: (() => { const g = got(); return `Slide-and-add round ${r + 1} of ${ev.rotations.length}: the locked slots slide over by ${rot.step} and are added to the unslid copy. Each slot now holds a total of ${span} products; slot 0 = ${fmt(g.slots[0])}.`; })(),
+                why: `A score needs every product added up, but locked slots only add position to position. Sliding uses a rotation (Galois) key: it rearranges the formula's coefficients, which moves the slots, and the key fixes up the result so the same secret key still unlocks it. Sliding by 64, 32, … 1 halves the distance each time: ${ev.rotations.length} rounds for ${P.slots} slots.`,
                 formal: `slot j ← slot j + slot j+${rot.step}.`,
                 next: r < ev.rotations.length - 1 ? `Next: slide by ${ev.rotations[r + 1].step}.` : "Every slot now holds the full total. Next: add the bias.",
             },
@@ -242,15 +245,15 @@ function buildDeepDiveSteps(dd, result) {
     steps.push(
         {
             eli5: {
-                what: `The model's fixed offset (bias ${fmt(dd.bias)}) is added to the locked total. That was the server's last step.`,
-                why: "The bias has to be scaled the same way as the total, or it would be added in the wrong units.",
-                formal: "locked score = locked total + bias.",
-                next: "Next: the client unlocks with the secret key.",
+                what: `The model's bias b = ${fmt(dd.bias)} is added to the locked total. It is first multiplied by Δ² (the total's scale) and added to c0 only.`,
+                why: "The total sits at scale Δ², so the bias must too, or it would count 2^25 times too little. Only c0 changes, because unlocking is c0 + c1·s. That was the server's last step.",
+                formal: "locked score = locked total + Δ²·b.",
+                next: "Next chapter: the locked result travels back to you.",
             },
             what: (() => { const r = C.bias(); return `+ b: the bias ${fmt(dd.bias)} is encoded at scale Δ² as a constant polynomial (coefficient 0 = ${r.coeff0}, the rest 0) and added to c0. c1 does not change.`; })(),
             why: "The ciphertext is at scale Δ² after the multiply, so the bias must be encoded at Δ² too, or it would be 2^25 times too small.",
             formal: "c0 ← c0 + round(Δ² b),  c1 unchanged",
-            next: "That was the last step on the server. Next: the client decrypts with s.",
+            next: "That was the last step on the server. Next chapter: Transport ← client.",
             renderVisual: (el) => {
                 const r = C.bias();
                 el.innerHTML = `${title("Add the bias")}${renderChecks([
@@ -262,9 +265,9 @@ function buildDeepDiveSteps(dd, result) {
         },
         {
             eli5: {
-                what: "The client unlocks: c0 + c1 × secret key. The random hiding cancels out exactly. Your browser redid it and got the same formula.",
-                why: "Only the secret key makes the hiding cancel; with any other key the result is still noise.",
-                formal: "unlocked = c0 + c1 × secret.",
+                what: "Up close: you unlock with c0 + c1·s. Substituting: c0 + c1·s = m′ + noise, where m′ is the formula of the scores. ✓ redone exactly.",
+                why: "Every step the server did (× ŵ, adding, rotations, + bias) kept the rule \"c0 + c1·s = hidden formula + small noise\" true. Only the real s makes the random masks cancel; any other key leaves noise.",
+                formal: "unlocked = c0 + c1·s.",
                 next: "Next: read the score out.",
             },
             what: "m′ = c0 + c1·s (mod q). Only the secret key cancels the mask. The browser recomputes m′ from the final ciphertext and s, and compares it with the client's m′ coefficient by coefficient.",
@@ -280,15 +283,15 @@ function buildDeepDiveSteps(dd, result) {
         },
         {
             eli5: {
-                what: (() => { const r = C.decrypt(); return `Reading slot 0 gives the score ${fmt(r.score, 6)}. The model on plain numbers gives ${fmt(dd.decode.plaintext_score, 6)}${tenScore !== null ? `, and the real TenSEAL run gave ${fmt(tenScore, 6)}` : ""}.`; })(),
-                why: "A from-scratch CKKS and TenSEAL agree with the plain model, up to tiny noise. The maths shown here really is what runs.",
-                formal: "score ≈ weights · numbers + bias.",
-                next: "End of the deep-dive. Next chapter: the trip to the server.",
+                what: (() => { const r = C.decrypt(); return `Read the slots: evaluate m′ at the slot points and divide by Δ² (the scale it ended at). Every slot holds the same total; slot 0 is the score, ${fmt(r.score, 6)}. The plain model gives ${fmt(dd.decode.plaintext_score, 6)}${tenScore !== null ? `, and the real TenSEAL run gave ${fmt(tenScore, 6)}` : ""}.`; })(),
+                why: "A from-scratch CKKS, TenSEAL, and the plain model agree, up to tiny noise. Dividing by the large scale is what shrinks that noise to almost nothing.",
+                formal: "score = slot 0 / Δ².",
+                next: "Next: what the score means.",
             },
             what: (() => { const r = C.decrypt(); return `Decode: slot 0 = m′(ζ)/Δ² = ${fmt(r.score, 6)}. The plaintext w·x + b = ${fmt(dd.decode.plaintext_score, 6)}${tenScore !== null ? `, the TenSEAL pipeline gave ${fmt(tenScore, 6)}` : ""}. Difference to plaintext: ${e1(Math.abs(r.score - dd.decode.plaintext_score))}.`; })(),
             why: "Two independent CKKS implementations, one written from scratch, agree with the plaintext model up to CKKS noise. The same math really runs inside TenSEAL.",
             formal: "score = Re m′(ζ^(5^0)) / Δ² ≈ w·x + b",
-            next: "End of the deep-dive. Next chapter: Transport → server.",
+            next: "Next: the prediction, compared with the plaintext run.",
             renderVisual: (el) => {
                 const r = C.decrypt();
                 const close = (a, b) => Math.abs(a - b) < 5e-3;
@@ -304,9 +307,11 @@ function buildDeepDiveSteps(dd, result) {
         },
     );
     // Every slot table in every step gets its hover formulas once the step is drawn.
-    steps.forEach((st) => {
+    steps.forEach((st, i) => {
         const draw = st.renderVisual;
         st.renderVisual = (el) => { const out = draw(el); hookSlotTables(el); return out; };
+        // The first 5 steps lock (encode, s, pk, c0, c1); the last 2 unlock (decrypt, decode).
+        st.stage = i < 5 ? "encrypt" : i >= steps.length - 2 ? "result" : "compute";
     });
-    return steps;
+    return stage ? steps.filter((st) => st.stage === stage) : steps;
 }

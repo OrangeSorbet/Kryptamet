@@ -1,11 +1,13 @@
 // Explanation level, switched in the navbar and remembered per browser:
+//   "eli1"     toy numbers: every hard idea worked by hand with tiny values, then "the real run does this"
 //   "eli5"     plain words and everyday comparisons, still built from this run's real values
 //   "advanced" the exact terms, numbers and formulas
-// Every Scrubber step carries both: its advanced text in what/why/formal/next and the plain one in
-// step.eli5 = { what, why, formal, next } (formal = "In one line" at ELI5). Chapter primers
-// (chapter_intros.js) carry an `eli5` twin too. Changing the level fires "explainlevel" on document;
-// scrubber.js and intro_card.js re-render their text.
-const EXPLAIN_LEVELS = [["eli5", "ELI5"], ["advanced", "Advanced"]];
+// A Scrubber step keeps its advanced text in what/why/formal/next, the plain one in step.eli5 and the
+// toy-number one in step.eli1 (each { what, why, formal, next }; formal is titled "Significance" at
+// ELI1/ELI5). A missing eli1 falls back to eli5, a missing eli5 to the advanced text. Chapter primers
+// (chapter_intros.js) carry `eli5` / `eli1` twins too. Changing the level fires "explainlevel" on
+// document; scrubber.js and intro_card.js re-render their text.
+const EXPLAIN_LEVELS = [["eli1", "ELI1"], ["eli5", "ELI5"], ["advanced", "Advanced"]];
 
 window.explainLevel = (() => {
     try {
@@ -14,11 +16,17 @@ window.explainLevel = (() => {
     } catch (e) { return "eli5"; }
 })();
 
-// The text of `key` at the current level: the eli5 twin when there is one, otherwise the advanced text.
+// The plain twin for obj at the current level (eli1, falling back to eli5), or null at Advanced.
+function levelTwin(obj) {
+    if (!obj || window.explainLevel === "advanced") return null;
+    return (window.explainLevel === "eli1" && obj.eli1) || obj.eli5 || null;
+}
+
+// The text of `key` at the current level.
 function levelText(obj, key) {
     if (!obj) return "";
-    if (window.explainLevel === "eli5" && obj.eli5 && obj.eli5[key] !== undefined) return obj.eli5[key];
-    return obj[key];
+    const twin = levelTwin(obj);
+    return twin && twin[key] !== undefined ? twin[key] : obj[key];
 }
 
 function createLevelSwitch(host) {

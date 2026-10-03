@@ -13,20 +13,29 @@ function createFormulaPop() {
     el.hidden = true;
     document.body.appendChild(el);
     const pop = {
-        // tex: KaTeX source of the cell's formula; note: a plain line under it (e.g. the exact value).
-        show(cell, tex, note) {
-            if (!cell || !cell.isConnected || !(tex || note)) { pop.hide(); return; }
+        // note: the actual value, as plain text (shown first, large); tex: KaTeX of what that value is /
+        // how it is made (shown just below it).
+        // plain: a plain-text line instead of tex (used by source-link previews).
+        show(cell, tex, note, plain) {
+            if (!cell || !cell.isConnected || !(tex || note || plain)) { pop.hide(); return; }
             el.innerHTML = "";
+            if (note) {
+                const n = document.createElement("div");
+                n.className = "formula-value";
+                n.textContent = note;
+                el.appendChild(n);
+            }
             if (tex) {
                 const eq = document.createElement("div");
+                eq.className = "formula-meaning";
                 try { katex.render(tex, eq, { throwOnError: false, displayMode: false }); } catch (e) { eq.textContent = tex; }
                 el.appendChild(eq);
             }
-            if (note) {
-                const n = document.createElement("div");
-                n.className = "formula-note";
-                n.textContent = note;
-                el.appendChild(n);
+            if (plain) {
+                const p = document.createElement("div");
+                p.className = "formula-meaning formula-plain";
+                p.textContent = plain;
+                el.appendChild(p);
             }
             el.hidden = false;
             const r = cell.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;

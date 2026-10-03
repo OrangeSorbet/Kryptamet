@@ -27,6 +27,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/transport.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/encryption.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/computation.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/how_he.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/source_links.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/scrubber.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/speed_dial.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/minimap.css') }}">
@@ -46,6 +48,7 @@
         </div>
         <div class="navbar-run-info" id="navbarRunInfo"></div>
         <div class="navbar-controls">
+            <button id="srcBackBtn" class="navbar-btn src-back" type="button" hidden></button>
             <div id="levelSwitch" class="level-switch" role="group" aria-label="Explanation level"></div>
             <button id="flowchartHelpBtn" class="navbar-btn navbar-icon-btn" type="button" aria-label="How to use this walkthrough" hidden>?</button>
             <button id="newInputBtn" class="navbar-btn" type="button" hidden>New input</button>
@@ -107,6 +110,8 @@
     <script src="{{ url_for('static', filename='js/deep_dive_check.js') }}"></script>
     <script src="{{ url_for('static', filename='js/deep_dive_steps.js') }}"></script>
     <script src="{{ url_for('static', filename='js/computation_steps.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/how_he_steps.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/source_links.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chapter_registry.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chapter_state.js') }}"></script>
     <script>initChapterState();</script>

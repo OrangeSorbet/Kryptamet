@@ -9,7 +9,13 @@ wheels/
 # Virtual environments
 .venv
 
-data/raw/
+# Raw datasets are fetched by scripts/download.py. The small ones the web app reads at runtime are kept in
+# git so a Vercel deploy has them (German Credit, price data, symptom CSVs; ~1.6 MB together).
+data/raw/*
+!data/raw/german_credit.data
+!data/raw/price_data.csv
+!data/raw/symptom_diagnosis/
+public/
 hecrypto/keys/*.pem
 hecrypto/keys/*.ctx
 

@@ -29,6 +29,14 @@ def encrypted_linear_score(context, x_plain, weights, bias):
     return decrypted[0]
 
 
+def encrypted_scores(context, x_plain, W, b):
+    """Every class score of W·x + b computed homomorphically in one Enc(x)·Wᵀ + b (the same operation the traced
+    pipeline runs, without the trace), decrypted. Used for the summary of the characters not traced in a request."""
+    enc = encrypt_vector(context, list(x_plain))
+    out = enc.matmul(np.asarray(W, dtype=float).T.tolist()) + [float(v) for v in np.atleast_1d(b)]
+    return np.asarray(decrypt_vector(out), dtype=float)
+
+
 def sigmoid(z):
     return 1.0 / (1.0 + np.exp(-z))
 

@@ -1,0 +1,23 @@
+/* "How HE works" chapter (interface/static/js/how_he_steps.js): one worked toy calculation per step. */
+.toy-calc {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 6px 18px;
+    align-items: baseline;
+    padding: 14px 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+}
+.toy-row { display: contents; }
+.toy-what { color: var(--color-text-muted); font-size: 13px; }
+.toy-how { font-family: var(--font-mono); font-size: 13px; color: var(--color-text); }
+.toy-val { font-family: var(--font-mono); font-size: 15px; font-weight: 600; color: var(--color-primary-hover); text-align: right; max-width: 36ch; }
+.toy-head > span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); padding-bottom: 4px; }
+.toy-head > span:last-child { text-align: right; }
+
+@media (max-width: 640px) {
+    .toy-calc { grid-template-columns: 1fr auto; }
+    .toy-how { grid-column: 1 / -1; order: 0; }
+    .toy-head > span { display: none; }
+}

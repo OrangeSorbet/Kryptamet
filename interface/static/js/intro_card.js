@@ -32,7 +32,8 @@ function _introKeyHandler(e) {
 function openIntroCard(id) {
     const c0 = CHAPTER_INTROS[id];
     if (!c0) return;
-    const c = window.explainLevel === "eli5" && c0.eli5 ? { ...c0, ...c0.eli5 } : c0;
+    const twin = levelTwin(c0);
+    const c = twin ? { ...c0, ...twin } : c0;
     closeIntroCard();
     markIntroSeen(id);
     const host = document.createElement("div");

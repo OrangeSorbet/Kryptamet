@@ -17,16 +17,17 @@ let forceReplay = false;      // set by the Scrubber's restart: replay animation
 // ended ✓ or ✕ while that step was on screen. Pending checks are not counted.
 let proofs = {};
 let shownStep = null;         // { index, i } of the step currently rendered
-// Drawings: one complete traced run per character (/api/infer char_runs). The chips (char_switch.js) pick
+// Drawings: one complete traced run per character, fetched from /api/infer one character at a time (the
+// first with the run, the others the first time their chip is picked). The chips (char_switch.js) pick
 // which one every chapter shows; each character keeps its own done chapters, step positions, proof badges
-// and deep-dive (fetched the first time that character is picked).
+// and deep-dive.
 let charRuns = [];
 let charIndex = 0;
 let charState = {};
 let charLoading = -1;
 
 function adoptRun() {
-    charRuns = [pipelineResult, ...(pipelineResult.char_runs || [])];
+    charRuns = Array.from({ length: (pipelineResult.characters || [null]).length }, (_, k) => (k === 0 ? pipelineResult : null));
     charIndex = 0;
     charState = {};
     charLoading = -1;
@@ -45,7 +46,16 @@ function renderCharSwitch() {
 }
 
 async function selectCharacter(k) {
-    if (k === charIndex || !charRuns[k] || zoomInFlight) return;
+    if (k === charIndex || k >= charRuns.length || charLoading >= 0 || zoomInFlight) return;
+    if (!charRuns[k]) {
+        charLoading = k;
+        renderCharSwitch();
+        const first = charRuns[0];
+        const run = await fetchCharRun(first.model, first.input, k, first.used_passphrase ? first.passphrase : "");
+        charLoading = -1;
+        if (!run) { renderCharSwitch(); return; }
+        charRuns[k] = run;
+    }
     tallyShown();
     clearFormulaPops();
     charState[charIndex] = { doneChapters, stepIndices, proofs, lastVisited, deepDive: ckksDeepDiveResult };
@@ -101,6 +111,38 @@ function buildAllChapterSteps() {
             bands: c.stepBands ? c.stepBands(pipelineResult) : [],
         };
     });
+    registerFacts(CHAPTERS, chapterSteps);
+}
+
+// Source links: jump to the step that made a value; the navbar pill walks back (a stack, so
+// chained jumps unwind one at a time). Esc also goes back while the stack isn't empty.
+let jumpStack = [];
+
+function showStep(index, i) {
+    lastVisited = index;
+    currentView = index;
+    stepIndices[index] = i;
+    buildChapterVisual(index);
+    maybeShowIntroCard(CHAPTERS[index].id);
+    updateBackPill();
+}
+
+function jumpToFact(id, fact) {
+    if (typeof currentView !== "number") return;
+    jumpStack.push({ index: currentView, i: stepIndices[currentView] || 0 });
+    showStep(fact.chapter, fact.step);
+    setTimeout(() => pulseFact($("sceneContent"), id), 350);
+}
+
+function jumpBack() {
+    const to = jumpStack.pop();
+    if (to) showStep(to.index, to.i);
+}
+
+function updateBackPill() {
+    const btn = $("srcBackBtn"), to = jumpStack[jumpStack.length - 1];
+    btn.hidden = !to || typeof currentView !== "number";
+    if (to) btn.textContent = `↩ Back to ${CHAPTERS[to.index].label}, step ${stepNumbers(chapterSteps[to.index].steps)[to.i]}`;
 }
 
 function chapterEnabled(index) {
@@ -259,6 +301,8 @@ function returnToOverview() {
 }
 
 function updateNavbar() {
+    if (typeof currentView !== "number") jumpStack = [];
+    updateBackPill();
     const info = $("navbarRunInfo");
     const onOverview = currentView === "overview";
     $("newInputBtn").hidden = !(pipelineResult && !onOverview);
@@ -316,6 +360,7 @@ window.onPassphraseRelock = async () => {
 
 document.addEventListener("keydown", (e) => {
     if (window.introCardOpen || e.key !== "Escape") return;
+    if (typeof currentView === "number" && jumpStack.length) { jumpBack(); return; }
     if (typeof currentView === "number") exitToFlowchart($("backToFlowchartBtn"));
 });
 
@@ -335,6 +380,8 @@ function initChapterState() {
     $("flowchartHelpBtn").addEventListener("click", () => openIntroCard("flowchart"));
     $("newInputBtn").addEventListener("click", returnToOverview);
     createLevelSwitch($("levelSwitch"));
+    initSourceLinks(jumpToFact);
+    $("srcBackBtn").addEventListener("click", jumpBack);
     showOverview();
     updateNavbar();
 }

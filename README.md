@@ -66,7 +66,10 @@ CLIENT (data owner)                                   SERVER (compute node)
   hold no secret key.
 - **`/live` teaching walkthrough.** A flowchart of chapters, a dolly-zoom into each one, and a scrubber
   (play/pause/step/speed) with a what/why/formal/next explanation for every step. Every explanation comes in
-  two levels, ELI5 and Advanced, switched in the navbar at any time. Every matrix has its own play/pause/step
+  three levels, switched in the navbar at any time: ELI1 (each hard idea worked by hand on toy numbers), ELI5
+  (plain words, every reason and every number's origin) and Advanced (exact maths). A number made in an
+  earlier step is a glowing link: hover shows where it came from, click jumps there, and a "↩ Back" pill
+  returns. Every matrix has its own play/pause/step
   controls and shows each cell's formula on hover. Graphs inside a chapter (PBKDF2, the encryption pipeline,
   AES counter mode) are walked box by box in split screen: the box's content on the left, the graph with the
   box highlighted on the right, numbered by the graph (7, 7.1, 7.2, …). The chapters are:
@@ -75,8 +78,10 @@ CLIENT (data owner)                                   SERVER (compute node)
     matrix) produce every key.
   - **Encryption:** how the vector is packed into slots, scaled, turned into a polynomial matched coefficient
     for coefficient against SEAL's own encoder, and encrypted. The full ciphertext is shown, never truncated.
-  - **CKKS deep-dive:** encode, keys, encrypt, homomorphic multiply, rotations and decrypt, on a from-scratch
-    CKKS implementation whose final score is checked against the production result.
+  - **How HE works:** the whole idea on toy numbers you can check by hand (keys, lock, add and multiply while
+    locked, unlock).
+  - **Up close:** inside Encryption, Computation and Result, the same steps on a from-scratch CKKS (N=256) with
+    every number visible, whose final score is checked against the production result.
   - **Transport, both ways:** AES-GCM counter blocks, the AES round matrix, the GHASH tag, the RSA key wrap,
     and a live tamper test.
   - **Computation, decryption and result:** what each weight means, the real encrypted operation, and the
@@ -114,3 +119,22 @@ uv run python -m benchmarks.metrics     # re-measure plaintext vs encrypted cost
 ```
 
 Tests are plain scripts, e.g. `uv run python -m tests.test_two_party_pipeline`.
+
+## Deploy on Vercel
+
+The web app deploys to Vercel as one Python (Flask) function, with no code changes:
+
+- **Entry point:** `index.py` (re-exports `interface.app:app`). Python 3.13 comes from `.python-version`.
+- **Dependencies:** `requirements.txt`, runtime only (Flask, NumPy, pandas, scikit-learn, SciPy, TenSEAL,
+  cryptography, Pillow; about 300 MB, under the 500 MB function limit). `.vercelignore` hides `pyproject.toml`
+  and `uv.lock`, so the training/desktop dependencies (torch, PyQt6, …) are never installed.
+- **Static files:** `vercel.json` runs `scripts/vercel_build.py`, which copies `interface/static` to
+  `public/static`, so the CDN serves them.
+- **Data:** the small datasets the app reads are committed (`data/raw/german_credit.data`,
+  `data/raw/price_data.csv`, `data/raw/symptom_diagnosis/`). The handwriting sample words come from
+  `data/samples/word_samples.json` (real test images; rebuild with `uv run python -m scripts.build_samples --force`).
+- **Limits:** `maxDuration` is 300 s; a run takes about 10 s. A drawing is traced one character per request
+  (about 2.2 MB each, under Vercel's 4.5 MB response limit); the other characters load when their chip is picked.
+
+Steps: push the repo, import it in Vercel (framework preset **Flask**, no build or install command needed),
+deploy. Or, from the repo root: `vercel deploy`.

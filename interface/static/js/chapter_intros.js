@@ -7,6 +7,21 @@
 // Roles: the client owns the data and the CKKS secret key; the server is
 // the compute node and only ever holds ciphertexts and public keys.
 const CHAPTER_INTROS = {
+    how_he: {
+        title: "How HE works",
+        io: "toy numbers: lock → compute while locked → unlock",
+        sections: [
+            ["What this chapter is", "The whole scheme on numbers small enough to check by hand: one secret coefficient, q = 10007, Δ = 1000. Keys, encryption, decryption, homomorphic addition and plaintext multiplication, and a linear score w·x + b evaluated on ciphertexts."],
+            ["What it leaves out", "Polynomials (N = 8192 coefficients), slot packing, RNS primes, rescaling and rotations. Those appear in the real chapters, each with an \"up close\" part at N = 256."],
+        ],
+        eli5: {
+            io: "tiny numbers: lock, compute while locked, unlock",
+            sections: [
+                ["What happens here", "Before your real run, the whole idea with tiny numbers you could check on paper: make a key, lock two numbers, let someone add and multiply them while locked, then unlock the answer."],
+                ["Why start here", "The real run does exactly the same maths, just with huge numbers. Once the small version makes sense, the rest is the same story at scale."],
+            ],
+        },
+    },
     flowchart: {
         title: "How to use this walkthrough",
         sections: [
@@ -71,23 +86,6 @@ const CHAPTER_INTROS = {
             ],
         },
     },
-    deepdive: {
-        title: "CKKS Deep-Dive",
-        io: "your features → polynomials → encrypted w·x + b → score",
-        sections: [
-            ["What this chapter is", "TenSEAL hides CKKS's internals, so this chapter re-runs the whole encrypted score with a small from-scratch implementation (N=256, q=2^60) on your real features and the real model weights: encoding, keys, encryption, the evaluation (multiply by the weights, add, 7 rotate-and-add rounds, add the bias), decryption and decoding."],
-            ["What you will see", "Every polynomial as a 256-cell grid with its own play/pause, step and speed controls; hover any cell for its equation and exact value. Your browser recomputes each relation (b = −a·s + e, c0, c1, every product) exactly with BigInt, and decrypts after every step to compare the slots with sums it computes from x and w itself."],
-            ["How it relates to the real pipeline", "Same scheme at toy size. The production path uses N=8192 and three RNS primes, and its rotations use the same Galois-key trick. The last step compares this score with TenSEAL's."],
-        ],
-        eli5: {
-            io: "the whole locked calculation, every number visible",
-            sections: [
-                ["What this is", "The real library hides its inner numbers, so this chapter redoes the whole thing with a small hand-built version where you can see every single number: making keys, locking, multiplying by the model's weights, adding up, unlocking."],
-                ["What you'll see", "Big grids of numbers that fill in one by one; hover any number to see the formula behind it. Your browser checks every one."],
-                ["Is it the same thing?", "Yes, just smaller. The last step shows it gets the same score as the real run."],
-            ],
-        },
-    },
     transport_out: {
         title: "Transport → server",
         io: "Enc(x) on the client → sealed packet → Enc(x) on the server",
@@ -135,33 +133,20 @@ const CHAPTER_INTROS = {
             ],
         },
     },
-    decrypt: {
-        title: "Decryption",
-        io: "Enc(score) → score → probability",
-        sections: [
-            ["What this stage does", "The client's CKKS secret key turns the returned ciphertext back into the model's raw score(s); the sigmoid (or softmax) turns them into probabilities."],
-            ["Why only the client can do this", "The secret key was generated on the client and never sent anywhere. The server computed on data it could not read and produced a result it cannot read."],
-        ],
-        eli5: {
-            io: "locked score → score → percentage",
-            sections: [
-                ["What happens here", "The client unlocks the result with the one key that can, then turns the score into a percentage."],
-                ["Why only the client", "That key never left the client. The server did all the work without ever seeing your data or the answer."],
-            ],
-        },
-    },
     result: {
         title: "Result",
-        io: "HE score vs plaintext score → prediction",
+        io: "Enc(score) → score → probability → prediction, vs plaintext",
         sections: [
-            ["What this stage does", "Compares the decrypted HE result with the same model run on your unencrypted features. CKKS is approximate, so the scores differ by a tiny amount of noise; the predictions should be identical."],
-            ["Why this check matters", "A match shows that encryption changed nothing about the answer. You get privacy without losing correctness."],
+            ["What this stage does", "The server's output is still a CKKS ciphertext: it never saw the score. The client decrypts it once with its secret key (c0 + c1·s, then decode), applies the sigmoid or softmax (not polynomial, so it can't run under encryption), and compares the result with the same model run on the unencrypted features."],
+            ["Up close", "The decryption is then repeated with the N=256 from-scratch CKKS, every coefficient visible."],
+            ["Why this check matters", "CKKS is approximate, so the scores differ by a tiny amount of noise; the predictions should be identical. A match shows that encryption changed nothing about the answer. (In a real deployment the client has no plaintext model to compare with; this simulation runs both sides.)"],
         ],
         eli5: {
-            io: "locked answer vs plain answer",
+            io: "locked answer → unlocked → percentage → compared",
             sections: [
-                ["What happens here", "The answer from the locked run is put next to the answer from running the same model on your plain numbers."],
-                ["Why it matters", "If they match, locking cost you nothing in correctness: you got privacy and the right answer."],
+                ["What happens here", "The answer arrives still locked: the server never saw it. You unlock it with your secret key, the only time anything gets unlocked, then turn the score into a percentage."],
+                ["Why the percentage only now", "Turning a score into a percentage needs maths the lock can't do (eˣ), so it happens after unlocking, on your side."],
+                ["Why compare", "The answer is put next to the same model run on your plain numbers. If they match, locking cost you nothing in correctness."],
             ],
         },
     },

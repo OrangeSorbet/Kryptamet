@@ -324,6 +324,90 @@
       "accessCount": 1,
       "lastAccessed": 1791016545031,
       "type": "file"
+    },
+    {
+      "path": "issues.md",
+      "accessCount": 1,
+      "lastAccessed": 1791034296293,
+      "type": "file"
+    },
+    {
+      "path": "image-2.png",
+      "accessCount": 1,
+      "lastAccessed": 1791034299408,
+      "type": "file"
+    },
+    {
+      "path": "image-3.png",
+      "accessCount": 1,
+      "lastAccessed": 1791034299898,
+      "type": "file"
+    },
+    {
+      "path": "image-4.png",
+      "accessCount": 1,
+      "lastAccessed": 1791034300381,
+      "type": "file"
+    },
+    {
+      "path": "image.png",
+      "accessCount": 1,
+      "lastAccessed": 1791034300844,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/chapter_registry.js",
+      "accessCount": 1,
+      "lastAccessed": 1791036869954,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/how_he_steps.js",
+      "accessCount": 1,
+      "lastAccessed": 1791037132743,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/css/how_he.css",
+      "accessCount": 1,
+      "lastAccessed": 1791037193912,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/source_links.js",
+      "accessCount": 1,
+      "lastAccessed": 1791037309284,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/css/source_links.css",
+      "accessCount": 1,
+      "lastAccessed": 1791037309948,
+      "type": "file"
+    },
+    {
+      "path": "requirements.txt",
+      "accessCount": 1,
+      "lastAccessed": 1791040610974,
+      "type": "file"
+    },
+    {
+      "path": "index.py",
+      "accessCount": 1,
+      "lastAccessed": 1791040612567,
+      "type": "file"
+    },
+    {
+      "path": "vercel.json",
+      "accessCount": 1,
+      "lastAccessed": 1791040613393,
+      "type": "file"
+    },
+    {
+      "path": ".vercelignore",
+      "accessCount": 1,
+      "lastAccessed": 1791040614174,
+      "type": "file"
     }
   ],
   "userDirectives": []

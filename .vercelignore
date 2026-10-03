@@ -1,0 +1,23 @@
+# Not uploaded to Vercel. pyproject.toml/uv.lock are hidden on purpose: they list training/desktop deps
+# (torch, torchvision, PyQt6, yfinance) that would blow the 500 MB function limit; Vercel installs
+# requirements.txt instead.
+pyproject.toml
+uv.lock
+.venv
+.omc
+.claude
+**/.omc
+tooldata
+UnProAIO.py
+src
+docs
+tests
+issues.md
+image*.png
+models/train
+models/saved/*.pt
+data/raw/emnist
+data/raw/mnist
+data/raw/human_vs_ai_text
+data/raw/sms_spam
+public
