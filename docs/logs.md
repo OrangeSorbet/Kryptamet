@@ -982,3 +982,18 @@
 - **Checks:**
   - tmp/vn2.py: german_credit + symptom_diagnosis, every chapter, step and level: 2,802 labels; no raw tokens, no bad text, no console errors
   - tmp/pv2.py: 256 popups hovered across all chapters (human_vs_ai_text): no KaTeX errors
+
+## [Project status] 2026-10-03
+- The user deployed on Vercel (Phase 7D done).
+- Phase 8 (GPU encrypted CNN) moved to future scope by user decision.
+- Project marked done by the user. 7C.7's final regression (all 7 models, desktop + phone) was still running; it gets ticked when it passes, or fixed if it finds something.
+
+## [Phase 7C · 7C.7] 2026-10-03 — final verification ✅
+- Python: all 9 test files PASS (after the Vercel patch).
+- Browser regression (tmp/all14.py, every chapter and step; EMNIST "123" walked once per character):
+  - desktop ELI5: all 7 models, proof badges 140/125/151/117/116/154/154 (×3 EMNIST characters) ✓; no problems, no console errors
+  - phone 390×844 Advanced: same counts ✓; no problems
+- The phone run logged KaTeX *warnings* (not errors) from the PBKDF2/CKKS/AES graph-box popups: box names with ₀–₉, ‖, ⊕ and → inside `\text{}`. Fixed in pbkdf2_graph.js: names are mapped to ASCII for TeX; the note line keeps the exact name. Rechecks:
+  - tmp/pv3.py: 27 graph boxes hovered, 0 warnings
+  - tmp/pv2.py: 256 popups, 0 errors or warnings
+- Phase 7C complete. Project done; Phase 8 is future scope.

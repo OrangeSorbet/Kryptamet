@@ -49,7 +49,12 @@ function renderPbkdf2Graph(containerEl, graph, options) {
     attachFormulaHover(wrap, ".pg-node", (el) => {
         if (!el.dataset.full) return null;
         const name = el.querySelector(".pg-node-title").textContent;
-        return { tex: kv(el.dataset.full, `\\text{${name.replace(/[\\{}_#%&$^~]/g, " ")}}`), note: `${name}: ${el.dataset.full}` };
+        // KaTeX's \text only has glyphs for plain ASCII: subscript digits become digits, common symbols become
+        // words, anything else non-ASCII is dropped (the note line above still shows the exact name).
+        const ASCII = { "‖": "||", "⊕": " xor ", "→": " -> ", "·": " ", "×": "x", "…": "...", "Δ": "Delta", "σ": "sigma", "⁻¹": "^-1" };
+        const texName = name.replace(/[\\{}_#%&$^~]/g, " ").replace(/[₀-₉]/g, (c) => String(c.charCodeAt(0) - 0x2080))
+            .replace(/‖|⊕|→|·|×|…|Δ|σ|⁻¹/g, (c) => ASCII[c]).replace(/[^\x20-\x7e]/g, "");
+        return { tex: kv(el.dataset.full, `\\text{${texName}}`), note: `${name}: ${el.dataset.full}` };
     });
     const lit = new Set(o.lit || []);
     const focus = new Set([].concat(o.focus || []));

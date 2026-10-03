@@ -200,6 +200,12 @@
       "type": "file"
     },
     {
+      "path": "interface/static/js/pbkdf2_graph.js",
+      "accessCount": 4,
+      "lastAccessed": 1791048625751,
+      "type": "file"
+    },
+    {
       "path": "interface/static/js/digit_canvas.js",
       "accessCount": 3,
       "lastAccessed": 1791007279371,
@@ -251,12 +257,6 @@
       "path": "interface/static/js/how_he_steps.js",
       "accessCount": 2,
       "lastAccessed": 1791042360690,
-      "type": "file"
-    },
-    {
-      "path": "interface/static/js/pbkdf2_graph.js",
-      "accessCount": 2,
-      "lastAccessed": 1791045131503,
       "type": "file"
     },
     {

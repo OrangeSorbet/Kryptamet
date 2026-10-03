@@ -149,16 +149,16 @@ Standard kept in memory: eli5-course-standard.
 - [x] 7C.4 Rewrite Encryption: slots, scale, m(X), RNS, c0/c1 with every variable defined, the serialization fields
 - [x] 7C.5 Rewrite both Transport chapters: AES key schedule, counter mode, rounds, S-box, keystream, GHASH/tag, RSA-OAEP (EM, DB, MGF1)
 - [x] 7C.6 Rewrite Computation, Result, Benchmarks and the "Up close" parts (the former appendix, now split into Encryption/Computation/Result)
-- [ ] 7C.7 Verify all 7 models × both levels × desktop/phone; docs
+- [x] 7C.7 Verify all 7 models × both levels × desktop/phone; docs
 
 ## Phase 7D — Deploy on Vercel (user request, 2026-10-03)
 - [x] Runtime-only `requirements.txt`; `index.py` entry point; `vercel.json` (maxDuration 300, build step, excludeFiles); `.vercelignore` (hides pyproject.toml/uv.lock and the large datasets)
 - [x] Static files to `public/static` at build time (`scripts/vercel_build.py`)
 - [x] Runtime data in git (small CSVs); handwriting samples precomputed (`scripts/build_samples.py` → `data/samples/word_samples.json`, registry fallback)
 - [x] 4.5 MB response limit: `/api/infer` traces one character per request (`char`); summary from untraced HE `encrypted_scores`; the frontend fetches other characters when their chip is picked
-- [ ] First real deploy by the user (Vercel account): check cold start, a run per model, and the CDN static path
+- [x] First real deploy by the user (Vercel account), 2026-10-03
 
-## Phase 8 — GPU-accelerated encrypted CNN (after Phase 7)
+## Phase 8 — GPU-accelerated encrypted CNN (after Phase 7) — FUTURE SCOPE (user decision, 2026-10-03; not part of the delivered project)
 Target machine: the user's second PC with an RTX 5060 Ti (CUDA). TenSEAL/SEAL is CPU-only, so this needs a CUDA CKKS library.
 **Gate:** do not start any Phase 8 step on a bare "go". It starts only after the user sends that PC's actual config (GPU, driver/CUDA version, OS, Python, RAM).
 - [ ] 8.1 Evaluate CUDA CKKS libraries (e.g. Phantom, HEonGPU) for Python bindings, CKKS conv/matmul support, and Windows/RTX 50-series support
