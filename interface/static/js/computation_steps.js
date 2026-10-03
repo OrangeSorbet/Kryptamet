@@ -85,7 +85,7 @@ function buildComputationSteps(result) {
             return {
                 what: `Replay ${k + 1}: "${t.name}" has weight ${sign(t.weight)}, your value is ${fmt(t.input)}, so it adds ${sign(prod)}. Running total: ${fmt(a.running_sum)}.`,
                 why: `A positive weight pushes the answer toward "${bias.row_class}", a negative one away, and bigger values push harder. This is only a plain replay; the real sum happened locked.`,
-                formal: `${fmt(t.weight)} × ${fmt(t.input)} = ${fmt(prod)}`,
+                formal: `${vn(fmt(t.weight), "w")} × ${vn(fmt(t.input), "x")} = ${vn(fmt(prod), "w·x")}`,
                 next: k < terms.length - 1 ? `Next: "${terms[k + 1].data_before.name}", the next-biggest contribution.` : "Next: everything smaller, added up together.",
             };
         }
@@ -104,7 +104,7 @@ function buildComputationSteps(result) {
         return {
             what: `Finally the model's fixed offset (${sign(a.bias)}) is added: score for "${a.row_class}" = ${fmt(a.score)}.`,
             why: "The bias is the score an all-zero input would get. In the locked run the bias is first scaled to match the locked total (else it would be added in the wrong units). This replayed total is exactly what the locked score will unlock to, up to tiny noise; the server itself never sees it.",
-            formal: `score = ${fmt(a.running_sum)} + ${fmt(a.bias)} = ${fmt(a.score)}`,
+            formal: `score = ${vn(fmt(a.running_sum), "Σ w·x")} + ${vn(fmt(a.bias), "b")} = ${vn(fmt(a.score), "score")}`,
             next: "Next chapter: the locked result travels back to the client.",
         };
     };
@@ -112,7 +112,7 @@ function buildComputationSteps(result) {
     // Toy-number twins (ELI1) for the steps whose idea isn't already a small sum.
     const computeEli1 = (op) => {
         if (op === "compute_overview") return {
-            what: `Toy from "How HE works": score = ${TOY.w1} × x₁ + (${TOY.w2}) × x₂ + ${TOY.b}. With x₁ = ${TOY.x1.x} and x₂ = ${TOY.x2.x}: ${TOY.w1 * TOY.x1.x} − ${TOY.x2.x} + ${TOY.b} = ${(TOY.w1 * TOY.x1.x + TOY.w2 * TOY.x2.x + TOY.b).toFixed(2)}.`,
+            what: `Toy from "How HE works": score = ${vn(TOY.w1, "w₁")} × x₁ + (${vn(TOY.w2, "w₂")}) × x₂ + ${vn(TOY.b, "b")}. With x₁ = ${TOY.x1.x} and x₂ = ${TOY.x2.x}: ${vn(TOY.w1 * TOY.x1.x, "w₁·x₁")} − ${vn(TOY.x2.x, "x₂")} + ${vn(TOY.b, "b")} = ${vn((TOY.w1 * TOY.x1.x + TOY.w2 * TOY.x2.x + TOY.b).toFixed(2), "score")}.`,
             why: `Your real model does the same with ${ov.d} numbers${ov.k > 1 ? `, once for each of the ${ov.k} answers` : ""}.`,
             formal: "toy: 3·x₁ − x₂ + 0.1.",
             next: "Next: the locked version.",
@@ -120,16 +120,16 @@ function buildComputationSteps(result) {
         if (op === "compute_general_form") {
             const s = [2, 5, 1, 4], r2 = s.map((v, j) => v + s[(j + 2) % 4]), r1 = r2.map((v, j) => v + r2[(j + 1) % 4]);
             return {
-                what: `Rescaling toy (Δ = 1000): 0.25 is stored as 250, weight 3 as 3000. Product 250 × 3000 = 750,000, at scale 1000 × 1000. Divide by 1000: 750, i.e. 0.75 at the normal scale. Slide-and-add toy: slots [${s.join(", ")}]; slide by 2 and add: [${r2.join(", ")}]; slide by 1 and add: [${r1.join(", ")}]. Every slot now holds the total ${s.reduce((a, v) => a + v, 0)}.`,
+                what: `Rescaling toy (Δ = 1000): 0.25 is stored as ⟨250|x·Δ⟩, weight 3 as ⟨3000|w·Δ⟩. Product ⟨250|x·Δ⟩ × ⟨3000|w·Δ⟩ = ⟨750,000|x·w·Δ²⟩, at scale ⟨1000|Δ⟩ × ⟨1000|Δ⟩. Divide by ⟨1000|Δ⟩: ⟨750|x·w·Δ⟩, i.e. ⟨0.75|x·w⟩ at the normal scale. Slide-and-add toy: slots [${s.map((v, j) => vn(v, `slot ${j}`)).join(", ")}]; slide by 2 and add: [${r2.map((v, j) => vn(v, `slot ${j}`)).join(", ")}]; slide by 1 and add: [${r1.map((v, j) => vn(v, `slot ${j}`)).join(", ")}]. Every slot now holds the total ${vn(s.reduce((a, v) => a + v, 0), "Σ slots")}.`,
                 why: "Each slide halves how far apart the pieces still are, so 4 slots need 2 rounds and 128 need 7.",
                 formal: "toy: [2,5,1,4] → [3,9,3,9] → [12,12,12,12].",
                 next: "Next: the plain replay.",
             };
         }
         if (op === "add_bias") return {
-            what: `Toy: the bias ${TOY.b} at scale Δ = ${TOY.delta} is ${TOY.bm}, added to c₀ only: c₀ + ${TOY.bm}. Unlocking then gives the hidden number + ${TOY.bm}, i.e. + ${TOY.b}.`,
+            what: `Toy: the bias ${vn(TOY.b, "b")} at scale Δ = ${TOY.delta} is ${vn(TOY.bm, "Δ·b")}, added to c₀ only: c₀ + ${vn(TOY.bm, "Δ·b")}. Unlocking then gives the hidden number + ${vn(TOY.bm, "Δ·b")}, i.e. + ${vn(TOY.b, "b")}.`,
             why: "Adding a plain number only needs to touch c₀, because unlocking is c₀ + c₁·s.",
-            formal: `toy: c₀ + ${TOY.bm}.`,
+            formal: `toy: c₀ + ${vn(TOY.bm, "Δ·b")}.`,
             next: "Next chapter: the result travels back.",
         };
         return null;

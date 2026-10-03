@@ -170,6 +170,9 @@ One component per file (`interface/static/js/`, with CSS of the same name where 
     `inputSummary`, the global `pipelineResult`.
   - `chapter_state.js`: views, per-chapter step memory, done chapters, `goToNextChapter`, proof tallies.
   - `chapter_registry.js`: `CHAPTERS` (id, label, `buildSteps`, `summary`, `stepBands`), `joinSteps`.
+  - `var_label.js`: every number tied to a variable shows the variable in small type underneath.
+    `vn(value, label)` → a token in step text; `vnHtml` for scene HTML; `richText` renders both token kinds;
+    plain `name = number` is labelled automatically (`VN_AUTO`).
   - `source_links.js`: "where did this number come from" links.
     - A step declares `facts: [{id, label, value}]`; `registerFacts` records each fact's chapter and step after
       every run.

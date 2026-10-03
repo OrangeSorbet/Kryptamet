@@ -206,6 +206,12 @@
       "type": "file"
     },
     {
+      "path": "interface/static/js/var_label.js",
+      "accessCount": 3,
+      "lastAccessed": 1791043220417,
+      "type": "file"
+    },
+    {
       "path": "docs/ARCHITECTURE.md",
       "accessCount": 2,
       "lastAccessed": 1791002538696,
@@ -233,6 +239,12 @@
       "path": "interface/static/js/chapter_intros.js",
       "accessCount": 2,
       "lastAccessed": 1791016083232,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/how_he_steps.js",
+      "accessCount": 2,
+      "lastAccessed": 1791042360690,
       "type": "file"
     },
     {
@@ -362,12 +374,6 @@
       "type": "file"
     },
     {
-      "path": "interface/static/js/how_he_steps.js",
-      "accessCount": 1,
-      "lastAccessed": 1791037132743,
-      "type": "file"
-    },
-    {
       "path": "interface/static/css/how_he.css",
       "accessCount": 1,
       "lastAccessed": 1791037193912,
@@ -407,6 +413,12 @@
       "path": ".vercelignore",
       "accessCount": 1,
       "lastAccessed": 1791040614174,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/css/var_label.css",
+      "accessCount": 1,
+      "lastAccessed": 1791042338175,
       "type": "file"
     }
   ],

@@ -134,7 +134,7 @@ function buildDigitFeatureSteps(result) {
             eli1: (() => {
                 const i = raw.findIndex((v) => v > 0), v = i < 0 ? 0 : raw[i];
                 return {
-                    what: `Example: pixel ${i < 0 ? 0 : i} (row ${Math.floor(Math.max(i, 0) / 28)}, column ${Math.max(i, 0) % 28}) has brightness ${v}. ${v} ÷ 255 = ${(v / 255).toFixed(4)}. Full ink: 255 ÷ 255 = 1. No ink: 0 ÷ 255 = 0.`,
+                    what: `Example: pixel ${i < 0 ? 0 : i} (row ${Math.floor(Math.max(i, 0) / 28)}, column ${Math.max(i, 0) % 28}) has brightness ${vn(v, "pixel")}. ${vn(v, "pixel")} ÷ ⟨255|max⟩ = ${vn((v / 255).toFixed(4), "x")}. Full ink: ⟨255|pixel⟩ ÷ ⟨255|max⟩ = ⟨1|x⟩. No ink: ⟨0|pixel⟩ ÷ ⟨255|max⟩ = ⟨0|x⟩.`,
                     why: "Dividing by the biggest possible value turns any brightness into a share between 0 and 1.",
                     formal: `${v} / 255 = ${(v / 255).toFixed(4)}.`,
                     next: "Next chapter: the keys.",
@@ -204,9 +204,9 @@ function buildFeatureSteps(result) {
             next: nonZero.length ? "Next: your words, one at a time." : "None of your words are known to the model, so this all-zero list is what gets locked.",
         },
         eli1: {
-            what: `Toy: 3 training messages, "free prize now", "see you now", "the bus now". "free" appears in 1 of 3, so IDF = log(3 ÷ 1) = ${Math.log(3).toFixed(2)}. "now" appears in all 3: log(3 ÷ 3) = 0. In your message "free free now": "free" scores 2 × ${Math.log(3).toFixed(2)} = ${(2 * Math.log(3)).toFixed(2)}, "now" scores 0.`,
+            what: `Toy: 3 training messages, "free prize now", "see you now", "the bus now". "free" appears in 1 of 3, so IDF = log(⟨3|messages⟩ ÷ ⟨1|with "free"⟩) = ${vn(Math.log(3).toFixed(2), "IDF(free)")}. "now" appears in all 3: log(⟨3|messages⟩ ÷ ⟨3|with "now"⟩) = ⟨0|IDF(now)⟩. In your message "free free now": "free" scores ⟨2|TF(free)⟩ × ${vn(Math.log(3).toFixed(2), "IDF(free)")} = ${vn((2 * Math.log(3)).toFixed(2), "TF·IDF")}, "now" scores ⟨0|TF·IDF⟩.`,
             why: "Words every message has tell the model nothing, so they score 0. The real model does this with thousands of training messages and then shrinks the list to length 1.",
-            formal: `toy: free → ${(2 * Math.log(3)).toFixed(2)}, now → 0.`,
+            formal: `toy: free → ${vn((2 * Math.log(3)).toFixed(2), "TF·IDF")}, now → ⟨0|TF·IDF⟩.`,
             next: nonZero.length ? "Next: your real words." : "Next chapter: the keys.",
         },
         what: `Your text was converted into a ${result.feature_dim.toLocaleString()}-dimension TF-IDF vector: one entry per vocabulary word, ${nonZero.length} of them non-zero.`,
@@ -279,9 +279,9 @@ function buildDecryptionSteps(result) {
             next: result.task === "multiclass" ? "Next: turning the scores into percentages." : "Next: turning the score into a probability.",
         },
         eli1: {
-            what: `Toy from "How HE works": the locked score (${TOY.score.c0}, ${TOY.score.c1}); unlock (${TOY.score.c0} + ${TOY.score.c1} × ${TOY.s}) mod ${TOY.q} = ${TOY.dec(TOY.score)}; ÷ ${TOY.delta} = ${TOY.dec(TOY.score) / TOY.delta}.`,
+            what: `Toy from "How HE works": the locked score (${vn(TOY.score.c0, "c₀")}, ${vn(TOY.score.c1, "c₁")}); unlock (${vn(TOY.score.c0, "c₀")} + ${vn(TOY.score.c1, "c₁")} × ${vn(TOY.s, "s")}) mod ${vn(TOY.q, "q")} = ${vn(TOY.dec(TOY.score), "score·Δ")}; ÷ ${vn(TOY.delta, "Δ")} = ${vn(TOY.dec(TOY.score) / TOY.delta, "score")}.`,
             why: "Your real result is unlocked the same way, with 8192-coefficient formulas.",
-            formal: `toy: → ${TOY.dec(TOY.score) / TOY.delta}.`,
+            formal: `toy: → ${vn(TOY.dec(TOY.score) / TOY.delta, "score")}.`,
             next: "Next: percentages.",
         },
         what: ev.description,
@@ -329,13 +329,13 @@ function buildDecryptionSteps(result) {
         decryptStep,
         {
             eli5: {
-                what: `The score ${fmt(score)} becomes a probability with the sigmoid: 1 ÷ (1 + e^(−score)) = ${(p * 100).toFixed(1)}% chance of "${resultLabel(result.model, 1)}". A score above 0 means more than 50%.`,
+                what: `The score ${fmt(score)} becomes a probability with the sigmoid: 1 ÷ (1 + e^(−${vn(fmt(score), "score")})) = ${vn(`${(p * 100).toFixed(1)}%`, "p")} chance of "${resultLabel(result.model, 1)}". A score above 0 means more than 50%.`,
                 why: "Scores can be any number; the sigmoid squeezes them into 0-100%: big positive → near 100%, big negative → near 0%, 0 → exactly 50%. It runs after unlocking, on your side, because e^x isn't an addition or multiplication, so CKKS can't do it.",
-                formal: `${fmt(score)} → ${(p * 100).toFixed(1)}%`,
+                formal: `${vn(fmt(score), "score")} → ${vn(`${(p * 100).toFixed(1)}%`, "p")}`,
                 next: "Next: is it the same answer the plain model gives?",
             },
             eli1: {
-                what: `Score 0: 1 ÷ (1 + e⁰) = 1 ÷ 2 = 50%. Score 2: 1 ÷ (1 + e⁻²) = 1 ÷ ${(1 + Math.exp(-2)).toFixed(3)} = ${(100 / (1 + Math.exp(-2))).toFixed(1)}%. Score −2: ${(100 / (1 + Math.exp(2))).toFixed(1)}%.`,
+                what: `Score 0: 1 ÷ (1 + e⁰) = 1 ÷ ⟨2|1 + e⁰⟩ = ⟨50%|p⟩. Score 2: 1 ÷ (1 + e⁻²) = 1 ÷ ${vn((1 + Math.exp(-2)).toFixed(3), "1 + e⁻²")} = ${vn((100 / (1 + Math.exp(-2))).toFixed(1) + "%", "p")}. Score −2: ${vn((100 / (1 + Math.exp(2))).toFixed(1) + "%", "p")}.`,
                 why: `Yours, ${fmt(score, 2)}, gives ${(p * 100).toFixed(1)}%.`,
                 formal: "toy: 0 → 50%, 2 → 88.1%.",
                 next: "Next: comparison.",
@@ -575,9 +575,9 @@ function featureEli5(result, trace, idx) {
     return {
         what: mu === undefined
             ? `"${step.name}" = ${raw}: compared with the training data it is ${step.value >= 0 ? "above" : "below"} average by ${fmt(Math.abs(step.value), 2)} typical spreads (rescaled value ${fmt(step.value)}).`
-            : `"${step.name}" = ${raw}. In the training data this column averages μ = ${fmt(mu, 2)} with a typical spread (standard deviation) σ = ${fmt(sd, 2)}. Rescaled: (${raw} − ${fmt(mu, 2)}) ÷ ${fmt(sd, 2)} = ${fmt(step.value)}, i.e. ${fmt(Math.abs(step.value), 2)} spreads ${step.value >= 0 ? "above" : "below"} average.`,
+            : `"${step.name}" = ${raw}. In the training data this column averages μ = ${fmt(mu, 2)} with a typical spread (standard deviation) σ = ${fmt(sd, 2)}. Rescaled: (${vn(raw, "value")} − ${vn(fmt(mu, 2), "μ")}) ÷ ${vn(fmt(sd, 2), "σ")} = ${vn(fmt(step.value), "z")}, i.e. ${fmt(Math.abs(step.value), 2)} spreads ${step.value >= 0 ? "above" : "below"} average.`,
         why: "Rescaling (\"standardizing\") puts every column on the same footing, so a big-number column (like an amount in DM) can't drown out a small one (like a rating from 1 to 4), and each weight's size reflects importance instead of units. μ and σ come from the training data and stay fixed.",
-        formal: `${step.name}: ${raw} → ${fmt(step.value)}`,
+        formal: `${step.name}: ${vn(raw, "value")} → ${vn(fmt(step.value), "z")}`,
         next,
     };
 }
@@ -588,9 +588,9 @@ function featureEli1(result, trace, idx) {
     if (step.mu === undefined || Array.isArray(step.value)) return undefined;
     const ages = [20, 30, 40], mean = 30, sd = Math.sqrt(ages.reduce((a, v) => a + (v - mean) ** 2, 0) / ages.length);
     return {
-        what: `Toy: three people aged 20, 30 and 40. Average 30; typical spread √((10² + 0² + 10²) ÷ 3) = ${sd.toFixed(2)}. A 45-year-old becomes (45 − 30) ÷ ${sd.toFixed(2)} = ${((45 - mean) / sd).toFixed(2)}: "${((45 - mean) / sd).toFixed(2)} spreads above average".`,
+        what: `Toy: three people aged 20, 30 and 40. Average ⟨30|μ⟩; typical spread √((10² + 0² + 10²) ÷ 3) = ${vn(sd.toFixed(2), "σ")}. A 45-year-old becomes (⟨45|age⟩ − ⟨30|μ⟩) ÷ ${vn(sd.toFixed(2), "σ")} = ${vn(((45 - mean) / sd).toFixed(2), "z")}: "${((45 - mean) / sd).toFixed(2)} spreads above average".`,
         why: `Your "${step.name}" goes through the same sum with the training data's average (${fmt(step.mu, 2)}) and spread (${fmt(step.sigma, 2)}).`,
-        formal: `toy: (45 − 30) ÷ ${sd.toFixed(2)} = ${((45 - mean) / sd).toFixed(2)}.`,
+        formal: `toy: (⟨45|age⟩ − ⟨30|μ⟩) ÷ ${vn(sd.toFixed(2), "σ")} = ${vn(((45 - mean) / sd).toFixed(2), "z")}.`,
         next: featureEli5(result, trace, idx).next,
     };
 }

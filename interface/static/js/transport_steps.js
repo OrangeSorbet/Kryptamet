@@ -242,7 +242,7 @@ function buildTransportSteps(result, leg) {
                 next: "Next: 2.3, the counter numbers AES will scramble.",
             },
             eli1: {
-                what: "Toy with 4-bit words: w0 = 1010, w1 = 0110. Rule: next word = (word before, rotated one place left) ⊕ (word two back). w1 rotated = 1100; 1100 ⊕ 1010 = 0110 = w2.",
+                what: "Toy with 4-bit words: w0 = 1010, w1 = 0110. Rule: next word = (word before, rotated one place left) ⊕ (word two back). w1 rotated = ⟨1100|rot(w1)⟩; ⟨1100|rot(w1)⟩ ⊕ ⟨1010|w0⟩ = ⟨0110|w2⟩.",
                 why: "The real schedule does this with 32-bit words, looking 8 words back, plus a byte swap and a constant every 8th word.",
                 formal: "toy: rot(0110) ⊕ 1010 = 0110.",
                 next: "Next: the counters.",
@@ -336,13 +336,13 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: (() => { const s0 = k1.input_state[0][0], r0 = k1.round_key_0[0][0], a0 = k1.after_initial_add_round_key[0][0]; return `AES writes the 16 counter bytes into a 4×4 grid (column by column) called the state, then XORs round key 0 into it, byte by byte. First byte: 0x${s0} ⊕ 0x${r0} = 0x${a0}. ✓ both grids recomputed.`; })(),
+                what: (() => { const s0 = k1.input_state[0][0], r0 = k1.round_key_0[0][0], a0 = k1.after_initial_add_round_key[0][0]; return `AES writes the 16 counter bytes into a 4×4 grid (column by column) called the state, then XORs round key 0 into it, byte by byte. First byte: ${vn(`0x${s0}`, "counter byte")} ⊕ ${vn(`0x${r0}`, "key byte")} = ${vn(`0x${a0}`, "state byte")}. ✓ both grids recomputed.`; })(),
                 why: "Everything AES does is 14 rounds of reshaping this one grid. Mixing the key in before the first round means even round 1 already depends on the key.",
                 formal: "state = counter ⊕ round key 0.",
                 next: "Next: 2.5, the byte-swap table every round uses.",
             },
             eli1: {
-                what: (() => { const s0 = parseInt(k1.input_state[0][0], 16), r0 = parseInt(k1.round_key_0[0][0], 16), b = (v) => v.toString(2).padStart(8, "0"); return `In bits: ${b(s0)} ⊕ ${b(r0)} = ${b(s0 ^ r0)} (= 0x${(s0 ^ r0).toString(16).padStart(2, "0")}). Same bits give 0, different bits give 1.`; })(),
+                what: (() => { const s0 = parseInt(k1.input_state[0][0], 16), r0 = parseInt(k1.round_key_0[0][0], 16), b = (v) => v.toString(2).padStart(8, "0"); return `In bits: ${vn(b(s0), "counter byte")} ⊕ ${vn(b(r0), "key byte")} = ${vn(b(s0 ^ r0), "state byte")} (= 0x${(s0 ^ r0).toString(16).padStart(2, "0")}). Same bits give 0, different bits give 1.`; })(),
                 why: "All 16 bytes get the same treatment, each with its own key byte.",
                 formal: "bitwise XOR.",
                 next: "Next: the swap table.",
@@ -428,13 +428,13 @@ function buildTransportSteps(result, leg) {
         },
         {
             eli5: {
-                what: (() => { const b = t.blocks[0]; return `Each 16-byte block of your package is XORed with its scrambled counter. Block 1: data ${ksShort(b.plaintext_hex)} ⊕ keystream ${ksShort(b.keystream_hex)} = ${ksShort(b.ciphertext_hex)}. ${chk.blocks.every((x) => x.keystreamOk && x.xorOk) ? "✓" : "✕"} first blocks recomputed.`; })(),
+                what: (() => { const b = t.blocks[0]; return `Each 16-byte block of your package is XORed with its scrambled counter. Block 1: data ${vn(ksShort(b.plaintext_hex), "P₁")} ⊕ keystream ${vn(ksShort(b.keystream_hex), "K₁")} = ${vn(ksShort(b.ciphertext_hex), "C₁")}. ${chk.blocks.every((x) => x.keystreamOk && x.xorOk) ? "✓" : "✕"} first blocks recomputed.`; })(),
                 why: "That XOR is the actual hiding: without the key the keystream is unpredictable, so the result looks random. The output is exactly as long as the input (no padding), because XOR works byte by byte.",
                 formal: "locked bytes = data ⊕ keystream.",
                 next: "Next: 3, the seal that detects tampering.",
             },
             eli1: {
-                what: (() => { const b = t.blocks[0], P = parseInt(b.plaintext_hex.slice(0, 2), 16), K = parseInt(b.keystream_hex.slice(0, 2), 16), s = (v) => v.toString(2).padStart(8, "0"); return `First byte: ${s(P)} ⊕ ${s(K)} = ${s(P ^ K)}. Undo: ${s(P ^ K)} ⊕ ${s(K)} = ${s(P)}, the original.`; })(),
+                what: (() => { const b = t.blocks[0], P = parseInt(b.plaintext_hex.slice(0, 2), 16), K = parseInt(b.keystream_hex.slice(0, 2), 16), s = (v) => v.toString(2).padStart(8, "0"); return `First byte: ${vn(s(P), "data")} ⊕ ${vn(s(K), "keystream")} = ${vn(s(P ^ K), "locked")}. Undo: ${vn(s(P ^ K), "locked")} ⊕ ${vn(s(K), "keystream")} = ${vn(s(P), "data")}, the original.`; })(),
                 why: "XOR twice with the same keystream byte always gives the original back.",
                 formal: "(p ⊕ k) ⊕ k = p.",
                 next: "Next: the seal.",
@@ -478,7 +478,7 @@ function buildTransportSteps(result, leg) {
                 next: "Next: 4, locking the AES key itself.",
             },
             eli1: {
-                what: (() => { const H = 5, q = 11, run = (bs) => bs.reduce((x, b) => ((x + b) * H) % q, 0); return `Toy checksum with secret H = 5, keep remainders mod 11, blocks 3, 1, 4: X = (0 + 3)×5 = 15 → 4; (4 + 1)×5 = 25 → 3; (3 + 4)×5 = 35 → 2. Tag = ${run([3, 1, 4])}. Change block 2 to 2: tag = ${run([3, 2, 4])}.`; })(),
+                what: (() => { const H = 5, q = 11, run = (bs) => bs.reduce((x, b) => ((x + b) * H) % q, 0); return `Toy checksum with secret H = 5, keep remainders mod 11, blocks 3, 1, 4: X = (⟨0|X⟩ + ⟨3|block 1⟩)×⟨5|H⟩ = 15 → ⟨4|X⟩; (⟨4|X⟩ + ⟨1|block 2⟩)×⟨5|H⟩ = 25 → ⟨3|X⟩; (⟨3|X⟩ + ⟨4|block 3⟩)×⟨5|H⟩ = 35 → ⟨2|X⟩. Tag = ${vn(run([3, 1, 4]), "tag")}. Change block 2 to 2: tag = ${vn(run([3, 2, 4]), "new tag")}.`; })(),
                 why: "Without knowing H, nobody can predict the new tag for changed blocks. The real GHASH uses 128-bit blocks and its own multiplication, but the running-total idea is the same.",
                 formal: "toy: X = (X + block) × H mod 11.",
                 next: "Next: locking the key.",
@@ -516,9 +516,9 @@ function buildTransportSteps(result, leg) {
                 next: "Next: 5, the envelope on the wire.",
             },
             eli1: {
-                what: `Toy with the server pair from Key Setup (n = 91, e = 5): message 2, padded with a random digit r as 10·r + 2. r = 1: 12⁵ mod 91 = ${Number(12n ** 5n % 91n)}. r = 4: 42⁵ mod 91 = ${Number(42n ** 5n % 91n)}. Same message, different envelopes.`,
+                what: `Toy with the server pair from Key Setup (n = 91, e = 5): message 2, padded with a random digit r as 10·r + 2. r = 1: ⟨12|padded⟩⁵ mod ⟨91|n⟩ = ${vn(Number(12n ** 5n % 91n), "c")}. r = 4: ⟨42|padded⟩⁵ mod ⟨91|n⟩ = ${vn(Number(42n ** 5n % 91n), "c")}. Same message, different envelopes.`,
                 why: "That's what the random seed in OAEP does, with a much more careful layout.",
-                formal: `toy: 2 → ${Number(12n ** 5n % 91n)} or ${Number(42n ** 5n % 91n)}.`,
+                formal: `toy: ⟨2|m⟩ → ${vn(Number(12n ** 5n % 91n), "c (r = 1)")} or ${vn(Number(42n ** 5n % 91n), "c (r = 4)")}.`,
                 next: "Next: the wire.",
             },
             what: `The ${L.from} seals the 32-byte AES key with RSA-OAEP under the ${L.to}'s public key (n: ${rsa.bit_lengths.n} bits, e = ${rsa.e}): EM = 00 ‖ maskedSeed ‖ maskedDB, c = EM^e mod n, ${w.encrypted_aes_key_size} bytes.`,
@@ -575,9 +575,9 @@ function buildTransportSteps(result, leg) {
                 next: "Next: 7, the AES key opens the package.",
             },
             eli1: {
-                what: `Toy: envelope ${Number(12n ** 5n % 91n)}, private d = 5: ${Number(12n ** 5n % 91n)}⁵ mod 91 = ${Number((12n ** 5n % 91n) ** 5n % 91n)}. Drop the pad digit (1): message 2.`,
+                what: `Toy: envelope ${vn(Number(12n ** 5n % 91n), "c")}, private d = 5: ${vn(Number(12n ** 5n % 91n), "c")}⁵ mod ⟨91|n⟩ = ${vn(Number((12n ** 5n % 91n) ** 5n % 91n), "padded")}. Drop the pad digit (1): message ⟨2|m⟩.`,
                 why: "Unlocking with d gives the padded block; removing the known structure leaves the key.",
-                formal: `toy: ${Number(12n ** 5n % 91n)}⁵ mod 91 = 12 → 2.`,
+                formal: `toy: ${vn(Number(12n ** 5n % 91n), "c")}⁵ mod ⟨91|n⟩ = ⟨12|padded⟩ → ⟨2|m⟩.`,
                 next: "Next: open the package.",
             },
             what: `The ${L.to} computes EM = c^d mod n with its private exponent d, then undoes OAEP: seed = maskedSeed ⊕ MGF1(maskedDB, 32), DB = maskedDB ⊕ MGF1(seed, 223), checks lHash, the zero run and the 01 separator, and takes the last 32 bytes as the AES key. Your browser does the same in BigInt.`,

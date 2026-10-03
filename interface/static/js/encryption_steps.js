@@ -105,7 +105,7 @@ function buildEncryptionSteps(result) {
                 next: "Next: 2.2, making every number a whole number.",
             },
             eli1: {
-                what: "Toy: 3 numbers [a, b, c] into 8 slots gives a, b, c, a, b, c, a, b. Slot 7: 7 mod 3 = 1, so it holds b.",
+                what: "Toy: 3 numbers [a, b, c] into 8 slots gives a, b, c, a, b, c, a, b. Slot 7: ⟨7|j⟩ mod ⟨3|d⟩ = ⟨1|j mod d⟩, so it holds b.",
                 why: `Same rule, bigger: ${d} numbers into ${sp.slots} slots, ${sp.replication.full_copies} copies.`,
                 formal: "toy: slot[j] = x[j mod 3].",
                 next: "Next: whole numbers.",
@@ -161,15 +161,15 @@ function buildEncryptionSteps(result) {
         },
         {
             eli5: {
-                what: (() => { const v = sc.values[0]; return `Every number is multiplied by the scale Δ = ${srcRef("ckks_params", `2^${p.scale_bits}`)} = ${sc.delta.toLocaleString()} and rounded. Your first value: ${v.x} × ${sc.delta.toLocaleString()} = ${BigInt(v.rounded).toLocaleString()}. ${scaling.every((v) => v.ok) ? "✓" : "✕"} recomputed.`; })(),
-                why: `The lock only works on whole numbers (remainders mod q), so decimals would be lost. Multiplying first keeps them: rounding loses at most 0.5, which is 0.5 ÷ 2^${p.scale_bits} ≈ ${(0.5 / sc.delta).toExponential(1)} once divided back, about 12 correct decimals. Why exactly 2^${p.scale_bits}: after a multiplication the scale doubles to 2^${2 * p.scale_bits}, and CKKS divides by one of the ${p.scale_bits}-bit primes to bring it back, so the scale matches those primes.`,
+                what: (() => { const v = sc.values[0]; return `Every number is multiplied by the scale Δ = ${srcRef("ckks_params", `2^${p.scale_bits}`, "Δ")} = ${sc.delta.toLocaleString()} and rounded. Your first value: ${vn(v.x, "x₀")} × ${vn(sc.delta.toLocaleString(), "Δ")} = ${vn(BigInt(v.rounded).toLocaleString(), "round(x₀·Δ)")}. ${scaling.every((v) => v.ok) ? "✓" : "✕"} recomputed.`; })(),
+                why: `The lock only works on whole numbers (remainders mod q), so decimals would be lost. Multiplying first keeps them: rounding loses at most 0.5, which is ⟨0.5|max rounding⟩ ÷ ${vn(`2^${p.scale_bits}`, "Δ")} ≈ ${vn((0.5 / sc.delta).toExponential(1), "error")} once divided back, about 12 correct decimals. Why exactly 2^${p.scale_bits}: after a multiplication the scale doubles to 2^${2 * p.scale_bits}, and CKKS divides by one of the ${p.scale_bits}-bit primes to bring it back, so the scale matches those primes.`,
                 formal: `whole number = round(value × 2^${p.scale_bits}).`,
                 next: "Next: 2.3, all slots packed into one formula.",
             },
             eli1: {
-                what: (() => { const v = sc.values[0]; return `Toy scale Δ = 1000: 0.25 × 1000 = 250. Real: ${v.x} × 2^${p.scale_bits} = ${BigInt(v.rounded).toLocaleString()}. At the end: ${BigInt(v.rounded).toLocaleString()} ÷ 2^${p.scale_bits} = ${v.x} again.`; })(),
+                what: (() => { const v = sc.values[0]; return `Toy scale Δ = 1000: ⟨0.25|x⟩ × ⟨1000|Δ⟩ = ⟨250|m⟩. Real: ${vn(v.x, "x₀")} × ${vn(`2^${p.scale_bits}`, "Δ")} = ${vn(BigInt(v.rounded).toLocaleString(), "m₀")}. At the end: ${vn(BigInt(v.rounded).toLocaleString(), "m₀")} ÷ ${vn(`2^${p.scale_bits}`, "Δ")} = ${vn(v.x, "x₀")} again.`; })(),
                 why: "A bigger scale keeps more decimals: Δ = 1000 keeps 3, 2^40 keeps about 12.",
-                formal: "toy: 0.25 × 1000 = 250.",
+                formal: "toy: ⟨0.25|x⟩ × ⟨1000|Δ⟩ = ⟨250|m⟩.",
                 next: "Next: the formula.",
             },
             what: `Each value is multiplied by Δ = 2^${p.scale_bits} = ${sc.delta.toLocaleString()} so its digits survive as an integer. The ${sc.values.length} ${sc.values.length === d ? "" : "non-zero "}values: browser recomputed x·Δ and the rounding for all of them: ${scaling.every((v) => v.ok) ? "✓" : "✕"}.`,
@@ -194,9 +194,9 @@ function buildEncryptionSteps(result) {
                 next: "Next: 2.4, each coefficient split into smaller pieces.",
             },
             eli1: {
-                what: "Toy with 2 slots and 2 coefficients: slots (5, 1) are the values of m(X) = m₀ + m₁·X at the points X = 1 and X = −1. Solve: m₀ + m₁ = 5 and m₀ − m₁ = 1, so m₀ = (5 + 1) ÷ 2 = 3, m₁ = (5 − 1) ÷ 2 = 2. Check: m(1) = 3 + 2 = 5, m(−1) = 3 − 2 = 1.",
+                what: "Toy with 2 slots and 2 coefficients: slots (5, 1) are the values of m(X) = m₀ + m₁·X at the points X = 1 and X = −1. Solve: m₀ + m₁ = 5 and m₀ − m₁ = 1, so m₀ = (⟨5|slot 1⟩ + ⟨1|slot 2⟩) ÷ 2 = ⟨3|m₀⟩, m₁ = (⟨5|slot 1⟩ − ⟨1|slot 2⟩) ÷ 2 = ⟨2|m₁⟩. Check: m(1) = ⟨3|m₀⟩ + ⟨2|m₁⟩ = ⟨5|slot 1⟩, m(−1) = ⟨3|m₀⟩ − ⟨2|m₁⟩ = ⟨1|slot 2⟩.",
                 why: `The real run does the same with ${p.slots} slots and ${N} coefficients; its special points are complex numbers (points on a circle), but the idea is identical: slots = the formula's values at fixed points.`,
-                formal: "toy: (5, 1) → m(X) = 3 + 2X.",
+                formal: "toy: (⟨5|slot 1⟩, ⟨1|slot 2⟩) → m(X) = ⟨3|m₀⟩ + ⟨2|m₁⟩X.",
                 next: "Next: splitting big numbers.",
             },
             what: `σ⁻¹ maps all ${p.slots} scaled slots to one polynomial m(X) = m₀ + m₁X + … + m_${N - 1}X^${N - 1} with integer coefficients (largest |m_i| = ${Number(ce.max_abs_coeff).toLocaleString()}). SEAL's own encoder gave the same ${N} coefficients (${ce.seal_check.coeffs_differing_from_seal} differ). Your browser evaluates m at all ${p.slots} slot roots to get x back.`,
@@ -237,9 +237,9 @@ function buildEncryptionSteps(result) {
                 next: "Next: 2.5, the actual locking.",
             },
             eli1: {
-                what: `Toy primes 5 and 7: the number 23 becomes (23 mod 5, 23 mod 7) = (${23 % 5}, ${23 % 7}). Which number below 5 × 7 = 35 leaves remainder 3 when divided by 5 and 2 when divided by 7? Only 23.`,
+                what: `Toy primes 5 and 7: the number 23 becomes (⟨23|m⟩ mod ⟨5|q₀⟩, ⟨23|m⟩ mod ⟨7|q₁⟩) = (${vn(23 % 5, "m mod q₀")}, ${vn(23 % 7, "m mod q₁")}). Which number below ⟨5|q₀⟩ × ⟨7|q₁⟩ = ⟨35|q₀·q₁⟩ leaves remainder 3 when divided by 5 and 2 when divided by 7? Only ⟨23|m⟩.`,
                 why: "So the pair (3, 2) is as good as 23 itself. The real run uses three primes of 60, 40 and 40 bits.",
-                formal: "toy: 23 → (3, 2).",
+                formal: "toy: ⟨23|m⟩ → (⟨3|mod 5⟩, ⟨2|mod 7⟩).",
                 next: "Next: locking.",
             },
             what: `The coefficients live modulo q = q₀·q₁·q₂ (${p.total_modulus_bits - p.coeff_mod_bit_sizes[p.coeff_mod_bit_sizes.length - 1]} bits of data primes). Each one is stored as ${rns.data_primes.length} small residues, one per prime. Your browser re-proved every prime (Miller–Rabin), checked q ≡ 1 mod ${2 * N}, and recomputed the first 16 residues per prime: ${rnsChk.allOk ? "all ✓" : "✕"}.`,
@@ -269,15 +269,15 @@ function buildEncryptionSteps(result) {
         },
         {
             eli5: {
-                what: `Locking with the ${srcRef("ckks_pk", "public key")} (pk₀, pk₁): c₀ = pk₀·u + e₀ + m and c₁ = pk₁·u + e₁. Here m is your formula m(X); u is a fresh random formula whose ${N} coefficients are each −1, 0 or 1; e₀ and e₁ are tiny random noise formulas; every product is done mod X^${N} + 1 and mod each prime. The pair (c₀, c₁) is the ciphertext: 2 formulas × ${rns.data_primes.length} primes × ${N} = ${en.coefficients_total.toLocaleString()} numbers.`,
+                what: `Locking with the ${srcRef("ckks_pk", "public key")} (pk₀, pk₁): c₀ = pk₀·u + e₀ + m and c₁ = pk₁·u + e₁. Here m is your formula m(X); u is a fresh random formula whose ${N} coefficients are each −1, 0 or 1; e₀ and e₁ are tiny random noise formulas; every product is done mod X^${N} + 1 and mod each prime. The pair (c₀, c₁) is the ciphertext: ⟨2|formulas⟩ × ${vn(rns.data_primes.length, "primes")} × ${vn(N, "N")} = ${vn(en.coefficients_total.toLocaleString(), "numbers")}.`,
                 why: `u makes every locking different, so equal inputs can't be spotted. The noise makes the lock hard: without it, s could be solved from the public key with school algebra. Unlocking computes c₀ + c₁·s: the big random parts cancel exactly and leave m + small noise. In this run, m₀ = ${BigInt(coeffs[0]).toLocaleString()} came back as ${BigInt(rt.decrypted_poly_first_16[0]).toLocaleString()} (largest noise ${rt.max_abs_noise_coeff}), which after ÷ 2^${p.scale_bits} is an error of about ${(rt.max_abs_noise_coeff / sc.delta).toExponential(0)}.`,
                 formal: "(c₀, c₁) = (pk₀·u + e₀ + m, pk₁·u + e₁).",
                 next: "Next: 2.6, writing the locked package down as bytes.",
             },
             eli1: {
-                what: `Same as "How HE works": m = ${TOY.x1.m}, u = ${TOY.x1.u}, e₀ = ${TOY.x1.e0}, e₁ = ${TOY.x1.e1}: c₀ = ${TOY.pk0}×${TOY.x1.u} + ${TOY.x1.e0} + ${TOY.x1.m} mod ${TOY.q} = ${TOY.x1.c0}; c₁ = ${TOY.pk1}×${TOY.x1.u} + ${TOY.x1.e1} mod ${TOY.q} = ${TOY.x1.c1}. Unlock: ${TOY.x1.c0} + ${TOY.x1.c1}×${TOY.s} mod ${TOY.q} = ${TOY.dec(TOY.x1)} (m + noise ${TOY.noise(TOY.x1)}).`,
+                what: `Same as "How HE works": m = ${TOY.x1.m}, u = ${TOY.x1.u}, e₀ = ${TOY.x1.e0}, e₁ = ${TOY.x1.e1}: c₀ = ${vn(TOY.pk0, "pk₀")}×${vn(TOY.x1.u, "u")} + ${vn(TOY.x1.e0, "e₀")} + ${vn(TOY.x1.m, "m")} mod ${vn(TOY.q, "q")} = ${vn(TOY.x1.c0, "c₀")}; c₁ = ${vn(TOY.pk1, "pk₁")}×${vn(TOY.x1.u, "u")} + ${vn(TOY.x1.e1, "e₁")} mod ${vn(TOY.q, "q")} = ${vn(TOY.x1.c1, "c₁")}. Unlock: ${vn(TOY.x1.c0, "c₀")} + ${vn(TOY.x1.c1, "c₁")}×${vn(TOY.s, "s")} mod ${vn(TOY.q, "q")} = ${vn(TOY.dec(TOY.x1), "m + noise")} (m + noise ${vn(TOY.noise(TOY.x1), "noise")}).`,
                 why: `The real run: the same two lines, but every number is a formula with ${N} coefficients.`,
-                formal: `toy: ${TOY.x1.m} → (${TOY.x1.c0}, ${TOY.x1.c1}).`,
+                formal: `toy: ${vn(TOY.x1.m, "m")} → (${vn(TOY.x1.c0, "c₀")}, ${vn(TOY.x1.c1, "c₁")}).`,
                 next: "Next: bytes.",
             },
             what: `Encryption with the public key: c = (c₀, c₁), two polynomials × ${en.primes_at_level} primes × ${N} coefficients = ${en.coefficients_total.toLocaleString()} numbers, at scale 2^${Math.log2(en.ciphertext_scale)}. Took ${(encEv.elapsed_sec * 1000).toFixed(0)} ms including the checks. Below: the real first 8 coefficients of c₀ and c₁ mod q₀ (browser: all < q₀ ${cRangeOk ? "✓" : "✕"}).`,
@@ -304,7 +304,7 @@ function buildEncryptionSteps(result) {
         },
         {
             eli5: {
-                what: `The two formulas are written out as bytes: in full that is ${en.ciphertext_polys} formulas × ${rns.data_primes.length} primes × ${N} coefficients × 8 bytes = ${ser.theoretical_uncompressed_bytes.toLocaleString()} bytes; zstd compression makes it ${ser.size_bytes.toLocaleString()} (${(ser.ratio * 100).toFixed(0)}%). The header says what follows: the SEAL marker 0xA15E, SEAL version ${ser.seal_header.seal_version}, compression "${ser.seal_header.compr_mode}".`,
+                what: `The two formulas are written out as bytes: in full that is ${vn(en.ciphertext_polys, "formulas")} formulas × ${vn(rns.data_primes.length, "primes")} primes × ${vn(N, "N")} coefficients × ⟨8|bytes each⟩ bytes = ${vn(ser.theoretical_uncompressed_bytes.toLocaleString(), "raw size")} bytes; zstd compression makes it ${vn(ser.size_bytes.toLocaleString(), "sent size")} (${vn((ser.ratio * 100).toFixed(0) + "%", "sent ÷ raw")}). The header says what follows: the SEAL marker 0xA15E, SEAL version ${ser.seal_header.seal_version}, compression "${ser.seal_header.compr_mode}".`,
                 why: "To travel over a network anything has to become one flat row of bytes. The header lets the receiver read them back correctly. Compression saves little, because locked data looks random, and random data barely compresses.",
                 formal: `locked package → ${ser.size_bytes.toLocaleString()} bytes.`,
                 next: "Next: 2.7, the finished package.",

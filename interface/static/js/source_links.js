@@ -19,21 +19,16 @@ function registerFacts(chapters, chapterSteps) {
     });
 }
 
-const SRC_TOKEN = /⟦([\w.-]+)\|([^⟧]*)⟧/g;
-const srcRef = (id, text) => `⟦${id}|${text}⟧`;
+// label (optional): the variable shown under the value (var_label.js).
+const srcRef = (id, text, label) => `⟦${id}|${text}${label ? `|${label}` : ""}⟧`;
 const srcLinkHtml = (id, text) => (FACTS.has(id)
     ? `<span class="src-link" data-fact="${escapeHtml(id)}" tabindex="0" role="link">${escapeHtml(text)}</span>`
     : escapeHtml(text));
 
-// Explanation text → HTML: source tokens become links, the rest gets glossary terms.
+// Explanation text → HTML: source tokens become links, labelled numbers get their variable underneath
+// (var_label.js, including every plain "name = number"), the rest gets glossary terms.
 function linkExplanation(text, seen) {
-    let out = "", last = 0;
-    const s = String(text);
-    for (const m of s.matchAll(SRC_TOKEN)) {
-        out += linkGlossaryTerms(s.slice(last, m.index), seen) + srcLinkHtml(m[1], m[2]);
-        last = m.index + m[0].length;
-    }
-    return out + linkGlossaryTerms(s.slice(last), seen);
+    return richText(text, (t) => linkGlossaryTerms(t, seen), true);
 }
 
 // The step a fact comes from marks the value with data-fact-src="<id>"; a jump pulses it.

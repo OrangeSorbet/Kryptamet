@@ -927,3 +927,21 @@
   - browser (tmp/cv.py): EMNIST "123"; chips 2 and 3 load their runs on click; no console errors
 - **Docs:** README "Deploy on Vercel"; CLAUDE.md note; checklist Phase 7D. The first real deploy is the user's (needs a Vercel account).
 - The 7C.7 regression was stopped for this patch: desktop had finished 7 models (all badges ✓), and the run was mid EMNIST character 2. It reruns in full after the patch.
+
+## [Phase 7C · 7C.7 extra] 2026-10-03 — every number shows its variable underneath (user request)
+- **New:** `js/var_label.js` + `css/var_label.css`.
+  - `vn(value, label)` makes a ⟨value|label⟩ token; `vnHtml` renders it directly in scene HTML.
+  - `richText` renders labelled-number tokens and source-link tokens together.
+  - `VN_AUTO` labels every plain `name = number` (also `"quoted name" = number`). It skips hex and skips a number followed by an operator, so "n = 5 × 11" doesn't put n under the 5.
+  - Rendering: inline-flex column, the variable in 0.62em muted type under the number.
+- **source_links.js:** `linkExplanation` now calls `richText(..., glossary, auto)`; `srcRef(id, text, label?)` can label a linked value; SRC_TOKEN removed.
+- **How HE** (tmp/vn_howhe.py): 283 value interpolations wrapped with their variable (c0 of x₁, pk0, q, Δ, …). `renderToyCalc` renders tokens in every column; numeric values show the row's variable (4th item or row name); notes are rich text.
+- **Hand-labelled calculations** (tmp/vn_rest.py):
+  - Key Setup: RSA toys, U-chain XOR, SHA padding sums, the toy schedule, the toy CKKS key, ipad/opad bits; the RSA ELI1 Significance lines
+  - Encryption: slot rule, Δ scaling (real + toy), toy m(X), CRT toy, TOY c0/c1 + unlock, coefficient and byte totals
+  - Transport: key-schedule toy, state XOR (hex + bits), keystream block, payload XOR bits, GHASH toy, OAEP/RSA toys
+  - Computation: w·x, bias sum, TOY score, rescale and rotate-and-add toys, bias toy
+  - Feature / Result: pixel ÷ 255, TF-IDF toy, z-score toy and the real (value − μ) ÷ σ, TOY unlock, sigmoid toys and the real sigmoid
+- **Check:** tmp/vn2.py, german_credit + symptom_diagnosis, all 9 chapters × every step × 3 levels:
+  - 1,790 labels rendered; no raw tokens in the explanations or scenes; no console errors
+  - fixed along the way: the toy-table row name was escaped (step 7), the label fallback for token-named rows, a quoted-name regex typo
