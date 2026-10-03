@@ -1,4 +1,4 @@
-// Computation chapter (runs on the client): what is computed, the real
+// Computation chapter (runs on the server): what is computed, the real
 // encrypted operation Enc(x)·Wᵀ + b, then the plaintext teaching mirror of
 // the traced row: the largest terms one by one (value captions under w, x and
 // w·x), the smaller terms summed, the zero terms, and the bias. A waterfall
@@ -64,17 +64,63 @@ function buildComputationSteps(result) {
     // The browser's own running sum before term k (from the encrypted x and the event's weights).
     const runBefore = (k) => terms.slice(0, k).reduce((s, t) => s + t.data_before.weight * x[t.data_before.index], 0);
 
+    // Plain-words twin of each event (explain_level.js), from the same event data.
+    const sign = (v) => `${v >= 0 ? "+" : ""}${fmt(v)}`;
+    const computeEli5 = (ev, op) => {
+        const a = ev.data_after || {};
+        if (op === "compute_overview") return {
+            what: `The server now runs the model on your locked numbers. It has the model (${ov.k} row${ov.k > 1 ? "s" : ""} of ${ov.d} weights) and the locked package. It never has your numbers, the secret key or the answer.`,
+            why: "Each score is just: multiply every number by its weight, add them all up, add a fixed offset. CKKS can do exactly that while the numbers stay locked.",
+            formal: "score = sum of (weight × number) + offset",
+            next: "Next: the one real locked calculation.",
+        };
+        if (op === "compute_general_form") return {
+            what: `The whole model ran on the locked package in one go (${fmt(a.he_elapsed_ms, 0)} ms) and produced a new locked package (${formatBytes(a.output_ciphertext_size)}) with the score${ov.k > 1 ? "s" : ""} inside. Your browser fingerprinted it: it is exactly what travels back.`,
+            why: "The server can't read its own result. The next steps replay the same sum with plain numbers, only to show what happened inside the lock.",
+            formal: "locked score = locked numbers · weights + offset",
+            next: "Next: the biggest contributions, one by one (a plain replay).",
+        };
+        if (op === "weight_multiply") {
+            const t = ev.data_before, k = terms.indexOf(ev), prod = a.product;
+            return {
+                what: `Replay ${k + 1}: "${t.name}" has weight ${sign(t.weight)}, your value is ${fmt(t.input)}, so it adds ${sign(prod)}. Running total: ${fmt(a.running_sum)}.`,
+                why: `A positive weight pushes the answer toward "${bias.row_class}", a negative one away, and bigger values push harder. This is only a plain replay; the real sum happened locked.`,
+                formal: `${fmt(t.weight)} × ${fmt(t.input)} = ${fmt(prod)}`,
+                next: k < terms.length - 1 ? `Next: "${terms[k + 1].data_before.name}", the next-biggest contribution.` : "Next: everything smaller, added up together.",
+            };
+        }
+        if (op === "smaller_terms") return {
+            what: `The remaining ${a.count} smaller contributions add ${sign(a.sum)} in total. Running total: ${fmt(a.running_sum)}.`,
+            why: "Each of them barely moves the score, so they're shown together.",
+            formal: `${a.count} small terms = ${fmt(a.sum)}`,
+            next: "Next: the values that are zero.",
+        };
+        if (op === "zero_terms") return {
+            what: `${a.count} of your values are 0, and anything × 0 = 0, so together they add nothing.`,
+            why: "Most of the model's inputs don't apply to your input, so they drop out of the sum.",
+            formal: `${a.count} × (weight × 0) = 0`,
+            next: "Next: the fixed offset.",
+        };
+        return {
+            what: `Finally the model's fixed offset (${sign(a.bias)}) is added: score for "${a.row_class}" = ${fmt(a.score)}.`,
+            why: "The offset is the score an all-zero input would get. In the real locked run this number is still hidden; only the client will see it after unlocking.",
+            formal: `score = ${fmt(a.running_sum)} + ${fmt(a.bias)} = ${fmt(a.score)}`,
+            next: "Next chapter: the locked result travels back to the client.",
+        };
+    };
+
     return events.map((ev) => {
         const step = { what: ev.description, why: ev.why, formal: ev.formal, next: ev.next_step };
         const op = ev.operation_name;
+        step.eli5 = computeEli5(ev, op);
         if (op === "compute_overview") {
             step.renderVisual = (el) => {
-                el.innerHTML = `${title("What the client computes")}<div class="scene-body">
+                el.innerHTML = `${title("What the server computes")}<div class="scene-body">
                     <div class="compute-current-line">score_j = W_j · x + b_j</div>
                     <div class="cmp-parties">
-                        <div class="cmp-party"><div class="cmp-party-name">Client has</div>
+                        <div class="cmp-party"><div class="cmp-party-name">Server has</div>
                             <div>the model: W (${ov.k} × ${ov.d}) and b (${ov.k})</div><div>Enc(x): the ciphertext from leg 1</div><div>the public CKKS context (no secret key)</div></div>
-                        <div class="cmp-party"><div class="cmp-party-name">Client never has</div>
+                        <div class="cmp-party"><div class="cmp-party-name">Server never has</div>
                             <div>x itself (${ov.d} values)</div><div>the CKKS secret key</div><div>the decrypted score</div></div>
                     </div>
                     <p class="step-text muted">${escapeHtml(ov.decision_rule)}. Classes: ${ov.class_names.slice(0, 6).map(escapeHtml).join(", ")}${ov.class_names.length > 6 ? ", …" : ""}.</p></div>`;
@@ -86,11 +132,11 @@ function buildComputationSteps(result) {
                     <div class="compute-current-line">Enc(x) · Wᵀ + b → Enc(score)</div>
                     ${renderChecks([
                         { label: `input = the ciphertext unwrapped on leg 1 (SHA-256 ${d.input_ciphertext_sha256.slice(0, 12)}…)`, ok: d.input_ciphertext_sha256 === leg1.payload_sha256 && d.input_ciphertext_sha256 === encSha },
-                        { label: "client context is public-only (is_private = false)", ok: d.is_private === false },
+                        { label: "server context is public-only (is_private = false)", ok: d.is_private === false },
                     ])}
                     <div class="ks-verify">${tpCheck("cmpOut", "browser: SHA-256 of the output ciphertext")}</div>
                     <div class="ciphertext-box">${escapeHtml(d.output_ciphertext_b64)}</div>
-                    <p class="step-text muted">Output: all ${d.output_ciphertext_size.toLocaleString()} bytes (${formatBytes(d.output_ciphertext_size)}), computed in ${fmt(d.he_elapsed_ms, 0)} ms. Weights ${d.weights_shape.join(" × ")}, client context SHA-256 ${escapeHtml(d.client_context_sha256.slice(0, 16))}…</p></div>`;
+                    <p class="step-text muted">Output: all ${d.output_ciphertext_size.toLocaleString()} bytes (${formatBytes(d.output_ciphertext_size)}), computed in ${fmt(d.he_elapsed_ms, 0)} ms. Weights ${d.weights_shape.join(" × ")}, server context SHA-256 ${escapeHtml(d.server_context_sha256.slice(0, 16))}…</p></div>`;
                 return encSha256(d.output_ciphertext_b64).then((s) => {
                     if (s.error) { tpSetCheck(el, "cmpOut", false, `browser: ${s.error}`); return; }
                     tpSetCheck(el, "cmpOut", s.hex === d.output_ciphertext_sha256 && s.hex === leg2.payload_sha256,

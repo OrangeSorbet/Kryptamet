@@ -1,0 +1,23 @@
+/* Send / receive chart (interface/static/js/sequence_chart.js). Texts get a dark halo so they stay readable
+   where they cross an arrow or a lifeline. */
+.seq-chart { width: 100%; max-width: 1180px; height: auto; display: block; margin: 0.25rem auto 0.5rem; }
+.seq-chart text { paint-order: stroke; stroke: var(--color-bg); stroke-width: 5px; stroke-linejoin: round; }
+.seq-party { font-family: var(--font-base); font-size: 17px; font-weight: 700; fill: var(--color-text); }
+.seq-life { stroke: var(--color-border); stroke-width: 2; }
+.seq-arrow { stroke: var(--color-primary-hover); stroke-width: 2; }
+.seq-head { fill: var(--color-primary-hover); }
+.seq-label { font-family: var(--font-base); font-size: 15px; font-weight: 600; fill: var(--color-text); }
+.seq-note { font-family: var(--font-mono); font-size: 12px; fill: var(--color-text-muted); }
+.seq-state { font-family: var(--font-base); font-size: 13px; fill: var(--color-warning); }
+.seq-time { font-size: 12px; fill: var(--color-text-muted); }
+.seq-msg.off { opacity: 0.28; }
+.seq-msg.on .seq-arrow { stroke: var(--color-warning); stroke-width: 3; }
+.seq-msg.on .seq-head { fill: var(--color-warning); }
+.seq-secrets { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 0.4rem; }
+.seq-secret { font-size: 12px; padding: 3px 9px; border: 1px solid var(--color-warning); border-radius: 999px; color: var(--color-text-muted); }
+.seq-secret strong { color: var(--color-text); font-weight: 600; }
+
+/* Transport step 1: the envelope layers and the chart side by side. */
+.tp-seq-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .tp-seq-row { grid-template-columns: minmax(0, 1fr); } }
+.seq-legend { font-family: var(--font-mono); font-size: 12.5px; fill: var(--color-text); }

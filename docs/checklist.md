@@ -3,7 +3,7 @@
 Roadmap, in order (rules.md #1). Each phase ends with a working, testable checkpoint (rules.md #8).
 Detail for each step lives in `docs/logs.md`, which is phase-tagged.
 
-**Status:** Phases 0–7 done. Next: Phase 8, gated on the user sending the second PC's config.
+**Status:** Phases 0–7 and 7B (7.10–7.15) done. Next: Phase 8, gated on the user sending the second PC's config.
 
 ---
 
@@ -84,6 +84,30 @@ HE compute → wrap (server RSA pub) → transport → server unwrap → CKKS de
     - [x] Input panels for every registry model (`/api/models`): text, tabular (real test rows, editable fields), symptoms (filterable chips, real test cases), MNIST (28×28 drawing canvas, real test images); Feature chapter covers tabular, symptom and pixel inputs
 - [x] 7.8 Docs: new `LIVE_UI_TRUTH.md` (flow, data sources, per-chapter browser checks, limits); `ARCHITECTURE.md` rewritten for the current code (incl. the old 6.5 file-list item); `CLAUDE.md` pointer + flow order; README claims re-checked: Benchmarks now really shows peak memory, proof badges added. Dead code removed (`run_traced_inference`, `run_full_traced_pipeline`)
 - [x] 7.9 Verify: all 9 test files pass (incl. the encrypted CNN, 3/3); headless Chrome for all 6 models at 1440×900 and 390×844, every chapter's every step, chapters chained by Next, every proof badge ✓ (792 browser checks per viewport, 0 failed), no console errors
+
+## Phase 7B — Clarity pass (user review, 2026-10-03) ✅
+Every model (7), every chapter. One milestone at a time; ask before each.
+- [x] 7.10 **Matrices everywhere behave the same.** Every matrix or grid (byte rows, AES 4×4 states, SHA-256 rounds, ipad/opad, poly grids, slot grid, residues, …):
+    - hover a cell → its formula popup, drawn in a layer that is never clipped
+    - animated ones get the same ▶/❚❚ ‹ › ↺ speed controls as the CKKS grids
+    - containers show the whole matrix instead of a small inner scroll box
+    - the public-key grids are aligned (centred, under their labels)
+    - native `title` tooltips are removed everywhere except the underlined glossary words
+- [x] 7.11 **Split screen for every graph inside a chapter** (PBKDF2, the Encryption pipeline, AES-GCM CTR, …). This replaces the nested dolly zoom (`sub_zoom.js`).
+    - right: the graph with the current node highlighted
+    - left: that node's inner content
+    - steps are numbered by the graph's flow: the graph step is N, its nodes N.1, N.2, … (e.g. Key Setup 7 → 7.1 passphrase, 7.2 bytes + salt, …)
+    - the Encryption chapter's "decryption round trip" stops being a step (it is a sanity check, not part of the protocol) and becomes a ✓ on the ciphertext step
+- [x] 7.12 **ELI5 / Advanced explanations.** A navbar switch, changeable any time and remembered. Every explanation (Scrubber what/why/formal/next, intro cards, captions) has both levels, built from the real run's values.
+- [x] 7.13 **Character switcher (MNIST / EMNIST).**
+    - Every drawn character gets its own full traced run.
+    - Chips in the chapter bar pick which character every chapter shows.
+    - Proof badges count per character; the deep-dive is fetched per character on demand.
+- [x] 7.15 **Roles + send/receive chart** (asked during 7.14).
+    - The client is the end user (input, CKKS secret key, final decryption) and the server is the compute node. That is the standard naming; it was swapped before.
+    - Swapped in the backend events, every chapter's text (ELI5 + Advanced), the primers, the docs and the tests. "Transport → server" / "Transport ← client".
+    - New `sequence_chart.js`: two lifelines, one arrow per network message with its real size, what each side holds. It replaces Key Setup's "Who holds which key" (key exchange highlighted) and sits in Transport step 1 (that leg highlighted).
+- [x] 7.14 Verify all 7 models × desktop/phone (every chapter, every step, both explanation levels, every character); update ARCHITECTURE / LIVE_UI_TRUTH / README.
 
 ## Phase 8 — GPU-accelerated encrypted CNN (after Phase 7)
 Target machine: the user's second PC with an RTX 5060 Ti (CUDA). TenSEAL/SEAL is CPU-only, so this needs a CUDA CKKS library.

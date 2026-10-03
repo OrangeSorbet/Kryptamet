@@ -32,12 +32,65 @@ body {
 }
 
 .dropdown {
-    background: var(--color-bg);
+    appearance: none;
+    background: var(--color-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%239a9fae' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat left 0.75rem center;
     color: var(--color-text);
     border: 1px solid var(--color-border);
     border-radius: 4px;
-    padding: 0.5rem;
+    padding: 0.5rem 0.5rem 0.5rem var(--dd-arrow-pad, 2.2rem);
     font-family: var(--font-base);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.2s ease;
+}
+
+.dropdown:hover { border-color: var(--color-primary-hover); }
+
+/* Arrow sits at the far left in every dropdown.
+   Customizable select (Chrome 135+): the open list is styled too; other
+   browsers keep the styled closed box above with their native list. */
+@supports (appearance: base-select) {
+    .dropdown, .dropdown::picker(select) { appearance: base-select; }
+    /* Arrow on the far left, value after it. */
+    .dropdown { background-image: none; justify-content: flex-start; gap: 0.6rem; --dd-arrow-pad: 0.75rem; }
+    .dropdown::picker-icon { order: -1; margin: 0; color: var(--color-text-muted); transition: rotate 0.2s ease; }
+    .dropdown:open::picker-icon { rotate: 180deg; }
+    .dropdown::picker(select) {
+        margin-top: 4px;
+        padding: 4px;
+        max-height: 340px;
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-border) transparent;
+    }
+    .dropdown option {
+        padding: 0.45rem 0.7rem;
+        border-radius: 6px;
+        color: var(--color-text);
+    }
+    .dropdown option:hover,
+    .dropdown option:focus-visible { outline: none; background: #1b1f10; }
+    .dropdown option:checked { background: rgba(92, 107, 62, 0.35); }
+    .dropdown option::checkmark { color: var(--color-warning); }
+}
+
+/* Scrollbars: thin, rounded, in the theme's olive. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border: 2px solid transparent;
+    border-radius: 10px;
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--color-primary-hover); }
+
+@supports not selector(::-webkit-scrollbar) {
+    * { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
 }
 
 .input-number {
@@ -231,3 +284,30 @@ table.benchmark-table th, table.benchmark-table td {
 
 
 .step-text.centered { text-align: center; }
+
+/* Formula popup of matrix and grid cells (interface/static/js/cell_formula.js): fixed on <body>, so no
+   scroll box, zoom or overflow can clip it. */
+.formula-pop {
+    position: fixed;
+    z-index: 3000;
+    max-width: min(560px, calc(100vw - 16px));
+    padding: 7px 11px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-warning);
+    border-radius: 7px;
+    color: var(--color-warning);
+    font-size: 14px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+    pointer-events: none;
+    overflow-wrap: anywhere;
+}
+.formula-pop[hidden] { display: none; }
+.formula-note { margin-top: 3px; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-text-muted); }
+
+/* Hoverable cells outside the grid components. */
+.enc-slot:hover, .recover-val:hover, .uchain-u:hover, .uchain-t:hover, .sym-flag:hover {
+    outline: 1px solid var(--color-warning);
+    cursor: help;
+}
+.digit-cell { fill: transparent; }
+.digit-feature rect[data-i]:hover { stroke: var(--color-warning); stroke-width: 0.12; }

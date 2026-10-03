@@ -7,7 +7,7 @@
 //   oaepOpen(encB64, rsa)    -- c^d mod n with BigInt, then the OAEP decode
 //       (MGF1-SHA256 via WebCrypto digest) that reveals the AES key inside.
 //   browserUnwrap(wrap, rsa) -- WebCrypto RSA-OAEP + AES-GCM decrypt of the
-//       full wire payload, its SHA-256, and the same bit flips the server made.
+//       full wire payload, its SHA-256, and the same bit flips the client made.
 const aesBytes = (hex) => (String(hex).match(/../g) || []).map((b) => parseInt(b, 16));
 const aesHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 const aesB64Bytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -235,7 +235,7 @@ async function browserUnwrapUncached(wrap, rsa, expectedSha, tamper) {
         const plain = new Uint8Array(await crypto.subtle.decrypt(params, aesKey, sealed));
         const sha = aesHex(new Uint8Array(await crypto.subtle.digest("SHA-256", plain)));
         const ms = performance.now() - t0;
-        // Same flips as the server's tamper test, on a copy of this exact payload.
+        // Same flips as the client's tamper test, on a copy of this exact payload.
         const rejects = async (offset, bit) => {
             const copy = sealed.slice();
             copy[offset] ^= 1 << bit;

@@ -1,0 +1,330 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1791001487735,
+  "projectRoot": "C:\\Users\\ashvi\\Documents\\VS_Codes\\Apps\\Kryptamet",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "flask",
+        "version": null,
+        "category": "backend"
+      }
+    ],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "pytest",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts",
+      "src",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "benchmarks": {
+      "path": "benchmarks",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1791001487671,
+      "keyFiles": [
+        "metrics.py",
+        "results.json"
+      ]
+    },
+    "data": {
+      "path": "data",
+      "purpose": "Data files",
+      "fileCount": 0,
+      "lastAccessed": 1791001487674,
+      "keyFiles": []
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 6,
+      "lastAccessed": 1791001487676,
+      "keyFiles": [
+        "ARCHITECTURE.md",
+        "checklist.md",
+        "LIVE_UI_POLISH.md",
+        "LIVE_UI_TRUTH.md",
+        "logs.md"
+      ]
+    },
+    "hecrypto": {
+      "path": "hecrypto",
+      "purpose": null,
+      "fileCount": 13,
+      "lastAccessed": 1791001487677,
+      "keyFiles": [
+        "aes_trace.py",
+        "ckks_context.py",
+        "ckks_encode_trace.py",
+        "ckks_math.py",
+        "decrypt.py"
+      ]
+    },
+    "inference": {
+      "path": "inference",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1791001487678,
+      "keyFiles": [
+        "he_cnn_infer.py",
+        "he_infer.py",
+        "model_registry.py",
+        "pipeline_events.py"
+      ]
+    },
+    "interface": {
+      "path": "interface",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1791001487679,
+      "keyFiles": [
+        "app.py",
+        "cli.py"
+      ]
+    },
+    "models": {
+      "path": "models",
+      "purpose": "Data models",
+      "fileCount": 0,
+      "lastAccessed": 1791001487680,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 1,
+      "lastAccessed": 1791001487681,
+      "keyFiles": [
+        "download.py"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1791001487681,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 10,
+      "lastAccessed": 1791001487682,
+      "keyFiles": [
+        "test_aes_trace.py",
+        "test_ckks_encode_trace.py",
+        "test_ckks_math.py",
+        "test_he_cnn_inference.py",
+        "test_he_inference.py"
+      ]
+    },
+    "tooldata": {
+      "path": "tooldata",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1791001487683,
+      "keyFiles": [
+        "checklist.json",
+        "ignore.json",
+        "logs.jsonl",
+        "output.txt",
+        "rules.md"
+      ]
+    },
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1791001487684,
+      "keyFiles": [
+        "_explore_tmp.cpython-313.pyc"
+      ]
+    },
+    "interface\\static": {
+      "path": "interface\\static",
+      "purpose": "Static files",
+      "fileCount": 0,
+      "lastAccessed": 1791001487687,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "interface/static/js/key_setup_steps.js",
+      "accessCount": 4,
+      "lastAccessed": 1791015210798,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/encryption_steps.js",
+      "accessCount": 4,
+      "lastAccessed": 1791015453899,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/digit_canvas.js",
+      "accessCount": 3,
+      "lastAccessed": 1791007279371,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/sequence_chart.js",
+      "accessCount": 3,
+      "lastAccessed": 1791024632740,
+      "type": "file"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "accessCount": 2,
+      "lastAccessed": 1791002538696,
+      "type": "directory"
+    },
+    {
+      "path": "models/train/emnist_logreg.py",
+      "accessCount": 2,
+      "lastAccessed": 1791009003957,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/poly_grid.js",
+      "accessCount": 2,
+      "lastAccessed": 1791014848675,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/byte_matrix.js",
+      "accessCount": 2,
+      "lastAccessed": 1791014866910,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/chapter_intros.js",
+      "accessCount": 2,
+      "lastAccessed": 1791016083232,
+      "type": "file"
+    },
+    {
+      "path": "interface",
+      "accessCount": 1,
+      "lastAccessed": 1791002139284,
+      "type": "directory"
+    },
+    {
+      "path": "interface/static/js/scene_fit.js",
+      "accessCount": 1,
+      "lastAccessed": 1791002378685,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/price_chart.js",
+      "accessCount": 1,
+      "lastAccessed": 1791004362676,
+      "type": "file"
+    },
+    {
+      "path": "data/loaders/emnist.py",
+      "accessCount": 1,
+      "lastAccessed": 1791005537413,
+      "type": "file"
+    },
+    {
+      "path": "data/features/glyph_redraw.py",
+      "accessCount": 1,
+      "lastAccessed": 1791008962264,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/grid_controls.js",
+      "accessCount": 1,
+      "lastAccessed": 1791014718390,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/cell_formula.js",
+      "accessCount": 1,
+      "lastAccessed": 1791014834915,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/reveal_controller.js",
+      "accessCount": 1,
+      "lastAccessed": 1791014835552,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/deep_dive_steps.js",
+      "accessCount": 1,
+      "lastAccessed": 1791015019317,
+      "type": "directory"
+    },
+    {
+      "path": "interface/static/js/pbkdf2_graph.js",
+      "accessCount": 1,
+      "lastAccessed": 1791015253906,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/split_view.js",
+      "accessCount": 1,
+      "lastAccessed": 1791015317788,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/transport_steps.js",
+      "accessCount": 1,
+      "lastAccessed": 1791015386420,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/explain_level.js",
+      "accessCount": 1,
+      "lastAccessed": 1791015697901,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/chapter_state.js",
+      "accessCount": 1,
+      "lastAccessed": 1791016353746,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/char_switch.js",
+      "accessCount": 1,
+      "lastAccessed": 1791016545031,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

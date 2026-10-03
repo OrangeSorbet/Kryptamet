@@ -60,6 +60,16 @@
     "plain_vs_he_agreement": 1.0
   },
   {
+    "model": "emnist_logreg",
+    "n_samples": 5,
+    "plaintext_time_sec": 0.059650300012435764,
+    "he_time_sec": 28.610140100005083,
+    "plaintext_peak_mem_bytes": 330197,
+    "he_peak_mem_bytes": 115463,
+    "slowdown_factor": 479.63111826831556,
+    "plain_vs_he_agreement": 1.0
+  },
+  {
     "model": "mnist_cnn_he",
     "n_samples": 3,
     "plaintext_time_sec": 0.16200519999256358,

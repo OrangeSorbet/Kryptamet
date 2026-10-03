@@ -6,7 +6,7 @@
 function initMinimap(containerEl, chapterLabels, onSelect) {
     containerEl.className = "chapter-minimap";
     containerEl.innerHTML = chapterLabels.map((label, i) => `
-        <button type="button" class="chapter-minimap-item" data-index="${i}" title="${i + 1}. ${label}" aria-label="Chapter ${i + 1}: ${label}">
+        <button type="button" class="chapter-minimap-item" data-index="${i}" aria-label="Chapter ${i + 1}: ${label}">
             <span class="chapter-minimap-dot"></span>
             <span class="chapter-minimap-label">${label}</span>
         </button>

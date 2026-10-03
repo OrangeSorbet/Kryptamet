@@ -2,7 +2,7 @@
 // as boxes in a "snake" layout (row 1 left->right, row 2 right->left) joined
 // by arrow connectors, so the pipeline reads as a pipeline instead of a
 // card list. Phones get a single column. The chart is sized once in fixed
-// pixels, then scaled down (never up) to fit the pane.
+// pixels, then scaled to fill ~90% of the pane (up to 1.7x).
 //
 // A connector lights up (with a dot travelling along it) once the chapter
 // it leaves is done. Box states: done (green + ✓), last-visited (glow),
@@ -49,8 +49,8 @@ function proofBadge(p) {
     if (!p || !(p.ok + p.bad)) return "";
     const n = p.ok + p.bad;
     return p.bad
-        ? ` · <span class="fc-proof bad" title="Browser checks that failed while you watched this chapter">✕ ${p.bad} of ${n} failed</span>`
-        : ` · <span class="fc-proof ok" title="Checks your browser recomputed while you watched this chapter">✓ ${n} browser check${n === 1 ? "" : "s"}</span>`;
+        ? ` · <span class="fc-proof bad" aria-label="Browser checks that failed while you watched this chapter">✕ ${p.bad} of ${n} failed</span>`
+        : ` · <span class="fc-proof ok" aria-label="Checks your browser recomputed while you watched this chapter">✓ ${n} browser check${n === 1 ? "" : "s"}</span>`;
 }
 
 function renderFlowchartInto(el, opts) {
@@ -105,7 +105,7 @@ function renderFlowchartInto(el, opts) {
         const w = stage.clientWidth - 2 * pad;
         const h = stage.clientHeight - 2 * pad;
         if (w <= 0 || h <= 0) return;
-        const scale = Math.min(1, w / g.width, h / g.height);
+        const scale = Math.min(1.7, (0.9 * w) / g.width, (0.9 * h) / g.height);
         chart.style.transform = `translate(-50%, -50%) scale(${scale})`;
     }
 

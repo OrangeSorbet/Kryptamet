@@ -24,18 +24,18 @@ any "my data, your model" situation. Both parties are simulated on one machine h
 ## End-to-end flow
 
 ```
-SERVER (data owner)                                   CLIENT (compute node)
+CLIENT (data owner)                                   SERVER (compute node)
  1. Feature extraction: input -> number vector x
  2. Key setup: CKKS keys, RSA key pairs,
     passphrase -> PBKDF2 -> AES key
  3. CKKS-encrypt x -> Enc(x)
  4. Seal Enc(x): AES-256-GCM, AES key locked
-    with the client's RSA public key        ------>  5. Unseal with its RSA private key
+    with the server's RSA public key        ------>  5. Unseal with its RSA private key
                                                         (tag checked: any tampering is rejected)
                                                      6. Compute on ciphertext only:
                                                         Enc(score) = Enc(x) · Wᵀ + b
                                                      7. Seal Enc(score) with a fresh AES key,
- 8. Unseal with its RSA private key         <------     locked with the server's RSA public key
+ 8. Unseal with its RSA private key         <------     locked with the client's RSA public key
  9. CKKS-decrypt -> score -> prediction
 10. Compare with the plaintext model: must match
 ```
@@ -48,22 +48,28 @@ SERVER (data owner)                                   CLIENT (compute node)
 
 ## Features
 
-- **Six live models** on real datasets:
+- **Seven live models** on real datasets:
   - SMS spam (TF-IDF)
   - Human vs AI text (stylometric)
-  - German Credit risk
-  - Stock price direction
-  - Symptom diagnosis (41 conditions)
-  - Handwritten digits (MNIST, 784 pixels)
+  - German Credit risk (each A-code shown with its meaning from the dataset's documentation)
+  - Stock price direction (each test case with a chart of the 20 closes before it)
+  - Symptom diagnosis (41 conditions; pick your own symptoms or start from a real case)
+  - Handwritten digits (MNIST) and handwritten digits + letters (EMNIST balanced, 47 classes)
 
-  Each works with the model's real preprocessing, for both binary and multiclass models. An HE-compatible CNN
-  for MNIST is included and benchmarked.
+  Each works with the model's real preprocessing, for both binary and multiclass models. Handwriting takes
+  several characters at once: draw a word in the strip, and every character is framed the way its dataset
+  framed images and gets its own complete encrypted run. EMNIST can be read as digits only or letters only.
+  An HE-compatible CNN for MNIST is included and benchmarked.
 - **Encrypted inference that matches plaintext.** Every run compares the decrypted score to the plain model's
   score and prediction.
 - **Two-party separation for real.** The compute side is rebuilt from public-key-only bytes and verified to
   hold no secret key.
 - **`/live` teaching walkthrough.** A flowchart of chapters, a dolly-zoom into each one, and a scrubber
-  (play/pause/step/speed) with a what/why/formal/next explanation for every step:
+  (play/pause/step/speed) with a what/why/formal/next explanation for every step. Every explanation comes in
+  two levels, ELI5 and Advanced, switched in the navbar at any time. Every matrix has its own play/pause/step
+  controls and shows each cell's formula on hover. Graphs inside a chapter (PBKDF2, the encryption pipeline,
+  AES counter mode) are walked box by box in split screen: the box's content on the left, the graph with the
+  box highlighted on the right, numbered by the graph (7, 7.1, 7.2, …). The chapters are:
   - **Feature extraction:** how your text, table row, symptoms or drawing becomes numbers.
   - **Key setup:** how the RSA primes, the PBKDF2 key-stretching (as a node graph) and the SHA-256 rounds (as a
     matrix) produce every key.
@@ -93,7 +99,8 @@ uv sync
 uv run scripts/download.py
 ```
 
-The download script fetches MNIST, SMS spam, German Credit, symptom diagnosis and price data. The human-vs-AI
+The download script fetches MNIST, EMNIST (balanced split, ~560 MB archive), SMS spam, German Credit, symptom
+diagnosis and price data. The human-vs-AI
 dataset must be added by hand: download it from
 https://www.kaggle.com/datasets/shanegerami/ai-vs-human-text and place `AI_Human.csv` in
 `data/raw/human_vs_ai_text/`.

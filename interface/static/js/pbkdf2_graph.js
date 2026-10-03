@@ -1,4 +1,5 @@
-// Node graph with animated data flow, used for PBKDF2 (key_setup_steps.js).
+// Node graph with animated data flow: PBKDF2 (Key Setup), the CKKS pipeline (Encryption), AES-GCM counter
+// mode (Transport); split_view.js shows it next to the node a step is about.
 // Nodes are HTML boxes placed on a CSS grid; edges are SVG curves drawn
 // behind them from the nodes' laid-out offsets (redrawn on resize, so it
 // survives zoom transforms and phone widths). A glowing "packet" travels
@@ -6,12 +7,11 @@
 //
 // renderPbkdf2Graph(containerEl, graph, options) -> Promise (flow finished)
 //   graph   = { cols, rows, nodes: [{id, col, row, title, value, full}],
-//               edges: [{from, to, label}] }       // label -> SVG <title>
+//               edges: [{from, to, label}] }       // label -> hover popup on the edge
 //   options = { lit: [nodeIds lit before the flow starts],
-//               focus: nodeId,                       // the node being explained
+//               focus: nodeId or [nodeIds],          // the node(s) being explained
 //               flow: [[ "from>to", ... ], ...],     // stages, animated in order
 //               skipAnimation: bool }                // jump to the end state
-// Node lookup for sub_zoom.js: containerEl.querySelector('[data-node="id"]').
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function pbkdf2EdgeMs() {
@@ -39,32 +39,38 @@ function renderPbkdf2Graph(containerEl, graph, options) {
         el.dataset.node = n.id;
         el.style.gridColumn = String(n.col + 1);
         el.style.gridRow = String(n.row + 1);
-        el.title = n.full || n.value || "";
+        el.dataset.full = n.full || n.value || "";
         el.innerHTML = `<div class="pg-node-title">${escapeHtml(n.title)}</div><div class="pg-node-value">${escapeHtml(n.value || "")}</div>`;
         wrap.appendChild(el);
         nodeEls[n.id] = el;
     });
+    // Hover a box: its full value (the box itself shows a shortened one).
+    attachFormulaHover(wrap, ".pg-node", (el) => (el.dataset.full ? { note: `${el.querySelector(".pg-node-title").textContent}: ${el.dataset.full}` } : null));
     const lit = new Set(o.lit || []);
+    const focus = new Set([].concat(o.focus || []));
+    attachFormulaHover(svg, ".pg-edge-hit", (h) => ({ note: h.dataset.label }));
     const flowStages = o.skipAnimation ? [] : (o.flow || []);
     if (o.skipAnimation) (o.flow || []).flat().forEach((k) => lit.add(k.split(">")[1]));
     const pending = new Set(flowStages.flat());
 
-    const edgeEls = {};
+    const edgeEls = {}, hitEls = {};
     graph.edges.forEach((e) => {
         const key = `${e.from}>${e.to}`;
         const path = document.createElementNS(SVG_NS, "path");
         path.setAttribute("class", "pg-edge" + (lit.has(e.from) && lit.has(e.to) && !pending.has(key) ? " lit" : ""));
-        if (e.label) {
-            const t = document.createElementNS(SVG_NS, "title");
-            t.textContent = e.label;
-            path.appendChild(t);
-        }
         svg.appendChild(path);
         edgeEls[key] = path;
+        if (e.label) { // a wide invisible twin of the edge catches the hover (cell_formula.js popup, no native tooltip)
+            const hit = document.createElementNS(SVG_NS, "path");
+            hit.setAttribute("class", "pg-edge-hit");
+            hit.dataset.label = `${e.from} → ${e.to}: ${e.label}`;
+            svg.appendChild(hit);
+            hitEls[key] = hit;
+        }
     });
     const refreshNodes = () => graph.nodes.forEach((n) => {
         nodeEls[n.id].classList.toggle("lit", lit.has(n.id));
-        nodeEls[n.id].classList.toggle("focus", n.id === o.focus);
+        nodeEls[n.id].classList.toggle("focus", focus.has(n.id));
     });
     refreshNodes();
     scroll.appendChild(wrap);
@@ -92,6 +98,7 @@ function renderPbkdf2Graph(containerEl, graph, options) {
                 d = `M${ax},${y1} C${ax},${y1 + m} ${bx},${y2 - m} ${bx},${y2}`;
             }
             edgeEls[`${e.from}>${e.to}`].setAttribute("d", d);
+            if (hitEls[`${e.from}>${e.to}`]) hitEls[`${e.from}>${e.to}`].setAttribute("d", d);
         });
     }
     const ro = new ResizeObserver(() => {

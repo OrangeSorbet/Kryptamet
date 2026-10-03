@@ -5,9 +5,13 @@ RAW_PATH = "data/raw/price_data.csv"
 FEATURES = ["Open", "High", "Low", "Volume"]
 
 
-def load():
+def load_frame():
     df = pd.read_csv(RAW_PATH, parse_dates=["Date"])
-    df = df.sort_values("Date").reset_index(drop=True)
+    return df.sort_values("Date").reset_index(drop=True)
+
+
+def load():
+    df = load_frame()
     X = df[FEATURES].values
     y = df["Close"].values
     return X, y

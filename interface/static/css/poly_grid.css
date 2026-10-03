@@ -1,6 +1,7 @@
 .poly-grid-host {
     width: 100%;
     max-width: 960px;
+    margin: 0 auto;
 }
 
 .poly-grid-scroll {
@@ -45,23 +46,6 @@
     color: white;
 }
 
-/* Floating equation for the cell currently being revealed (poly_grid.js
-   positions it next to that cell). */
-.poly-eq-overlay {
-    position: absolute;
-    z-index: 5;
-    display: none;
-    max-width: min(420px, 90%);
-    padding: 6px 10px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-warning);
-    border-radius: 6px;
-    color: var(--color-warning);
-    font-size: 13px;
-    white-space: nowrap;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-    pointer-events: none;
-}
 
 .poly-label {
     text-align: center;
@@ -75,9 +59,13 @@
 .grid-pair {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 1rem;
     width: 100%;
 }
+
+/* Each grid of the pair is as wide as a single grid and centred under its label. */
+.grid-pair > div { width: 100%; max-width: 960px; }
 
 /* Phone: 16 readable columns don't fit, so the grid scrolls sideways
    instead of crushing every cell to a few pixels. */
@@ -85,3 +73,5 @@
     .poly-grid-scroll { overflow-x: auto; }
     .poly-grid { min-width: 800px; }
 }
+
+.poly-cell:hover { box-shadow: inset 0 0 0 1px var(--color-warning); }

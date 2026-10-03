@@ -22,7 +22,7 @@ const scrubberIcon = (name) => `<svg width="12" height="12" viewBox="0 0 24 24" 
 const EXPLANATION_CELLS = [
     { key: "what", title: "What happened", short: "What" },
     { key: "why", title: "Why", short: "Why" },
-    { key: "formal", title: "Formal notation", short: "Formal", mono: true },
+    { key: "formal", title: "Formal notation", eli5Title: "In one line", short: "Formal", mono: true },
     { key: "next", title: "What's next", short: "Next" },
 ];
 
@@ -35,11 +35,11 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
 
     containerEl.innerHTML = `
         <div class="scrubber-controls">
-            <button class="scrubber-btn" data-act="play" type="button" title="Play/pause (Space)">${scrubberIcon("play")}</button>
-            <button class="scrubber-btn" data-act="prev" type="button" title="Previous step (&larr;)">${scrubberIcon("prev")}</button>
+            <button class="scrubber-btn" data-act="play" type="button" aria-label="Play/pause (Space)">${scrubberIcon("play")}</button>
+            <button class="scrubber-btn" data-act="prev" type="button" aria-label="Previous step (&larr;)">${scrubberIcon("prev")}</button>
             <span class="scrubber-counter"></span>
-            <button class="scrubber-btn" data-act="next" type="button" title="Next step (&rarr;)">${scrubberIcon("next")}</button>
-            <button class="scrubber-btn" data-act="restart" type="button" title="Restart chapter and replay its animation">${scrubberIcon("restart")}</button>
+            <button class="scrubber-btn" data-act="next" type="button" aria-label="Next step (&rarr;)">${scrubberIcon("next")}</button>
+            <button class="scrubber-btn" data-act="restart" type="button" aria-label="Restart chapter and replay its animation">${scrubberIcon("restart")}</button>
             <div class="scrubber-speed-slot"></div>
             <span class="scrubber-meta"></span>
         </div>
@@ -65,12 +65,14 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
     const textEls = {};
     EXPLANATION_CELLS.forEach((c) => { textEls[c.key] = q(`.explanation-cell[data-key="${c.key}"] .explanation-text`); });
     q(".scrubber-meta").textContent = meta || "";
+    const nums = stepNumbers(steps);
 
     createSpeedDial(q(".scrubber-speed-slot"));
     const slider = createStepSlider(q(".scrubber-slider-slot"), {
         total: steps.length,
         current: 0,
         chapters: chapters || [],
+        labels: nums,
         onSeek: (i) => { stop(); seek(i); },
     });
 
@@ -106,16 +108,25 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
         });
     }
 
+    // The four explanation cells at the current level (explain_level.js); re-run when the level changes.
+    function renderText(step) {
+        const seen = new Set(), eli5 = window.explainLevel === "eli5";
+        EXPLANATION_CELLS.forEach((c) => {
+            const el = textEls[c.key];
+            el.innerHTML = linkGlossaryTerms(levelText(step, c.key) || "", seen);
+            el.classList.toggle("explanation-mono", !!c.mono && !(eli5 && step.eli5));
+            el.previousElementSibling.textContent = eli5 && c.eli5Title && step.eli5 ? c.eli5Title : c.title;
+        });
+    }
+    const onLevel = () => renderText(steps[index] || {});
+    document.addEventListener("explainlevel", onLevel);
+
     function render() {
         const step = steps[index] || {};
-        counter.textContent = `Step ${steps.length ? index + 1 : 0} / ${steps.length}`;
-        const seen = new Set();
-        EXPLANATION_CELLS.forEach((c) => {
-            const text = step[c.key] || "";
-            const el = textEls[c.key];
-            el.innerHTML = linkGlossaryTerms(text, seen);
-            el.parentElement.title = text; // full text on hover when the cell clamps
-        });
+        // Graph-ordered number (7.3) plus the plain position among all of the chapter's steps.
+        counter.textContent = steps.length ? `Step ${nums[index]} · ${index + 1}/${steps.length}` : "Step 0";
+        counter.dataset.total = String(steps.length); // every step incl. sub-steps (tests read this)
+        renderText(step);
         grid.classList.remove("step-fade-in");
         void grid.offsetWidth; // restart the fade animation
         grid.classList.add("step-fade-in");
@@ -123,7 +134,7 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
         prevBtn.disabled = index <= 0;
         nextBtn.disabled = atEnd && !onEnd;
         nextBtn.classList.toggle("scrubber-next-chapter", atEnd && !!onEnd);
-        nextBtn.title = atEnd && onEnd ? `Next chapter${nextLabel ? `: ${nextLabel}` : ""} (→)` : "Next step (→)";
+        nextBtn.ariaLabel = atEnd && onEnd ? `Next chapter${nextLabel ? `: ${nextLabel}` : ""} (→)` : "Next step (→)";
         slider.update(index);
     }
 
@@ -179,6 +190,13 @@ function createScrubber(containerEl, { steps, chapters, meta, onStepChange, onRe
         restart,
         seek: (i) => { stop(); return seek(i); },
         getIndex: () => index,
-        destroy: () => { stop(); document.removeEventListener("keydown", onKey); },
+        destroy: () => { stop(); document.removeEventListener("keydown", onKey); document.removeEventListener("explainlevel", onLevel); },
     };
+}
+
+// Step numbers that follow a chapter's graphs: a step marked `sub` belongs to the graph step before it,
+// so "PBKDF2" is step 7 and its nodes are 7.1, 7.2, ... (split_view.js marks them).
+function stepNumbers(steps) {
+    let top = 0, sub = 0;
+    return steps.map((s) => (s.sub ? `${top}.${++sub}` : String((sub = 0, ++top))));
 }

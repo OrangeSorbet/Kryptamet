@@ -3,10 +3,10 @@
 // dial (window.gridSpeed). Separate from the Scrubber, which moves whole steps.
 function createGridControls(barEl, ctrl) {
     barEl.innerHTML = `
-        <button class="scrubber-btn" data-g="play" type="button" title="Play/pause this grid">${scrubberIcon("pause")}</button>
-        <button class="scrubber-btn" data-g="prev" type="button" title="Previous cell">${scrubberIcon("prev")}</button>
-        <button class="scrubber-btn" data-g="next" type="button" title="Next cell">${scrubberIcon("next")}</button>
-        <button class="scrubber-btn" data-g="restart" type="button" title="Replay this grid">${scrubberIcon("restart")}</button>
+        <button class="scrubber-btn" data-g="play" type="button" aria-label="Play/pause this grid">${scrubberIcon("pause")}</button>
+        <button class="scrubber-btn" data-g="prev" type="button" aria-label="Previous cell">${scrubberIcon("prev")}</button>
+        <button class="scrubber-btn" data-g="next" type="button" aria-label="Next cell">${scrubberIcon("next")}</button>
+        <button class="scrubber-btn" data-g="restart" type="button" aria-label="Replay this grid">${scrubberIcon("restart")}</button>
         <div class="grid-ctl-speed"></div>
         <span class="grid-ctl-pos"></span>`;
     const btn = (g) => barEl.querySelector(`[data-g="${g}"]`);

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd /c/Users/ashvi/Documents/VS_Codes/Apps/Kryptamet; python - <<'EOF'\\ndef edit(p, pairs):\\n    s=open(p,encoding='utf-8').read()\\n    for a,b in pairs:\\n        assert a in s,(p,a); s=s.r...",
+  "error": "Exit code 1\nTraceback (most recent call last):\r\n  File \"<stdin>\", line 17, in <module>\r\n  File \"<stdin>\", line 4, in edit\r\nAssertionError: ('inference/model_registry.py', '\"real test row, then change anything')\r\nTraceback (most recent call last):\r\n  File \"<string>\", line 3, in <module>\r\n    r=get_model('price_data')['samples']()['rows'][0]; print(r['label_name'], r['input'], {k:(v[-2:] if isinstance(v,list) else v) for k,v in r['history'].items()})\r\n                                              ...",
+  "timestamp": "2026-10-03T05:12:10.059Z",
+  "retry_count": 1
+}

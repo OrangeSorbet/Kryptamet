@@ -12,16 +12,16 @@ from inference.he_infer import TERM_STEPS, run_two_party_pipeline
 
 HUMAN_FEATURES = ["word_count", "char_count", "avg_word_length", "sentence_count", "avg_sentence_length",
                   "lexical_diversity", "punctuation_ratio", "uppercase_ratio"]
-KEYS_ORDER = ["ckks_keygen", "rsa_keygen_server", "rsa_keygen_client", "passphrase", "pbkdf2",
+KEYS_ORDER = ["ckks_keygen", "rsa_keygen_client", "rsa_keygen_server", "passphrase", "pbkdf2",
               "load_plaintext", "ckks_encrypt", "leg1_wrap", "leg1_unwrap", "compute_overview",
               "compute_general_form"]
 TAIL_ORDER = ["zero_terms", "add_bias", "leg2_session_key", "leg2_wrap", "leg2_unwrap", "ckks_decrypt"]
-PARTY = {"ckks_keygen": "server", "rsa_keygen_server": "server", "rsa_keygen_client": "client",
-         "passphrase": "server", "pbkdf2": "server", "load_plaintext": "server", "ckks_encrypt": "server",
-         "leg1_wrap": "server", "leg1_unwrap": "client", "compute_overview": "client",
-         "compute_general_form": "client", "weight_multiply": "client", "smaller_terms": "client", "zero_terms": "client",
-         "add_bias": "client", "leg2_session_key": "client", "leg2_wrap": "client", "leg2_unwrap": "server",
-         "ckks_decrypt": "server"}
+PARTY = {"ckks_keygen": "client", "rsa_keygen_client": "client", "rsa_keygen_server": "server",
+         "passphrase": "client", "pbkdf2": "client", "load_plaintext": "client", "ckks_encrypt": "client",
+         "leg1_wrap": "client", "leg1_unwrap": "server", "compute_overview": "server",
+         "compute_general_form": "server", "weight_multiply": "server", "smaller_terms": "server", "zero_terms": "server",
+         "add_bias": "server", "leg2_session_key": "server", "leg2_wrap": "server", "leg2_unwrap": "client",
+         "ckks_decrypt": "client"}
 
 
 def _load(name):
@@ -120,8 +120,40 @@ def main():
     # More than TERM_STEPS non-zero inputs: the rest collapse into one smaller_terms event.
     x = np.where(X_test[1] > 0, 1.0, 0.0) if np.count_nonzero(X_test[1]) > TERM_STEPS else np.ones(len(feature_names))
     _check("symptom_diagnosis (dense)", sd["model"], x, feature_names, class_names)
+
+    check_multi_character()
     print("ALL PASS")
 
+
+def check_multi_character():
+    """A 5-character drawing ("hello", real EMNIST test images) through /api/infer: every character gets its
+    own complete traced run; every decrypted class equals the plaintext model's. Then the same images read
+    as digits only."""
+    from interface.app import app
+    from inference.model_registry import get_model
+    m = get_model("emnist_logreg")
+    images = m["samples"]()["rows"][-1]["input"]["images"]
+    client = app.test_client()
+    t0 = time.perf_counter()
+    r = client.post("/api/infer", json={"model": "emnist_logreg", "input": {"images": images}}).get_json()
+    runs = [r, *r["char_runs"]]
+    assert len(runs) == 5 and [x["char_index"] for x in runs] == [0, 1, 2, 3, 4]
+    W, b = m["weights"]()
+    for k, run in enumerate(runs):
+        x = m["featurize"]({"images": [images[k]]})["x"]
+        assert run["char_input"]["images"] == [images[k]] and np.allclose(run["x"], x)
+        assert run["he_pred"] == run["plain_pred"] == m["plain_predict"](x), (k, run["he_pred"], run["plain_pred"])
+        assert run["events"] and run["characters"] == r["characters"]
+        assert len({run["passphrase"] for run in runs}) == 5  # no passphrase given: each run drew its own
+    reads = "".join(c["he_label"] for c in r["characters"])
+    print(f"emnist 'hello' via /api/infer: reads {reads!r}, 5 traced runs in {time.perf_counter() - t0:.1f}s")
+
+    r = client.post("/api/infer", json={"model": "emnist_logreg", "input": {"images": images, "charset": "digits"},
+                                       "passphrase": "same for all"}).get_json()
+    runs = [r, *r["char_runs"]]
+    assert all(c["he_pred"] < 10 and c["match"] for c in r["characters"])
+    assert {run["passphrase"] for run in runs} == {"same for all"}
+    print(f"emnist 'hello' read as digits: {''.join(c['he_label'] for c in r['characters'])!r}")
 
 if __name__ == "__main__":
     main()

@@ -14,13 +14,23 @@ from sklearn.model_selection import train_test_split
 from data.features import mnist as mnist_features
 from data.features import symptoms as symptom_features
 from data.features import tabular, text_stylometric, tfidf
-from data.loaders import german_credit, mnist, price_data, symptom_diagnosis
+from data.loaders import emnist, german_credit, mnist, price_data, symptom_diagnosis
 
 SAVE_DIR = "models/saved"
 MAX_TEXT_CHARS = 10_000
 N_TABULAR_SAMPLES = 8
+PRICE_HISTORY_DAYS = 20  # closes shown before each Price direction case (input panel line chart)
 N_SYMPTOM_SAMPLES = 5
-N_IMAGE_SAMPLES = 8
+MAX_CHARS = 8  # characters per drawing; each is one 784-pixel image and one encrypted inference
+# Class order of emnist_logreg = emnist-balanced-mapping.txt (checked by tests.test_model_registry).
+EMNIST_CLASS_NAMES = list("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabdefghnqrt")
+# How each dataset framed its characters inside 28x28 (box size and centring measured on the test sets):
+# the drawing strip (digit_canvas.js renderGlyph) re-renders every drawn character this way before it is
+# sent. pen (stroke width / box) and blur were calibrated by re-drawing 600 real test characters from their
+# centre lines and keeping the best setting; on 600 held-out ones, re-drawn MNIST digits score 0.955 (real
+# images 0.940) and re-drawn EMNIST characters 0.577 (real 0.703).
+MNIST_FRAMING = {"box": 20, "center": "mass", "pen": 0.10, "blur": 0.3}
+EMNIST_FRAMING = {"box": 24, "center": "box", "pen": 0.12, "blur": 0}
 
 # Categories of Training.csv's `prognosis`, i.e. the order symptom_diagnosis.load() label-encodes them
 # (tests/test_model_registry.py asserts this still matches the data).
@@ -122,6 +132,33 @@ def _symptom_list(inp, names):
     return present
 
 
+def _images(inp):
+    """{"images": [784 ints, ...]} (one per character, 1..MAX_CHARS) or the single-image {"pixels": [...]}."""
+    d = _as_dict(inp)
+    imgs = d.get("images") if "images" in d else [d.get("pixels")]
+    if not isinstance(imgs, list) or not 1 <= len(imgs) <= MAX_CHARS:
+        raise ValueError(f"images must be a list of 1..{MAX_CHARS} images")
+    return [_pixels({"pixels": px}) for px in imgs]
+
+
+CHARSETS = {"all": None, "digits": str.isdigit, "letters": str.isalpha}
+
+
+def _image_featurize(class_names):
+    """The first image's features (/api/infer featurizes each drawn character on its own).
+    Optional "charset" ("all" / "digits" / "letters") limits which classes a prediction may be."""
+    def featurize(inp):
+        imgs = _images(inp)
+        charset = _as_dict(inp).get("charset", "all")
+        if charset not in CHARSETS:
+            raise ValueError(f"charset must be one of {sorted(CHARSETS)}")
+        feats = mnist_features.featurize(imgs[0])
+        keep = CHARSETS[charset]
+        feats["allowed"] = None if keep is None else [i for i, c in enumerate(class_names) if keep(c)]
+        return feats
+    return featurize
+
+
 def _pixels(inp):
     px = _as_dict(inp).get("pixels")
     if not isinstance(px, list) or len(px) != 784:
@@ -144,9 +181,12 @@ def _german():
     fields = []
     for c in X.columns:
         if c in cats:
-            fields.append({"name": c, "type": "categorical", "codes": sorted(X[c].unique().tolist())})
+            codes = sorted(X[c].unique().tolist(), key=lambda a: int(a[1:]))
+            fields.append({"name": c, "type": "categorical", "codes": codes, "doc": german_credit.FIELD_DOCS[c],
+                           "meanings": {a: german_credit.CODE_MEANINGS[a] for a in codes}})
         else:
-            fields.append({"name": c, "type": "numeric", "min": float(X[c].min()), "max": float(X[c].max())})
+            fields.append({"name": c, "type": "numeric", "min": float(X[c].min()), "max": float(X[c].max()),
+                           "doc": german_credit.FIELD_DOCS[c]})
     return X, y, cats, fields
 
 
@@ -165,16 +205,16 @@ def _german_samples(class_names):
     _, test_idx = train_test_split(np.arange(len(y)), test_size=0.2, random_state=42)
     rows = [_labeled({"row": {k: (v.item() if hasattr(v, "item") else v) for k, v in X.iloc[i].items()}},
                      y[i], class_names) for i in test_idx[:N_TABULAR_SAMPLES]]
-    return {"fields": fields, "rows": rows,
-            "note": "UCI A-codes as stored in german_credit.data; no code meanings ship in data/raw."}
+    return {"fields": fields, "rows": rows}
 
 
 @functools.lru_cache(maxsize=None)
 def _price():
-    X, close = price_data.load()
+    df = price_data.load_frame()
+    X, close = df[price_data.FEATURES].values, df["Close"].values
     fields = [{"name": n, "type": "numeric", "min": float(X[:, j].min()), "max": float(X[:, j].max())}
               for j, n in enumerate(price_data.FEATURES)]
-    return X, price_data.direction(close), fields
+    return X, price_data.direction(close), fields, close, df["Date"].dt.strftime("%Y-%m-%d").tolist()
 
 
 def _price_featurize(inp):
@@ -186,12 +226,18 @@ def _price_featurize(inp):
 
 def _price_samples(class_names):
     try:
-        X, y, fields = _price()
+        X, y, fields, close, dates = _price()
     except OSError as exc:
         return _missing_data(exc)
     _, test_idx = train_test_split(np.arange(len(y)), test_size=0.2, shuffle=False)
-    rows = [_labeled({"row": {n: float(X[i, j]) for j, n in enumerate(price_data.FEATURES)}}, y[i], class_names)
-            for i in test_idx[:N_TABULAR_SAMPLES]]
+    rows = []
+    for i in test_idx[:N_TABULAR_SAMPLES]:
+        r = _labeled({"row": {n: float(X[i, j]) for j, n in enumerate(price_data.FEATURES)}}, y[i], class_names)
+        lo = max(0, i - PRICE_HISTORY_DAYS)
+        # Real closes of the trading days before this one, and this day's own close (what the label is from).
+        r["history"] = {"dates": dates[lo:i], "close": [float(c) for c in close[lo:i]],
+                        "day": dates[i], "day_close": float(close[i])}
+        rows.append(r)
     return {"fields": fields, "rows": rows}
 
 
@@ -218,12 +264,22 @@ def _symptom_samples(class_names):
     return {"symptoms": names, "rows": rows}
 
 
-def _mnist_samples(class_names):
-    try:
-        X, y = mnist.load(split="test")
-    except OSError as exc:
-        return _missing_data(exc)
-    return {"rows": [_labeled({"pixels": X[i].tolist()}, y[i], class_names) for i in range(N_IMAGE_SAMPLES)]}
+def _word_samples(load, words, framing):
+    """Each sample word is made of real test-set images, the first test image of each character's class.
+    A letter with no class of its own (EMNIST balanced merges c/C, l/L, o/O, ...) uses its capital's class."""
+    def samples(class_names):
+        try:
+            X, y = load(split="test")
+        except OSError as exc:
+            return {**_missing_data(exc), "framing": framing}
+        rows = []
+        for word in words:
+            idx = [class_names.index(c if c in class_names else c.upper()) for c in word]
+            first = [int(np.flatnonzero(y == k)[0]) for k in idx]
+            rows.append({"input": {"images": [X[i].tolist() for i in first]}, "label": None, "label_name": word,
+                         "classes": "".join(class_names[k] for k in idx), "test_indices": first})
+        return {"rows": rows, "framing": framing, "max_chars": MAX_CHARS}
+    return samples
 
 
 def _text_samples(model_id):
@@ -276,8 +332,10 @@ MODELS = {e["id"]: e for e in [
            "Type a few sentences of English prose; the model only sees 8 style statistics of it, not the words."),
     _entry("german_credit", "German Credit -- 20 applicant attributes", "german_credit_logreg", "tabular",
            ["bad credit risk", "good credit risk"], _german_featurize, _german_samples,
-           "Fill in one loan applicant's 20 attributes as coded in the UCI German Credit data: numbers for "
-           "numeric fields, A-codes for categorical ones."),
+           "One real loan applicant from the UCI Statlog German Credit data (amounts in Deutsche Mark): start "
+           "from a test case and change anything. Dropdowns show each A-code's meaning from the dataset's "
+           "german.doc (the model receives the code, one-hot encoded); number boxes show the training range. "
+           "The model scores good vs bad credit risk."),
     _entry("price_data", "Price direction -- Open/High/Low/Volume", "price_data_logreg", "tabular",
            ["price goes down/flat", "price goes up"], _price_featurize, _price_samples,
            "Enter one trading day's Open, High and Low prices and its Volume; the model predicts whether that "
@@ -287,9 +345,17 @@ MODELS = {e["id"]: e for e in [
            "Pick the symptoms present from the 132 in the training table; every symptom you leave out counts "
            "as absent."),
     _entry("mnist_logreg", "MNIST digits -- 784 pixels", "mnist_logreg", "image",
-           [str(d) for d in range(10)],
-           lambda inp: mnist_features.featurize(_pixels(inp)), _mnist_samples,
-           "Draw one digit on the 28x28 grid: 784 grayscale pixels, 0 = empty background, 255 = full ink."),
+           [str(d) for d in range(10)], _image_featurize([str(d) for d in range(10)]), _word_samples(mnist.load, ["0", "123"], MNIST_FRAMING),
+           "Draw one or more digits in the strip, any size, with a gap between them. On run each one is cut out "
+           "and framed like MNIST (scaled to fit 20×20, centred by its centre of mass) into 28×28 = 784 grayscale "
+           "pixels, 0 = empty background, 255 = full ink; the framed images shown are exactly what is sent."),
+    _entry("emnist_logreg", "EMNIST handwriting -- digits + letters", "emnist_logreg", "image",
+           EMNIST_CLASS_NAMES, _image_featurize(EMNIST_CLASS_NAMES),
+           _word_samples(emnist.load, ["0", "123", "abcd", "hello"], EMNIST_FRAMING),
+           "Draw digits and letters in the strip, with a gap between characters. On run each one is cut out and "
+           "framed like EMNIST (scaled to fit 24×24, centred on its bounding box) into 784 pixels, 0 = empty "
+           "background, 255 = full ink; the framed images shown are exactly what is sent. 47 classes: EMNIST "
+           "merges look-alike cases, so c, i, j, k, l, m, o, p, s, u, v, w, x, y, z are read as capitals."),
 ]}
 
 

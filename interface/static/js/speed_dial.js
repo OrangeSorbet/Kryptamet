@@ -50,7 +50,7 @@ function createSpeedDial(containerEl, opts) {
         thumb.style.left = pct + "%";
         valueEl.textContent = `${v}/${SPEED_MAX}`;
         track.setAttribute("aria-valuenow", v);
-        btn.title = `${label}: ${v}/${SPEED_MAX}`;
+        btn.ariaLabel = `${label}: ${v}/${SPEED_MAX}`;
     }
 
     function set(v) {

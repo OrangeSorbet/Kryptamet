@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/overview.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tabular_input.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/price_chart.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/symptom_input.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/digit_canvas.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/flowchart.css') }}">
@@ -21,8 +22,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/grid_controls.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/byte_matrix.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pbkdf2_graph.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/sub_zoom.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/key_setup.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sequence_chart.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/transport.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/encryption.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/computation.css') }}">
@@ -45,7 +46,8 @@
         </div>
         <div class="navbar-run-info" id="navbarRunInfo"></div>
         <div class="navbar-controls">
-            <button id="flowchartHelpBtn" class="navbar-btn navbar-icon-btn" type="button" title="How to use this walkthrough" hidden>?</button>
+            <div id="levelSwitch" class="level-switch" role="group" aria-label="Explanation level"></div>
+            <button id="flowchartHelpBtn" class="navbar-btn navbar-icon-btn" type="button" aria-label="How to use this walkthrough" hidden>?</button>
             <button id="newInputBtn" class="navbar-btn" type="button" hidden>New input</button>
         </div>
     </nav>
@@ -57,8 +59,9 @@
             <div class="scene active" id="sceneContent"></div>
         </div>
         <div class="chapter-chrome">
-            <button id="backToFlowchartBtn" class="chrome-btn" type="button" title="Back to chapters (Esc)" hidden>&larr; Chapters</button>
-            <button id="chapterHelpBtn" class="chrome-btn chrome-icon-btn" type="button" title="What is this chapter? (theory primer)" hidden>?</button>
+            <button id="backToFlowchartBtn" class="chrome-btn" type="button" aria-label="Back to chapters (Esc)" hidden>&larr; Chapters</button>
+            <button id="chapterHelpBtn" class="chrome-btn chrome-icon-btn" type="button" aria-label="What is this chapter? (theory primer)" hidden>?</button>
+            <div id="charSwitch" class="char-switch" role="group" aria-label="Which drawn character the chapters show" hidden></div>
         </div>
         <div id="minimapContainer" hidden></div>
         <div id="scrubberDock" class="scrubber-dock" hidden></div>
@@ -67,11 +70,15 @@
     <script>window.BENCHMARKS = {{ benchmarks|tojson }};</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
     <script src="{{ url_for('static', filename='js/escape_html.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/explain_level.js') }}"></script>
     <script src="{{ url_for('static', filename='js/glossary.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pipeline_api.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cell_formula.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/reveal_controller.js') }}"></script>
     <script src="{{ url_for('static', filename='js/poly_grid.js') }}"></script>
     <script src="{{ url_for('static', filename='js/grid_controls.js') }}"></script>
     <script src="{{ url_for('static', filename='js/zoom_transition.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/scene_fit.js') }}"></script>
     <script src="{{ url_for('static', filename='js/step_slider.js') }}"></script>
     <script src="{{ url_for('static', filename='js/speed_dial.js') }}"></script>
     <script src="{{ url_for('static', filename='js/scrubber.js') }}"></script>
@@ -79,6 +86,8 @@
     <script src="{{ url_for('static', filename='js/chapter_intros.js') }}"></script>
     <script src="{{ url_for('static', filename='js/intro_card.js') }}"></script>
     <script src="{{ url_for('static', filename='js/text_input.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/price_chart.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/char_switch.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tabular_input.js') }}"></script>
     <script src="{{ url_for('static', filename='js/symptom_input.js') }}"></script>
     <script src="{{ url_for('static', filename='js/digit_canvas.js') }}"></script>
@@ -87,7 +96,8 @@
     <script src="{{ url_for('static', filename='js/scene_renderers.js') }}"></script>
     <script src="{{ url_for('static', filename='js/byte_matrix.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pbkdf2_graph.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/sub_zoom.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/split_view.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sequence_chart.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sha256_check.js') }}"></script>
     <script src="{{ url_for('static', filename='js/key_setup_steps.js') }}"></script>
     <script src="{{ url_for('static', filename='js/aes_check.js') }}"></script>

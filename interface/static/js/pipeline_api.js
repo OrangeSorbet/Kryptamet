@@ -19,7 +19,7 @@ async function postJson(url, body) {
     }
 }
 
-// `input` is the model's input object: {text} / {row} / {symptoms} / {pixels}
+// `input` is the model's input object: {text} / {row} / {symptoms} / {images}
 // (inference/model_registry.py validates it).
 async function runPipeline(model, input, passphrase) {
     const r = await postJson("/api/infer", { model, input, passphrase: passphrase || "" });
@@ -52,6 +52,7 @@ function inputSummary(result) {
     const cut = (t, n) => (t.length > n ? t.slice(0, n) + "…" : t);
     if (inp.text !== undefined) return `"${cut(inp.text, 48)}"`;
     if (inp.symptoms) return cut(`${inp.symptoms.length} symptoms: ${inp.symptoms.map(symptomLabel).join(", ")}`, 60);
+    if (inp.images) return `a drawing, ${inp.images.length} character${inp.images.length > 1 ? "s" : ""}`;
     if (inp.pixels) return `a drawn digit, ${inp.pixels.filter((v) => v > 0).length} inked pixels`;
     if (inp.row) return cut(Object.entries(inp.row).map(([k, v]) => `${k} ${typeof v === "number" ? Number(v.toPrecision(5)) : v}`).join(", "), 60);
     return "";

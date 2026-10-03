@@ -9,8 +9,11 @@
 /* A chapter's visual area leaves room for the docked scrubber below it. */
 #sceneContent.chapter-scene {
     justify-content: flex-start;
-    padding: 8.5rem 2rem 240px;
+    padding: 60px 2rem 240px;
 }
+
+/* scene_fit.js sets --fit so each step fills ~90% of the free area. */
+#sceneContent.chapter-scene > * { zoom: var(--fit, 1); }
 
 #sceneContent.chapter-scene > .scene-title { margin-top: auto; }
 #sceneContent.chapter-scene > :last-child { margin-bottom: auto; }
@@ -252,7 +255,7 @@
 }
 
 @media (max-width: 640px) {
-    #sceneContent.chapter-scene { padding: 7.5rem 0.75rem 250px; }
+    #sceneContent.chapter-scene { padding: 60px 0.75rem 250px; }
     .chapter-chrome { top: 62px; left: 8px; }
     .scrubber-dock { padding: 10px 12px 12px; }
     .scrubber-controls { gap: 6px; height: 34px; }
@@ -302,4 +305,10 @@
     color: var(--color-bg);
     background: var(--color-warning);
     border-color: var(--color-warning);
+}
+
+/* Big screens: larger explanation text (step_slider.js maps pointer x through the zoom). */
+@media (min-width: 1500px) and (min-height: 820px) {
+    .scrubber-dock { zoom: 1.15; }
+    #sceneContent.chapter-scene { padding-top: 44px; padding-bottom: 270px; }
 }

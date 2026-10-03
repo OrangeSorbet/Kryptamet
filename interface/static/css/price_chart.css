@@ -1,0 +1,20 @@
+/* Price direction case chart (interface/static/js/price_chart.js). */
+.tab-chart { margin: 0 0 0.6rem; }
+.price-chart { width: 100%; height: auto; display: block; flex: 0 1 auto; min-height: 0; max-height: 18vh; }
+.pc-axis { stroke: var(--color-border); stroke-width: 1; }
+.pc-line { fill: none; stroke: var(--color-primary-hover); stroke-width: 2; stroke-linejoin: round; }
+.pc-dot { fill: var(--color-primary-hover); }
+.pc-prev { stroke: var(--color-text-muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.6; }
+.pc-range { stroke: var(--color-warning); stroke-width: 3; stroke-linecap: round; }
+.pc-close { stroke: var(--color-bg); stroke-width: 1.5; }
+.pc-close.up { fill: var(--color-success); }
+.pc-close.down { fill: var(--color-error); }
+.pc-label, .pc-tag { font-family: var(--font-mono); font-size: 11px; fill: var(--color-text-muted); }
+.pc-tag, .pc-day { fill: var(--color-warning); }
+.pc-legend { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+.pc-key { display: inline-block; width: 12px; height: 3px; border-radius: 2px; }
+.pc-key.line { background: var(--color-primary-hover); }
+.pc-key.range { background: var(--color-warning); width: 3px; height: 12px; }
+.pc-key.close { width: 8px; height: 8px; border-radius: 50%; }
+.pc-key.close.up { background: var(--color-success); }
+.pc-key.close.down { background: var(--color-error); }

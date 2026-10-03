@@ -3,12 +3,13 @@ import tracemalloc
 import pickle
 import json
 import os
+import sys
 import numpy as np
 import torch
 from hecrypto.ckks_context import create_context
 from inference.he_infer import encrypted_linear_score
 from inference.he_cnn_infer import run_encrypted_cnn
-from data.loaders import sms_spam, german_credit, symptom_diagnosis, price_data, human_vs_ai_text, mnist
+from data.loaders import sms_spam, german_credit, symptom_diagnosis, price_data, human_vs_ai_text, mnist, emnist
 from data.features import text_stylometric
 from data.features import mnist as mnist_features
 from models.train.mnist_cnn_he import HECompatibleCNN
@@ -115,6 +116,26 @@ def _benchmark_mnist_cnn():
     }
 
 
+def _benchmark_emnist():
+    bundle = _load_pickle("emnist_logreg")
+    X, y = emnist.load(split="test")
+    X = mnist_features.normalize(X[:N_SAMPLES]).astype(float)
+    return _benchmark_model("emnist_logreg", X, bundle["model"])
+
+
+def run_one(name):
+    """Re-measures one model and replaces (or inserts before mnist_cnn_he) its row in results.json."""
+    runners = {"emnist_logreg": _benchmark_emnist}
+    row = runners[name]()
+    with open(OUT_PATH) as f:
+        results = [r for r in json.load(f) if r["model"] != name]
+    at = next((i for i, r in enumerate(results) if r["model"] == "mnist_cnn_he"), len(results))
+    results.insert(at, row)
+    with open(OUT_PATH, "w") as f:
+        json.dump(results, f, indent=2)
+    print(row)
+
+
 def run_all():
     results = []
 
@@ -147,6 +168,8 @@ def run_all():
     X = mnist_features.normalize(X[:N_SAMPLES]).astype(float)
     results.append(_benchmark_model("mnist_logreg", X, bundle["model"]))
 
+    results.append(_benchmark_emnist())
+
     results.append(_benchmark_mnist_cnn())
 
     os.makedirs("benchmarks", exist_ok=True)
@@ -160,4 +183,5 @@ def run_all():
 
 
 if __name__ == "__main__":
-    run_all()
+    # `python -m benchmarks.metrics` measures everything; `... metrics emnist_logreg` just that row.
+    run_one(sys.argv[1]) if len(sys.argv) > 1 else run_all()

@@ -3,7 +3,7 @@
 // { start, end, label } sub-groupings within the current chapter's steps
 // (e.g. Computation splits into "weight multiplies" / "bias" / "vectorized
 // compute" bands). The visible track is 4px; the hit area around it is 16px.
-function createStepSlider(containerEl, { total, current, chapters, onSeek }) {
+function createStepSlider(containerEl, { total, current, chapters, labels, onSeek }) {
     chapters = chapters || [];
     let shown = current;
     containerEl.innerHTML = `
@@ -58,8 +58,9 @@ function createStepSlider(containerEl, { total, current, chapters, onSeek }) {
         const idx = indexFromClientX(e.clientX);
         const chap = chapterAt(idx);
         tooltip.hidden = false;
-        tooltip.textContent = `Step ${idx + 1}` + (chap ? ` · ${chap.label}` : "");
-        tooltip.style.left = `${e.clientX - track.getBoundingClientRect().left}px`;
+        tooltip.textContent = `Step ${labels ? labels[idx] : idx + 1}` + (chap ? ` · ${chap.label}` : "");
+        const rect = track.getBoundingClientRect(); // visual px; the dock may be CSS-zoomed
+        tooltip.style.left = `${((e.clientX - rect.left) * track.offsetWidth) / rect.width}px`;
         if (e.buttons === 1) seekTo(idx);
     });
     hit.addEventListener("pointerleave", () => { tooltip.hidden = true; });

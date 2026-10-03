@@ -48,7 +48,7 @@
 }
 
 .overview .dropdown {
-    padding: 0.6rem 0.75rem;
+    padding: 0.6rem 0.75rem 0.6rem var(--dd-arrow-pad, 2.4rem);
     border-radius: 8px;
     font-size: var(--font-size-base);
 }
@@ -156,3 +156,27 @@
 /* Model help line and the input panel host (overview_form.js) */
 .overview-help { margin: 0.35rem 0 0; }
 .overview-panel { min-height: 4rem; }
+
+@media (min-width: 1500px) and (min-height: 820px) {
+    .overview { zoom: 1.1; }
+}
+@media (min-width: 1500px) and (min-height: 1000px) {
+    .overview { zoom: 1.2; }
+}
+
+/* One screen, no page scroll: the overview is capped at the scene's height and
+   only the panel's own list (fields, symptoms) shrinks and scrolls. */
+#sceneContent:not(.chapter-scene) > .overview { flex: 0 1 auto; min-height: 0; max-height: 100%; }
+.overview > * { flex-shrink: 0; }
+.overview > .overview-panel { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.overview-panel > * { flex-shrink: 0; }
+.overview-panel > .tab-grid,
+.overview-panel > .sym-chips { flex: 0 1 auto; min-height: 90px; max-height: none; }
+.overview-panel > .tab-chart { flex: 0 1 auto; min-height: 80px; display: flex; flex-direction: column; }
+.overview-eyebrow { display: none; }
+
+/* Phones: drop the eyebrow and lede so every panel fits one screen. */
+@media (max-width: 640px) {
+    .overview-lede { display: none; }
+    .overview-panel > .tab-grid, .overview-panel > .sym-chips { min-height: 70px; }
+}

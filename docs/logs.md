@@ -443,3 +443,296 @@
   - Desktop 1440×900: badges sms 138, human 123, german 149, price 115, symptom 116, mnist 151 = 792 checks ✓, 0 failed; no overflow, no console errors.
   - Phone 390×844: identical counts, 0 failed, no overflow, no console errors.
 - Phase 7 is complete. Phase 8 (GPU encrypted CNN) is gated on the user sending the second PC's config.
+
+## [Phase 7 polish] 2026-10-03 — styled dropdown, scrollbar, content fills big screens
+- User asked: native dropdown → styled, styled scrollbar, and less empty space (content ~50% of the screen; target 15–20% margin).
+- `css/components.css`:
+  - `.dropdown` uses `appearance: none` with an SVG chevron and hover border.
+  - Under `@supports (appearance: base-select)` (Chrome 135+; checked on Chrome 154) the open list is themed too: `::picker(select)` surface, olive hover/checked, gold ✓.
+  - Themed thin scrollbars (`::-webkit-scrollbar*`; `scrollbar-color` fallback for Firefox).
+- `overview.css` / `tabular_input.css`: dropdown right padding so text clears the arrow.
+- New `js/scene_fit.js` (`fitSceneContent`): after every step render, and again once it settles, scales the step's content via `--fit` → `zoom` on `#sceneContent.chapter-scene > *`.
+  - Target is 90% of the free height, cap 1.6×, scale-up only.
+  - Measured with layout offsets, so it is safe mid dolly-zoom.
+  - It backs off if anything overflows, and refits on resize.
+  - Hooked in `chapter_state.js` `onStepChange`; script tag in `scenes.html`.
+- `flowchart.js` `fit`: the chart now scales to 90% of the pane, up to 1.7× (was capped at 1×).
+- Wide screens (≥1500×820): `.scrubber-dock` zoom 1.15 (chapter padding adjusted), `.overview` zoom 1.2. `step_slider.js` tooltip x is mapped through the dock zoom.
+- Checked at 1880×920 (tmp/shots10.py, tmp/pick10.py): flowchart fills the pane; short steps (Key Setup bytes) scale ~1.6×; tall steps (Computation waterfall, Deep-Dive grid) stay at ~1× because they are height-bound; no console errors.
+
+## [Phase 7 polish] 2026-10-03 — input panels: German guide, own symptom case, MNIST framing, arrows, steppers
+- German Credit:
+  - `data/loaders/german_credit.py`: `FIELD_DOCS` + `CODE_MEANINGS`, from UCI Statlog german.doc.
+  - `inference/model_registry.py`: fields carry `doc` + `meanings`, codes sorted numerically; longer input_help and note.
+  - `tabular_input.js`: options read "A11 · < 0 DM", each field shows its description (+ training range).
+- Number fields: native spin buttons hidden. Custom ▲▼ chevron steppers (±1) in `tabular_input.js` / `tabular_input.css`.
+- Dropdown arrow moved to the far left in every dropdown. `components.css`: `::picker-icon { order: -1 }`; fallback background chevron on the left; `--dd-arrow-pad` for padding.
+- Symptoms (`symptom_input.js`):
+  - Case picker gains "My own case" (the default, starting empty).
+  - Toggling a chip switches back to it.
+  - New "Your symptoms" row of removable pills.
+- MNIST — finding (500 real test digits redrawn): the logreg scores 12% drawn big, 7% small in a corner, 20% off-centre. It predicted mostly "3" or "7" no matter the digit.
+  - New `mnistFrame` in `digit_canvas.js` (bbox → fit 20×20 bilinear → centre of mass to (14,14)) brings these to 93% / 89% / 93% (originals unchanged at 93%). Checked in Chrome (tmp/mnist_js.py).
+  - It is applied on run to hand drawings only; the canvas is redrawn with the framed pixels. A small "7" drawn in the top-left corner now gives 7 (encrypted result matches plaintext).
+- Docs: LIVE_UI_TRUTH.md limits section (re-framing, code-meaning source).
+
+## [Phase 7 polish] 2026-10-03 — navbar clearance, one-screen overview, price chart, case labels
+- Navbar overlap fixed at the root: `navbar.css` defines `--nav-clear` (76px; 60px on phones), and `.scene` uses `top: var(--nav-clear)`, so content and its scroll start below the bar. Scene paddings were reduced by the same amount (scenes, flowchart, chapter, phone, wide).
+- The overview fits one screen (`overview.css`):
+  - The overview is capped at the scene height.
+  - Only the panel's list (`.tab-grid`, `.sym-chips`, `.tab-chart`) shrinks and scrolls; eyebrow line removed.
+  - Overview zoom is 1.1 below 1000px of height (1.2 above).
+  - Phones drop the lede; the digit canvas is `min(280px, 34vh)` (`28vh` on phones).
+- The open dropdown list gets the themed thin scrollbar (`scrollbar-color` on `::picker(select)`).
+- German Credit: the note was folded into a shorter input_help.
+- Price direction:
+  - `price_data.load_frame()`; registry `_price` returns closes + dates.
+  - Each sample case carries `history` (20 previous real closes, dates, the day's real close).
+  - New `js/price_chart.js` + `css/price_chart.css`: a line of those closes, the day's Low–High bar + Open tick from the fields (redrawn on edit), and the real close dot (green above / red not above the prev close; labelled "not a model input").
+- Pickers read "case N" (Price shows the date), not "row N".
+- Checked (tmp/fit12.py), 6 models × 1880×920, 1440×900, 1366×768, 390×844: 24/24 OK, meaning no scene scroll, scene top ≥ navbar bottom, panel never overlaps the run button, no page errors.
+
+## [Phase 7 polish] 2026-10-03 — multi-character handwriting, EMNIST digits + letters
+- Data:
+  - `scripts/download.py` `download_emnist()` (idempotent) fetches NIST's official `gzip.zip` (562 MB) with a User-Agent header (NIST returns 403 to urllib's default) and keeps only the balanced split's 5 files in `data/raw/emnist/`.
+  - New `data/loaders/emnist.py` (transposes EMNIST back to MNIST orientation; `class_names()` from the mapping file).
+  - Measured on 3,000 test images: EMNIST characters fit a 24px box and are centred by bounding box (centre std 0.2px vs 1.3px for centre of mass); MNIST digits fit 20px and are centred by mass.
+- Model: new `models/train/emnist_logreg.py` (47 classes, 112,800 training images, LogisticRegression max_iter=300) gives train 0.7336, test 0.6882, 531 s; sklearn reports it not fully converged. Saved to `models/saved/emnist_logreg.pkl`.
+- Benchmarks: `benchmarks/metrics.py` gained an emnist_logreg row and `python -m benchmarks.metrics <model>` to re-measure one row. emnist_logreg: 5 samples, plaintext 0.027 s vs HE 10.5 s (390×), agreement 1.00.
+- Registry:
+  - Image input `{"images": [784 ints, ...]}` (1..`MAX_CHARS`=8; `{"pixels"}` still accepted).
+  - `_image_featurize` features character 1 fully, plus `extra_x` for the rest.
+  - Sample words are made of real test images (`_word_samples`): MNIST "0", "123"; EMNIST "0", "123", "abcd", "hello". Merged letters use their capital's class.
+  - Per-model `framing` (MNIST box 20 / mass; EMNIST box 24 / box).
+  - New `emnist_logreg` entry; merged help text.
+- Pipeline:
+  - `run_two_party_pipeline(..., extra_xs=)`: after character 1's traced run, every other character takes the same real path with the same keys, untraced (encrypt, wrap for the client, unwrap + compute on the public-only context, wrap back with a fresh AES key, unwrap + decrypt).
+  - The result gains `characters`; `/api/infer` returns them with labels and a match flag.
+- Frontend:
+  - `digit_canvas.js` rewritten: a drawing strip as wide as the panel, empty at first. `segmentStrip` splits at empty columns and `frameGlyph` frames each piece with the model's framing. A "sends" row shows the exact images; sample words sit in one row under the strip and are sent untouched.
+  - Feature chapter: character 1 of n.
+  - Result chapter: new first step "Your drawing reads …", one card per character (decrypted vs plaintext, Δ, which one is traced).
+  - Flowchart summaries and navbar summary updated.
+- Tests:
+  - `test_model_registry`: EMNIST mapping order, sample words are real test images of the right classes, invalid image lists rejected. ALL PASS.
+  - `test_two_party_pipeline`: "hello" reads "heLLO" (l/L, o/O merged), all 5 match plaintext, extra characters ~1.2 s each. ALL PASS.
+- Browser (tmp/hello13.py, fit12.py):
+  - EMNIST "hello" sample end to end gives "heLLO", 5/5 match.
+  - A hand-drawn "1" and "7" on the MNIST strip read "17", matching.
+  - Fit check 28/28 (7 models × 4 sizes), no page errors.
+
+## [Phase 7 polish] 2026-10-03 — drawing accuracy: vector strokes, calibrated rendering, "Read as" switch
+- User drew "01ab", which read "DLQb". Diagnosis on 18,800 real EMNIST test images:
+  - The model itself gets 0 right 67% of the time (mistakes O 88, D 13), 1 59% (I 75, L 63), a 60% (Q, 2, G), b 81%.
+  - My old pixel-brush framing cost 5 points on real images and fell to ~40% on thin strokes.
+- `digit_canvas.js` rewritten around vector strokes:
+  - Strokes with overlapping x-extents form one character (`groupStrokes`; an i-dot joins its stem).
+  - `renderGlyph` re-renders each character at 4× (112×112): pen = share of the box, one blur pass, exact 4×4 average down to 28×28, peak stretched to 255, MNIST centre-of-mass shift.
+  - Drawing after loading a sample starts a fresh strip.
+- Calibration (tmp/glyph_cal.py):
+  - 600 real test characters → skeleton of a 4× upscale (scikit-image, temp script only) → rendered by the browser's `renderGlyph`; best (pen, blur) on that half, reported on 600 held-out.
+  - MNIST: pen 0.10, blur 0.3 → 0.955 (real images 0.940).
+  - EMNIST: pen 0.12, blur 0 → 0.577 (real 0.703).
+  - Stored in the registry `*_FRAMING`.
+- "Read as" (EMNIST): digits + letters / digits / letters.
+  - Registry `charset` → `allowed` class indices.
+  - `run_two_party_pipeline(allowed=)`: all k scores are still computed and decrypted; argmax and softmax run over the allowed classes, server-side after decryption.
+  - `app.py` `_plain_pred` and the deep-dive row use the same rule.
+  - Effect on the real test set: 0 and 1 go from 67% / 59% to 97% read as digits.
+- Result steps 2–3 show the label (and "class #k") for multiclass models and say "Character 1" for multi-character drawings.
+- Tests: `test_model_registry` (bad charset rejected) and `test_two_party_pipeline` ("hello" read as digits = "10660", all digits, HE == plaintext) ALL PASS.
+- Full regression (before the vector rewrite), 7 models × desktop + phone: every chapter via Next, every proof badge ✓, no problems, no console errors.
+
+## [Phase 7 polish] 2026-10-03 — EMNIST retrained on real + drawn-style images; top-3 per character
+- All interface servers were stopped at the user's request. A test server ran only during browser checks and was stopped after.
+- `uv add --dev scikit-image` (0.26.0, dev group): centre lines for the re-drawing.
+- New `data/features/glyph_redraw.py`: a Python twin of `renderGlyph` (skeleton of a 4× upscale, anti-aliased round pen via distance transform, 4×4 average, peak → 255).
+  - Parity with the browser on 200 real test characters: mean |py − js| = 2.2/255, same prediction 92.5%.
+- `models/train/emnist_logreg.py`:
+  - Re-draws every train/test image once (cached as `data/raw/emnist/emnist-balanced-{train,test}-redrawn.npy`; train 265 s, test 55 s).
+  - Fits on real + re-drawn (225,600 images, same labels; augmentation derived from real data, not a synthetic dataset). `--evaluate` scores a saved model.
+  - Before (real only): real test 0.6882, re-drawn test 0.5687.
+  - After: train 0.7019, real test 0.6728, re-drawn test 0.6824 (fit 1031 s, not fully converged at max_iter=300).
+  - Kept, since `/live` input is drawn. The old model is saved at tmp/emnist_logreg_real_only.pkl.
+  - The real "hello" sample now reads "he66O" (was "heLLO").
+- Benchmarks: emnist_logreg row re-measured: 5 samples, plaintext 0.060 s, HE 28.6 s, agreement 1.00.
+  - It is ~4.7× MNIST's HE time (5.6 s now) because the benchmark encrypts once per class (47 vs 10). The first 10.5 s measurement was the outlier.
+- Result chapter: each character card shows its top-3 classes (softmax of its decrypted scores over the allowed classes).
+- Checked:
+  - Registry and pipeline tests ALL PASS.
+  - A mouse-drawn "01ab" (tmp/draw14.py) reads "01Qb" with top-3 0 56%/O 15%/D 12%; 1 39%/I 28%/L 26%; Q 56%/B 8%/a 7%; b 92%. Read as letters it gives "OIQb". No console errors.
+  - all10.py for mnist_logreg + emnist_logreg, desktop + phone: every chapter via Next, 152 checks ✓ each, no problems, no console errors.
+
+## [Phase 7B] 2026-10-03 — clarity pass planned (user review on human_vs_ai_text)
+- Asks:
+  - every matrix gets the hover formula (never clipped, no inner scroll box) and, if animated, the CKKS grid controls
+  - graphs inside chapters become a split screen (graph right with the current node highlighted, node content left), with steps numbered by the graph flow (N, N.1, N.2…) instead of the nested dolly zoom
+  - no native title tooltips except glossary words
+  - public-key grid alignment
+  - ELI5 / Advanced explanation levels switched in the navbar
+  - character switcher for MNIST / EMNIST
+- Question answered: the Encryption chapter's decryption round trip is a sanity check (the server decrypts its own fresh ciphertext to prove correctness and measure starting noise), not a protocol step; it becomes a ✓ in 7.11.
+- Added to docs/checklist.md as Phase 7B, milestones 7.10–7.14; plan file updated.
+
+## [Phase 7B · 7.10] 2026-10-03 — matrices everywhere behave the same
+- New `js/cell_formula.js`: formula popups are fixed-position elements on `<body>`, placed from the cell's screen rectangle, so scroll boxes, CSS zoom and overflow can't clip them.
+  - `attachFormulaHover` gives one shared hover popup; `createFormulaPop` gives a per-grid reveal popup.
+  - `clearFormulaPops()` runs on every step change and on chapter exit (`chapter_state.js`).
+  - Cause of the user's screenshot: the old per-grid overlay sat inside the byte row's scroll box, which grew a scrollbar and clipped it.
+- New `js/reveal_controller.js`: the CKKS grid's play / pause / step / restart engine made generic (`createRevealController`, `gridRevealDelay`; pace `window.gridSpeed`).
+  - `poly_grid.js` and `byte_matrix.js` rebuilt on it; `byte_matrix` still returns a Promise, so its 25 call sites are unchanged.
+  - Every animated matrix now has the same control bar: passphrase/salt bytes, K/ipad/opad, the SHA-256 schedule + 64 rounds (HMAC), the final key, AES key/schedule/J0/states/S-box/XOR, OAEP blocks, m(X) coefficients, c0/c1, the serialization header, the slot grid.
+- Hover formulas added where they were missing:
+  - CKKS poly grids (equation + exact value)
+  - the slot grid (`z_j = x_{j mod d}`)
+  - deep-dive slot tables (per-row meaning + exact value)
+  - digit pixels (`p_{r,c}` and `x_i = p/255`)
+  - U-chain (`U_i = HMAC(P, U_{i-1})`, `T_i = T_{i-1} ⊕ U_i`)
+  - symptom flags
+  - PBKDF2 graph boxes (full value)
+- Native `title` tooltips removed everywhere except glossary terms (23 attributes → `aria-label`; navbar run info, explanation cells, next button, speed dial).
+- Public-key grids centred (`.grid-pair` align-items centre, grids max 960 px, `margin: 0 auto`). The 64-row SHA-256 matrices keep their height cap (their popups are no longer clipped).
+- Browser check (tmp/m710.py, human_vs_ai_text, 1880×920):
+  - passphrase byte popup "P_7 = 0x72 / P[7] = 0x72 = 'r'" in view, no scrollbar
+  - slot grid has controls + hover
+  - public-key grids centred (centre 940 = scene centre)
+  - deep-dive slot hover; 0 non-glossary titles; no console errors
+
+## [Phase 7B · 7.11] 2026-10-03 — split screen for every graph inside a chapter
+- New `js/split_view.js` (`subStep(step, {graph, focus, lit, flow, caption})`): a step about one node of a chapter's graph is drawn split screen.
+  - left: the node's own content
+  - right: the whole graph, the node(s) highlighted (gold), the boxes reached so far lit, the edges into the node animated
+  - The step is marked `sub`.
+- Numbering follows the graph: `scrubber.js stepNumbers` makes the graph step N and its node steps N.1, N.2, …
+  - The counter reads "Step 7.3 · 10/17"; the step-slider tooltip uses the same labels.
+  - `data-total` on the counter carries the real step count (tests read it).
+- Key Setup:
+  - 1–6 keys/CKKS/RSA
+  - 7 PBKDF2 graph (moved before its nodes, as the user asked)
+  - 7.1 passphrase [P], 7.2 bytes + salt [P, salt], 7.3 K/ipad/opad [K, ipad, opad]
+  - 7.4 inner SHA-256 input [inner], 7.5 message schedule [inner], 7.6 64 rounds [inner]
+  - 7.7 outer hash → U₁ [outer] (now shows the inner digest and U₁ as matrices with formulas)
+  - 7.8 chain [chain, xor], 7.9 AES key [key]
+  - 8 every key
+  - The nested zoom is gone; the chain step's own small graph is gone (the split view's graph replaces it).
+- Encryption:
+  - 1 plaintext, 2 pipeline graph
+  - 2.1 slots, 2.2 ×Δ, 2.3 m(X), 2.4 RNS, 2.5 Enc_pk, 2.6 serialization, 2.7 ciphertext + SHA-256
+  - The decryption round-trip step was removed. It is now a labelled sanity check on 2.7 (two ✓: noise, decoded slots), not a protocol step.
+- Transport (both legs):
+  - 1 why seal, 2 counter-mode graph
+  - 2.1 key, 2.2 key schedule, 2.3 nonce/J₀/counter, 2.4 inside AES (no zoom), 2.5 14 rounds, 2.6 S-box, 2.7 keystream ⊕ payload → C₁
+  - 3 tag, 4 RSA-OAEP, 5 wire, 6 unwrap, 7 tamper
+  - "the RSA envelope (step 4)" text fixed.
+- `pbkdf2_graph.js`:
+  - `focus` takes several nodes
+  - edge labels are hover popups on a wide invisible hit path (the SVG `<title>` native tooltips are gone)
+- `sub_zoom.js` / `sub_zoom.css` deleted; breadcrumbs → `.graph-crumbs` in pbkdf2_graph.css.
+- Backend text: the client-RSA event's next_step now points at PBKDF2.
+- "Next:" texts carry the new numbers.
+- Browser check (tmp/m711.py, human_vs_ai_text, 1880×920):
+  - key: 1…7, 7.1[P], 7.2[salt,P], 7.3[K,ipad,opad], 7.4–7.6[inner], 7.7[outer], 7.8[chain,xor], 7.9[key], 8
+  - enc: 1, 2, 2.1[slots] … 2.7[sha]
+  - transport: 1, 2, 2.1[key], 2.2[key], 2.3[nonce,j0,ctr], 2.4–2.6[aes], 2.7[ks,xor,p,c], 3…7
+  - no failed checks, no console errors
+
+## [Phase 7B · 7.12] 2026-10-03 — ELI5 / Advanced explanations
+- New `js/explain_level.js`: a navbar switch "Explain: ELI5 | Advanced".
+  - Default ELI5 (the user said they didn't understand the Key Setup steps); remembered per browser as `kryptamet.level`.
+  - `levelText(step, key)` picks `step.eli5[key]` at ELI5. Switching fires `explainlevel`; the Scrubber re-renders its four cells (formal is titled "In one line" at ELI5, in normal type) and an open primer redraws.
+  - The navbar now sits above the primer backdrop (z-index 2100), so the switch works while a primer is open (found by the test).
+- Every step got a plain-words twin built from the real run's values:
+  - key_setup_steps (17)
+  - encryption_steps (9)
+  - transport_steps (15 blocks incl. both key-step variants)
+  - deep_dive_steps (12 blocks, the rotation one per round)
+  - computation_steps (`computeEli5` per event kind)
+  - scene_renderers: TF-IDF overview + per word; `featureEli5` for stylometric/tabular features; symptoms; digits; decryption, softmax, sigmoid; the reading step, the score and prediction compare; benchmarks
+- `chapter_intros.js` rewritten. Every primer has an `eli5` twin.
+  - Advanced text corrected for the two-party flow: Computation runs on the client, not the server; the secret key is the server's.
+  - Advanced text corrected for 7.11: split screen and numbered sub-steps instead of zoom; the round trip is a sanity check.
+- Check (tmp/m712.py, all 7 models): each chapter's steps rebuilt in the browser.
+  - sms 115, human 104, german 129, price 96, symptom 93, mnist 112, emnist 112 steps (761 in all); every step has non-empty eli5 what / why / formal / next: 0 missing.
+  - Switching changes the Scrubber text and cell title ("In one line" ↔ "Formal notation") and the primer text; no console errors.
+
+## [Phase 7B · 7.13] 2026-10-03 — character switcher (MNIST / EMNIST)
+- Backend (`interface/app.py`):
+  - New `_run(spec, feats, passphrase)`: one complete traced run.
+  - For image input, `/api/infer` featurizes and runs each drawn character on its own, with its own keys, ciphertexts, transport legs, events and checks. A typed passphrase is shared; otherwise each run draws its own.
+  - The response is run 1 + `char_runs` (runs 2..n). Every run carries `char_index`, `char_input` (its single image + charset), the full `input` and the shared `characters` summary.
+- The untraced shortcut was removed: `run_two_party_pipeline(extra_xs=)`, the pipeline's `characters` field, the registry's `extra_x`.
+- Frontend:
+  - New `js/char_switch.js`: chips (framed image + decrypted label) in the chapter chrome at the top left, also shown on the flowchart.
+  - `chapter_state.js` `selectCharacter(k)` saves and restores per-character done chapters, step positions, proof tallies, last-visited box and deep-dive (fetched with that character's `char_input` the first time). It rebuilds the flowchart or the open chapter in place.
+  - Navbar: "showing character k". Re-lock re-runs every character and returns to character 1.
+  - Texts: the Feature chapter says "Character k of n"; Result steps 2–3 say "Character k"; the reading step marks the shown character's card and explains every character has its own run. The Feature summary reads "character k of n · 784 pixels".
+- Tests:
+  - `test_two_party_pipeline.check_multi_character` now goes through `/api/infer` (Flask test client): "hello" gives 5 complete runs (char_index 0–4, own x, own events, 5 different random passphrases, every decrypted class = plaintext), 18.7 s.
+  - The digits-only run with a shared passphrase reads "10660".
+  - `test_model_registry` ALL PASS.
+- Browser (tmp/m713.py, EMNIST "123"):
+  - 3 chips; each character has a distinct run (own leg-1 payload hash, own passphrase) and its own deep-dive score (7.17 / 14.61 / 8.74)
+  - switching inside a chapter rebuilds it ("Character 3 of 3"); per-character step positions are restored
+  - the Result card marks the shown character; no console errors
+- Earlier full regression (7.10–7.12 code, desktop): all 7 models, every chapter via Next incl. the new sub-steps; proof badges sms 140, human 125, german 151, price 117, symptom 116, mnist 154, emnist 154 ✓; no problems, no console errors. The phone half was stopped for the 7.13 restart and is part of 7.14.
+
+## [Phase 7B · 7.14] 2026-10-03 — verification (in progress)
+- Python tests: all 9 files PASS.
+  - test_transport_roundtrip, test_pbkdf2_rsa_trace, test_aes_trace, test_ckks_encode_trace, test_ckks_math
+  - test_model_registry
+  - test_two_party_pipeline: "hello" via /api/infer = 5 traced runs in 16.6 s
+  - test_he_inference
+  - test_he_cnn_inference: HE 3/3 = plain 3/3, 217 s
+- README: seven live models, EMNIST + multi-character handwriting, ELI5/Advanced, per-matrix controls + hover formulas, split-screen graphs; the download script now fetches EMNIST.
+- New regression script tmp/all14.py:
+  - LEVEL=eli5|advanced checks every step's cell title and non-empty explanation at that level
+  - EMNIST "123" is walked through every chapter once per character via the chips
+- The temporary test server was stopped by Claude Code (system low on memory). The browser regression is pending until the user allows a restart.
+
+## [Phase 7B · 7.15] 2026-10-03 — roles swapped to the standard naming + send/receive chart
+- User: the end user is the client (types the input, holds the CKKS secret key, decrypts the answer); the server computes. The app had them the other way round (as named when Phase 7 was planned). User also asked for a TCP-style send/receive chart instead of the 3-column "Who holds which key".
+- Answered: CKKS encryption uses the public key (the secret key only decrypts). Both the RSA-wrapped AES key and the AES-encrypted CKKS ciphertext travel in the open, which is safe: the AES key needs the recipient's RSA private key, and the inner layer stays CKKS-locked.
+- Role swap (tmp/swap715.py): a two-way word swap server ↔ client (also as `_`-parts of identifiers, event names `rsa_keygen_client/_server`, the leg AAD strings) in every file that shares those names.
+  - Files: inference/he_infer.py, 13 JS files, the docs; 328 + 29 words.
+  - JS `clientX/clientWidth` and the Flask web-server messages in pipeline_api.js were left alone.
+  - The test tables (KEYS_ORDER, PARTY) were swapped the same way.
+- Fixed by hand after the swap:
+  - two legacy lines that already meant the compute side ("the server that computed it never saw your real data", "the server only ever computed the linear part")
+  - the (S)/(C) subscripts in two Key Setup formulas
+  - ELI5 phrasing ("The client is you: it owns the data")
+  - labels "Client (you, the data owner)" / "Server (compute node)"
+- New `js/sequence_chart.js` + `css/sequence_chart.css`: the protocol as a sequence diagram built from the run's events.
+  - Client (you) and Server (compute node) lifelines, time running down.
+  - Messages: CKKS public context (33.7 MB), client RSA public key, server RSA public key, leg 1 (RSA-OAEP(AES key) 256 B + nonce + AES-GCM(Enc(x)) + tag), leg 2 (… Enc(score) …).
+  - What each side holds after each message; label and size above each sloped arrow; text halos.
+  - Key Setup step 1 is now "Who sends what, and who keeps what" (key exchange highlighted, secrets listed under the chart).
+  - Transport step 1 shows the envelope layers and the chart side by side, that leg highlighted.
+  - Dead party-grid code and CSS removed.
+- Tests: test_two_party_pipeline ALL PASS (event order + party per event under the new names, "hello" 5 traced runs, digits-only "10660"); test_pbkdf2_rsa_trace PASS.
+- Browser (tmp/m715.py):
+  - flowchart reads "… Transport → server | Computation | Transport ← client …"
+  - titles read "Transport leg 1: Client (you) → Server (compute node)"
+  - the charts highlight 3 / 1 / 1 messages; no console errors
+- Follow-up (user restated the flow in X / Y / Z terms: X = CKKS(text), Y = AES(X), Z = RSA_server-public(AES key), send Y + Z; the server opens Z → AES key → X, computes, sends Y′ + Z′ back; the client opens Z′ → Y′ → X′ → CKKS secret → result).
+  - This is exactly the implemented flow after the swap; the chart and texts now say it in those terms.
+  - `sequence_chart.js` rewritten: legend X/Y/Z; arrows "Y + Z" and "Y′ + Z′" with real sizes; every operation listed in order on the side that does it; row heights fit the lists.
+  - Transport step 1: ELI5 "what" and the formal line use X/Y/Z.
+- Follow-up 2: the user didn't want literal X/Y/Z. The chart and the Transport step-1 text now name things plainly:
+  - CKKS ciphertext (your input, homomorphically encrypted)
+  - AES-sealed ciphertext / result (AES-256-GCM on top)
+  - RSA-wrapped AES key (RSA-OAEP with the receiver's public key)
+  - Every operation is listed on the side that does it; the chart widened to 1180 px. Confirmed against inference/he_infer.py that this is the flow the code runs:
+    - leg 1: PBKDF2 AES key, wrapped with the server's public key
+    - the server computes on a public-only context
+    - leg 2: a fresh random AES key, wrapped with the client's public key
+    - the client CKKS-decrypts
+
+## [Phase 7B · 7.14] 2026-10-03 — final verification: Phase 7B complete
+- Python: all 9 test files PASS (logged above). test_two_party_pipeline re-run after the role swap: PASS.
+- Browser (tmp/all14.py), all 7 models; every chapter and every step (incl. graph sub-steps), chapters reached only through Next:
+  - Desktop 1440×900 at ELI5 and phone 390×844 at Advanced. Every step's formal-cell title matches the level ("In one line" / "Formal notation") and its explanation is non-empty.
+  - EMNIST "123": walked once per character via the chips.
+  - Proof badges (both viewports): sms 140, human 125, german 151, price 117, symptom 116, mnist 154, emnist characters 1/2/3 154 each, all ✓, 0 failed.
+  - No problems, no console errors.
+- One-screen input check (tmp/fit12.py): 28/28 OK (7 models × 4 sizes).
+- The temporary test server was stopped. Phase 7B is complete; Phase 8 stays gated on the second PC's config.

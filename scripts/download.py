@@ -1,4 +1,5 @@
 import os
+import shutil
 import zipfile
 import urllib.request
 from torchvision import datasets
@@ -59,6 +60,35 @@ def download_price_data(ticker="AAPL", period="5y"):
     df.to_csv(dest, index=False)
 
 
+EMNIST_SPLIT = "balanced"  # 47 classes: 10 digits + 37 letters (look-alike lower/upper case merged)
+
+
+def download_emnist():
+    """NIST's official EMNIST archive (~560 MB); keeps only the balanced split's 5 files."""
+    out_dir = os.path.join(RAW_DIR, "emnist")
+    names = [f"emnist-{EMNIST_SPLIT}-{p}" for p in ("train-images-idx3-ubyte.gz", "train-labels-idx1-ubyte.gz",
+                                                    "test-images-idx3-ubyte.gz", "test-labels-idx1-ubyte.gz", "mapping.txt")]
+    if all(os.path.exists(os.path.join(out_dir, n)) for n in names):
+        print("emnist already exists, skipping")
+        return
+    os.makedirs(out_dir, exist_ok=True)
+    zip_path = os.path.join(RAW_DIR, "emnist_gzip.zip")
+    if not os.path.exists(zip_path):
+        # NIST answers 403 to urllib's default User-Agent.
+        req = urllib.request.Request("https://biometrics.nist.gov/cs_links/EMNIST/gzip.zip",
+                                     headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req) as resp, open(zip_path + ".part", "wb") as out:
+            shutil.copyfileobj(resp, out, 1 << 20)
+        os.replace(zip_path + ".part", zip_path)
+    with zipfile.ZipFile(zip_path, "r") as z:
+        for info in z.infolist():
+            base = os.path.basename(info.filename)
+            if base in names:
+                with z.open(info) as src, open(os.path.join(out_dir, base), "wb") as dst:
+                    dst.write(src.read())
+    os.remove(zip_path)
+
+
 if __name__ == "__main__":
     os.makedirs(RAW_DIR, exist_ok=True)
     download_mnist()
@@ -66,4 +96,5 @@ if __name__ == "__main__":
     download_german_credit()
     download_symptom_diagnosis()
     download_price_data()
-    print("Done: mnist, sms_spam, german_credit, symptom_diagnosis, price_data downloaded to data/raw/")
+    download_emnist()
+    print("Done: mnist, sms_spam, german_credit, symptom_diagnosis, price_data, emnist downloaded to data/raw/")

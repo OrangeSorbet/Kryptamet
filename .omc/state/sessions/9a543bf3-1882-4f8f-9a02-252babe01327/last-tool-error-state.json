@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:\\\\Users\\\\ashvi\\\\Documents\\\\VS_Codes\\\\Apps\\\\Kryptamet\\\\\\\" && uv run python -m interface.app > /tmp/flask5.log 2>&1 &\\nsleep 3\\ncurl -s http://127.0.0.1:5000/live | grep -A2 \\\"html, b...",
+  "error": "Exit code 2\n/usr/bin/bash: eval: line 6: unexpected EOF while looking for matching `\"'",
+  "timestamp": "2026-09-29T15:13:44.025Z",
+  "retry_count": 1
+}

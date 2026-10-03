@@ -8,8 +8,8 @@ the browser verifies it, chapter by chapter, is in `docs/LIVE_UI_TRUTH.md`.
 
 Homomorphic encryption (HE) computes on encrypted data without decrypting it. Kryptamet trains ordinary
 models (logistic regression, a small CNN) on plaintext data and runs the same models on CKKS-encrypted input
-(TenSEAL). A **server** (data owner) encrypts; a **client** (compute node) holding only public keys computes
-`Enc(x)·Wᵀ + b`. The server then decrypts and checks the result against the plaintext model. Ciphertexts
+(TenSEAL). A **client** (data owner) encrypts; a **server** (compute node) holding only public keys computes
+`Enc(x)·Wᵀ + b`. The client then decrypts and checks the result against the plaintext model. Ciphertexts
 travel between the two sealed with AES-256-GCM, with the AES key locked by RSA-OAEP. A Flask app serves `/live`,
 a step-by-step teaching walkthrough of one real run.
 
@@ -38,7 +38,7 @@ Every crypto operation lives here (rules.md).
   - `ckks_params_of` reads the real parameters back.
   - The CNN path builds its own N=32768 context.
 - **`encrypt.py` / `decrypt.py`** — thin TenSEAL wrappers (encrypt, serialize, deserialize, decrypt).
-- **`evaluate.py`** — `encrypted_linear_scores(enc_x, W, b)`: the client's one homomorphic op,
+- **`evaluate.py`** — `encrypted_linear_scores(enc_x, W, b)`: the server's one homomorphic op,
   `enc_x.matmul(Wᵀ) + b`. It serves both binary (k=1) and multiclass (k>1) models.
 - **`keygen.py`** — saves a secret-bearing and a public-only context to disk. This is a standalone utility;
   the app makes a fresh context per request.
@@ -76,8 +76,8 @@ Every crypto operation lives here (rules.md).
 
 ## Data and models
 
-- **Loaders** (`data/loaders/`: `mnist`, `sms_spam`, `german_credit`, `symptom_diagnosis`, `price_data`,
-  `human_vs_ai_text`) read `data/raw/<dataset>/`. `scripts/download.py` fetches all of them except
+- **Loaders** (`data/loaders/`: `mnist`, `emnist` (balanced split, 47 classes), `sms_spam`, `german_credit`,
+  `symptom_diagnosis`, `price_data`, `human_vs_ai_text`) read `data/raw/<dataset>/`. `scripts/download.py` fetches all of them except
   `human_vs_ai_text`, which comes from a manual Kaggle download (README).
 - **Featurizers** (`data/features/`). Each `featurize` returns `{x, feature_names, x_captions, feature_trace,
   input_echo}`, the trace being the step-by-step computation the Feature chapter shows:
@@ -95,7 +95,7 @@ Every crypto operation lives here (rules.md).
 
 ## Inference — `inference/`
 
-- **`model_registry.py`** — the six live models. Each entry holds:
+- **`model_registry.py`** — the seven live models (`emnist_logreg`: handwriting, digits + letters). Each entry holds:
   - `label`, `input_kind` (`text` / `tabular` / `symptoms` / `image`), `task`, `class_names`
   - `featurize`, which validates its input at the trust boundary
   - `weights()`, `plain_predict`, `plain_scores`
@@ -107,7 +107,7 @@ Every crypto operation lives here (rules.md).
     `test_he_inference`.
   - `run_two_party_pipeline(...)`: the `/live` pipeline. It records ordered events (operation, party,
     description, why, formal, next, data):
-    - **keys:** `ckks_keygen`, `rsa_keygen_server`/`_client`, `passphrase`, `pbkdf2`
+    - **keys:** `ckks_keygen`, `rsa_keygen_client`/`_server`, `passphrase`, `pbkdf2`
     - **encrypt:** `load_plaintext`, `ckks_encrypt`
     - **leg 1:** `leg1_wrap`/`_unwrap`
     - **compute:** `compute_overview`, `compute_general_form` (the real op on a context rebuilt from public
@@ -150,9 +150,9 @@ Each box shows a proof badge: the browser checks that passed while you watched t
 2. Key Setup
 3. Encryption
 4. CKKS Deep-Dive
-5. Transport → client
+5. Transport → server
 6. Computation
-7. Transport ← server
+7. Transport ← client
 8. Decryption
 9. Result
 10. Benchmarks
@@ -166,14 +166,31 @@ One component per file (`interface/static/js/`, with CSS of the same name where 
   - `chapter_registry.js`: `CHAPTERS` (id, label, `buildSteps`, `summary`, `stepBands`).
   - `flowchart.js`, `zoom_transition.js`, `minimap.js`, `intro_card.js` + `chapter_intros.js` (the per-chapter
     theory primers).
+  - `scene_fit.js`: `fitSceneContent` zooms each step's content (`--fit`) to fill ~90% of the free height
+    (≤1.6×, scale-up only); called by `chapter_state.js` on every step and again when it settles.
 - **Scrubber**
   - `scrubber.js`, `step_slider.js`, `speed_dial.js`, `glossary.js`.
+  - `explain_level.js`: the navbar ELI5 / Advanced switch.
+    - `window.explainLevel`, default `eli5`, remembered as `kryptamet.level`.
+    - `levelText(obj, key)` picks the text; an `explainlevel` event makes the Scrubber and an open primer
+      redraw.
+    - Every step carries `eli5: {what, why, formal, next}` beside its advanced text ("formal" is titled
+      "In one line" at ELI5).
+    - Primers in `chapter_intros.js` carry `eli5: {io, sections}`.
+    - All ELI5 text is built from the run's values: `featureEli5` (stylometric/tabular), `computeEli5`
+      (per compute event), and inline twins in every other step builder.
   - Two speeds: `window.stepSpeed` (Scrubber and step animations) and `window.gridSpeed` (poly grids), each
     saved to localStorage.
 - **Overview and input panels**
   - `overview_form.js`.
-  - Panels: `text_input.js`, `tabular_input.js`, `symptom_input.js`, `digit_canvas.js` (also
-    `digitGridSvg`).
+  - Panels: `text_input.js`, `tabular_input.js` (case picker, German code meanings, ±1 steppers),
+    `symptom_input.js` ("My own case" default), `digit_canvas.js` (drawing strip: vector strokes,
+    `groupStrokes` splits characters, `renderGlyph` re-renders each like its dataset at 4×, "Read as" switch; also `digitGridSvg`; one complete traced
+    run per character: `/api/infer` returns run 1 + `char_runs`; `char_switch.js` chips pick the character
+    every chapter shows, and `chapter_state.js` keeps per-character progress, proofs and deep-dive), `price_chart.js` (`priceChartSvg`: 20 real closes before a
+    Price direction case + that day's range).
+  - Layout: every `.scene` starts at `--nav-clear` (below the navbar). The overview fits one screen: only the
+    panel's list (fields / symptom chips / chart) shrinks and scrolls.
 - **Chapter step builders**: each returns `[{what, why, formal, next, renderVisual(el)}]`.
   - `scene_renderers.js`: Feature Extraction, Decryption, Result, Benchmarks, plus shared helpers (`fmt`,
     `findEv`, `inputVector`).
@@ -185,10 +202,24 @@ One component per file (`interface/static/js/`, with CSS of the same name where 
     relations and slot decoding).
   - The ✓/✕ chips are `renderChecks` / `tpCheck` / `tpSetCheck`.
 - **Visual components**
-  - `poly_grid.js` (256-cell grid; returns a controller {play, pause, stepCell, restart, done}) with
-    `grid_controls.js`.
-  - `byte_matrix.js`, `pbkdf2_graph.js` (generic node graph), `sub_zoom.js` (nested dolly zoom),
-    `escape_html.js`.
+  - Every matrix shares two modules:
+    - `reveal_controller.js` (`createRevealController`: play / pause / step / restart / done, pace
+      `window.gridSpeed`), drawn by `grid_controls.js`
+    - `cell_formula.js` (formula popups fixed on `<body>`, never clipped; `attachFormulaHover`;
+      `clearFormulaPops` on every step change)
+  - Users: `poly_grid.js` (256-cell CKKS grids), `byte_matrix.js` (hex bytes and words; still returns a
+    Promise), the Encryption slot grid, the deep-dive slot tables, the digit pixels, the U-chain and the
+    symptom flags.
+  - No native `title` tooltips except glossary terms; buttons use `aria-label`.
+  - `pbkdf2_graph.js`: generic node graph. Several focus nodes; hover a box for its full value, an edge for
+    what it does.
+  - `split_view.js` (`subStep`): every step about a node of a chapter's graph is drawn split screen.
+    - left: the node's content; right: the graph with that node highlighted
+    - graphs: PBKDF2 (Key Setup 7 → 7.1–7.9), the CKKS pipeline (Encryption 2 → 2.1–2.7), AES-GCM counter
+      mode (Transport 2 → 2.1–2.7)
+    - steps marked `sub` are numbered by the graph (`scrubber.js stepNumbers`; the counter shows
+      "Step 7.3 · 10/17")
+  - The nested dolly zoom (`sub_zoom.js`) was removed. `escape_html.js`.
 - **CSS**
   - Design tokens in `colors.css` / `fonts.css`; shared components in `components.css` (including the global
     `[hidden]` rule).

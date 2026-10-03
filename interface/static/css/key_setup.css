@@ -15,65 +15,6 @@
     to { opacity: 1; transform: none; }
 }
 
-/* Step 1: party diagram */
-.party-grid {
-    display: grid;
-    grid-template-columns: 1fr minmax(180px, 0.8fr) 1fr;
-    gap: 14px;
-    align-items: start;
-}
-
-.party-col,
-.party-mid {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 0;
-}
-
-.party-head {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--color-text-muted);
-    text-align: center;
-    padding-bottom: 4px;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.party-item {
-    padding: 9px 12px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: 9px;
-    min-width: 0;
-}
-
-.party-item.secret { border-color: var(--color-warning); }
-.party-item-name { font-size: 13.5px; color: var(--color-text); }
-
-.party-item-note {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--color-text-muted);
-    overflow-wrap: anywhere;
-}
-
-.party-arrow {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
-    padding: 6px 8px;
-    border: 1px dashed var(--color-border);
-    border-radius: 9px;
-    font-size: 12.5px;
-    color: var(--color-text);
-    text-align: center;
-}
-
-.party-arrow-dir { font-size: 20px; line-height: 1; color: var(--color-primary-hover); }
-
 /* Step 3: context size bars */
 .size-bars { display: flex; flex-direction: column; gap: 12px; }
 
@@ -297,8 +238,6 @@
 
 @media (max-width: 640px) {
     .rsa-grid { grid-template-columns: minmax(0, 1fr); }
-    .party-grid { grid-template-columns: 1fr; }
-    .party-arrow-dir { transform: rotate(90deg); } /* columns stack: server above client */
     .size-bar-row { grid-template-columns: 1fr 90px; }
     .size-bar-row .size-bar { grid-column: 1 / -1; grid-row: 2; }
     .rsa-bits { margin-left: 0; }

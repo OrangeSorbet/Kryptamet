@@ -5,7 +5,7 @@ function createTextInput(host, model) {
     host.innerHTML = `
         <textarea id="textInput" class="input-text" rows="3" placeholder="Type a real sentence here..." aria-label="Your text"></textarea>
         <div class="overview-examples">${samples.length ? `<span class="overview-examples-label">Try:</span>` : ""}${samples.map((t, i) => `
-            <button type="button" class="example-chip" data-i="${i}" title="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}</div>`;
+            <button type="button" class="example-chip" data-i="${i}" aria-label="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}</div>`;
     const area = host.querySelector("textarea");
     host.querySelectorAll(".example-chip").forEach((chip) => chip.addEventListener("click", () => {
         area.value = samples[Number(chip.dataset.i)];

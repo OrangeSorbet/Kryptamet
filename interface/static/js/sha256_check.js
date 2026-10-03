@@ -1,7 +1,7 @@
 // Browser-side re-computation of one traced SHA-256 block (FIPS 180-4) from
 // the backend's trace (pbkdf2.inner_sha256_trace.blocks[i]): every message-
 // schedule word W_t and every round's T1/T2/new registers are recomputed
-// here and compared with the server's values, so the matrices the Key Setup
+// here and compared with the client's values, so the matrices the Key Setup
 // chapter shows are checked, not just displayed.
 const SHA256_K = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,

@@ -2,7 +2,7 @@ import json
 import numpy as np
 from sklearn.model_selection import train_test_split
 from data.features import text_stylometric
-from data.loaders import german_credit, human_vs_ai_text, mnist, price_data, symptom_diagnosis
+from data.loaders import emnist, german_credit, human_vs_ai_text, mnist, price_data, symptom_diagnosis
 from inference.model_registry import MODELS, SYMPTOM_CLASS_NAMES, get_model, public_models, _bundle
 
 
@@ -67,11 +67,18 @@ def check_label_orders():
     for i, r in enumerate(m["samples"]()["rows"]):
         assert np.array_equal(m["featurize"](r["input"])["x"], X[i].astype(float))
         assert r["label"] == y[i]
-    X, y = mnist.load("test")
-    m = get_model("mnist_logreg")
-    for i, r in enumerate(m["samples"]()["rows"]):
-        assert np.array_equal(m["featurize"](r["input"])["x"], X[i] / np.float32(255.0))
-        assert r["label"] == y[i]
+    assert emnist.class_names() == get_model("emnist_logreg")["class_names"]
+    for model_id, load, words in [("mnist_logreg", mnist.load, ["0", "123"]),
+                                  ("emnist_logreg", emnist.load, ["0", "123", "abcd", "hello"])]:
+        X, y = load("test")
+        m = get_model(model_id)
+        rows = m["samples"]()["rows"]
+        assert [r["label_name"] for r in rows] == words
+        for r in rows:  # each sample word = real test images whose classes spell it (merged letters as capitals)
+            assert [m["class_names"][y[i]] for i in r["test_indices"]] == list(r["classes"])
+            assert r["classes"] == "".join(c if c in m["class_names"] else c.upper() for c in r["label_name"])
+            feats = m["featurize"](r["input"])
+            assert np.array_equal(feats["x"], X[r["test_indices"][0]] / np.float32(255.0))
     print("label orders: PASS")
 
 
@@ -117,6 +124,9 @@ def check_invalid_inputs():
         ("symptom_diagnosis", {"symptoms": "itching"}),
         ("mnist_logreg", {"pixels": [0] * 783}), ("mnist_logreg", {"pixels": [0] * 783 + [256]}),
         ("mnist_logreg", {"pixels": [0] * 783 + [1.5]}),
+        ("emnist_logreg", {"images": []}), ("emnist_logreg", {"images": [[0] * 784] * 9}),
+        ("emnist_logreg", {"images": [[0] * 784, [0] * 783]}),
+        ("emnist_logreg", {"images": [[0] * 784], "charset": "symbols"}),
     ]
     for model_id, inp in cases:
         try:

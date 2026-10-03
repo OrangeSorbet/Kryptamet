@@ -17,6 +17,63 @@ let forceReplay = false;      // set by the Scrubber's restart: replay animation
 // ended ✓ or ✕ while that step was on screen. Pending checks are not counted.
 let proofs = {};
 let shownStep = null;         // { index, i } of the step currently rendered
+// Drawings: one complete traced run per character (/api/infer char_runs). The chips (char_switch.js) pick
+// which one every chapter shows; each character keeps its own done chapters, step positions, proof badges
+// and deep-dive (fetched the first time that character is picked).
+let charRuns = [];
+let charIndex = 0;
+let charState = {};
+let charLoading = -1;
+
+function adoptRun() {
+    charRuns = [pipelineResult, ...(pipelineResult.char_runs || [])];
+    charIndex = 0;
+    charState = {};
+    charLoading = -1;
+}
+
+function renderCharSwitch() {
+    const r = charRuns[0];
+    createCharSwitch($("charSwitch"), {
+        characters: r ? r.characters || [] : [],
+        images: r && r.input ? r.input.images || [] : [],
+        current: charIndex,
+        loading: charLoading,
+        visible: charRuns.length > 1 && currentView !== "overview",
+        onSelect: selectCharacter,
+    });
+}
+
+async function selectCharacter(k) {
+    if (k === charIndex || !charRuns[k] || zoomInFlight) return;
+    tallyShown();
+    clearFormulaPops();
+    charState[charIndex] = { doneChapters, stepIndices, proofs, lastVisited, deepDive: ckksDeepDiveResult };
+    charIndex = k;
+    pipelineResult = charRuns[k];
+    const st = charState[k];
+    doneChapters = st ? st.doneChapters : new Set();
+    stepIndices = st ? st.stepIndices : {};
+    proofs = st ? st.proofs : {};
+    lastVisited = st ? st.lastVisited : -1;
+    ckksDeepDiveResult = st ? st.deepDive : null;
+    if (!ckksDeepDiveResult) {
+        charLoading = k;
+        renderCharSwitch();
+        const dd = await fetchCkksDeepDive(pipelineResult.model, pipelineResult.char_input);
+        if (charIndex !== k) return; // another chip was picked meanwhile
+        ckksDeepDiveResult = dd;
+        charLoading = -1;
+    }
+    buildAllChapterSteps();
+    shownStep = null;
+    if (currentView === "flowchart") renderFlowchart($("flowchartContainer"), false);
+    else if (typeof currentView === "number") {
+        if (chapterEnabled(currentView)) buildChapterVisual(currentView);
+        else exitToFlowchart($("backToFlowchartBtn"));
+    }
+    updateNavbar();
+}
 
 function tallyShown() {
     if (!shownStep) return;
@@ -97,6 +154,7 @@ function buildChapterVisual(index) {
         onEnd: () => goToNextChapter(index),
         nextLabel: nextChapterIndex(index) >= 0 ? CHAPTERS[nextChapterIndex(index)].label : "back to the chapters",
         onStepChange: (i, step) => {
+            clearFormulaPops(); // the previous step's grids are gone: drop their popups
             tallyShown();
             stepIndices[index] = i;
             window.sceneAlreadyVisited = doneChapters.has(index) && !forceReplay;
@@ -104,7 +162,8 @@ function buildChapterVisual(index) {
             const settled = step.renderVisual(el);
             const here = { index, i };
             shownStep = here;
-            Promise.resolve(settled).then(() => { if (shownStep === here) tallyShown(); });
+            fitSceneContent(el);
+            Promise.resolve(settled).then(() => { if (shownStep === here) { tallyShown(); fitSceneContent(el); } });
             el.classList.remove("step-fade-in");
             void el.offsetWidth; // restart the fade animation
             el.classList.add("step-fade-in");
@@ -153,6 +212,7 @@ function goToNextChapter(index) {
 
 function exitToFlowchart(originEl, then) {
     if (zoomInFlight) return;
+    clearFormulaPops();
     tallyShown();
     shownStep = null;
     currentView = "flowchart";
@@ -204,12 +264,11 @@ function updateNavbar() {
     $("newInputBtn").hidden = !(pipelineResult && !onOverview);
     $("flowchartHelpBtn").hidden = currentView !== "flowchart";
     if (pipelineResult && !onOverview) {
-        info.textContent = `${pipelineResult.model} · ${inputSummary(pipelineResult)}`;
-        info.title = info.textContent;
+        info.textContent = `${pipelineResult.model} · ${inputSummary(pipelineResult)}${charRuns.length > 1 ? ` · showing character ${charIndex + 1}` : ""}`;
     } else {
         info.textContent = "";
-        info.title = "";
     }
+    renderCharSwitch();
 }
 
 function startAfterInference() {
@@ -230,7 +289,8 @@ function startAfterInference() {
 window.onRunRequested = async (model, input) => {
     const r = await runPipeline(model, input, "");
     if (!r.ok) return r;
-    ckksDeepDiveResult = await fetchCkksDeepDive(model, input);
+    adoptRun();
+    ckksDeepDiveResult = await fetchCkksDeepDive(model, pipelineResult.char_input || input);
     doneChapters = new Set();
     stepIndices = {};
     proofs = {};
@@ -239,7 +299,12 @@ window.onRunRequested = async (model, input) => {
     return r;
 };
 
-window.onPassphraseRelock = () => {
+window.onPassphraseRelock = async () => {
+    // The re-run replaced every character's run: start over from character 1 with fresh progress.
+    adoptRun();
+    doneChapters = new Set();
+    proofs = {};
+    ckksDeepDiveResult = await fetchCkksDeepDive(pipelineResult.model, pipelineResult.char_input || pipelineResult.input);
     buildAllChapterSteps();
     const keyIndex = CHAPTERS.findIndex((c) => c.id === "key");
     // Land back on the step that holds the passphrase controls (flagged `relock`).
@@ -269,6 +334,7 @@ function initChapterState() {
     });
     $("flowchartHelpBtn").addEventListener("click", () => openIntroCard("flowchart"));
     $("newInputBtn").addEventListener("click", returnToOverview);
+    createLevelSwitch($("levelSwitch"));
     showOverview();
     updateNavbar();
 }

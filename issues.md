@@ -1,0 +1,12 @@
+❯ Who sends what, and who keeps what - this section is supposed to be explained step by step. ckks parameters nothing is explained properly what is ring degree what simd slots what scale no idea why is it picked why
+  is it like that no idea what is coefficient modulus chain what does each part mean. no idea what is galois key, one sentence is not enough. from p and q the client makes a public number e - HOW?. what is lambda(n),
+  what is d. i didnt understand c either. also i have no idea about the theory like how does HE even work how is the model understanding random cipher text that is different even if the input is same. k XOR ipad and k
+  XOR opad - idk ipad opad fullform/meaning and we dont know why specifically 0x36 and 0x5c. "The last 64-byte scoop is cut into 16 words and stretched into 64 words. Your browser recomputed the 48 new words: all the
+  same." huh? 128 byte thing was split into 64 byte scoops, last means  which one? cut into 16 and stretched into 64? how what when? "64 rounds stir 8 number registers (a to h), one row per round. Your browser re-ran
+  all 64: identical. Out comes the inner result 88241e14a5a5dc9d…." where did the inner result come from? its not shown anywhere how is it derived, we dont even know whats the purpose/significance of each step in
+  pbkdf2-hmac-sha256. [Image #14] all popups are supposed to show the actual value as normal text and the variable that the number signifies just below the number. [Image #15] [Image #16] random sizing of the chart on
+  the right side? sometimes big sometimes small? in literally all phases?. replace "in one line" in eli5 mode with "significance". "All 4096 slots are packed into one polynomial: a long formula with 8,192
+  whole-number coefficients. Your browser plugged numbers back into the formula and got your values out again." clearly the grid has different coefficients than text below "All 8192 coefficients:". "The formula is
+  locked with the public key: it is mixed with random noise into two scrambled formulas, c₀ and c₁ (49,152 numbers in total)." this part isnt explained properly, says that many numbers but only 16 numbers seen c1 c2
+  total and the formula given at the top for c0 and c1 the meaning of variables isnt given. [Image #17] significance/function of any of those TenSEAL numbers isnt explained at all and we dont know how we got those
+  numbers, why are they placed that way, no information at all. then suddenly the entire cipher text is produced and i have no idea where it came from.

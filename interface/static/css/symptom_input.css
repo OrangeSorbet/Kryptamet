@@ -26,3 +26,5 @@
     opacity: 0.55;
 }
 .sym-flag.on { opacity: 1; color: var(--color-bg); background: var(--color-warning); border-color: var(--color-warning); }
+.sym-selected { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 0.6rem; min-height: 26px; }
+.sym-picked { color: var(--color-bg); }

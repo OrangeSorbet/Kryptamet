@@ -16,4 +16,3 @@ hecrypto/keys/*.ctx
 # Claude Code / plugin local state
 .claude/worktrees/
 .claude/
-.omc/

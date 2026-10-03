@@ -26,7 +26,7 @@ function ddMul(a, b) {
     return acc.map(ddMod);
 }
 
-// slot j = Re m(ζ^(5^j)) / scale, ζ = e^(iπ/N): the decode the server uses.
+// slot j = Re m(ζ^(5^j)) / scale, ζ = e^(iπ/N): the decode the client uses.
 const DD_COS = Array.from({ length: 2 * DD_N }, (_, t) => Math.cos((Math.PI * t) / DD_N));
 const DD_EXP = Array.from({ length: DD_SLOTS }, (_, j) => { let e = 1; for (let k = 0; k < j; k++) e = (e * 5) % (2 * DD_N); return e; });
 function ddDecode(poly, scale) {

@@ -30,12 +30,14 @@ function _introKeyHandler(e) {
 }
 
 function openIntroCard(id) {
-    const c = CHAPTER_INTROS[id];
-    if (!c) return;
+    const c0 = CHAPTER_INTROS[id];
+    if (!c0) return;
+    const c = window.explainLevel === "eli5" && c0.eli5 ? { ...c0, ...c0.eli5 } : c0;
     closeIntroCard();
     markIntroSeen(id);
     const host = document.createElement("div");
     host.id = "introCardHost";
+    host.dataset.intro = id;
     host.className = "intro-backdrop";
     host.innerHTML = `
         <div class="intro-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(c.title)}">
@@ -62,3 +64,9 @@ function openIntroCard(id) {
 function maybeShowIntroCard(id) {
     if (!introSeen(id)) openIntroCard(id);
 }
+
+// Switching ELI5 / Advanced while a primer is open redraws it at the new level.
+document.addEventListener("explainlevel", () => {
+    const open = document.getElementById("introCardHost");
+    if (open) openIntroCard(open.dataset.intro);
+});
