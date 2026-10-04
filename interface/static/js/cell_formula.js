@@ -13,11 +13,13 @@ function createFormulaPop() {
     el.hidden = true;
     document.body.appendChild(el);
     const pop = {
+        el,
         // note: the actual value, as plain text (shown first, large); tex: KaTeX of what that value is /
         // how it is made (shown just below it).
         // plain: a plain-text line instead of tex (used by source-link previews).
-        show(cell, tex, note, plain) {
-            if (!cell || !cell.isConnected || !(tex || note || plain)) { pop.hide(); return; }
+        // lines: plain-text step lines (a "## " prefix makes a heading), used by the (?) help tips (help_tip.js).
+        show(cell, tex, note, plain, lines) {
+            if (!cell || !cell.isConnected || !(tex || note || plain || lines)) { pop.hide(); return; }
             el.innerHTML = "";
             if (note) {
                 const n = document.createElement("div");
@@ -37,20 +39,37 @@ function createFormulaPop() {
                 p.textContent = plain;
                 el.appendChild(p);
             }
+            (lines || []).forEach((l) => {
+                const d = document.createElement("div");
+                const head = l.startsWith("## ");
+                d.className = head ? "formula-step-head" : "formula-step";
+                d.textContent = head ? l.slice(3) : l;
+                el.appendChild(d);
+            });
             el.hidden = false;
-            // Never on top of the hovered cell: below it, else above it, else beside it (whichever side has room).
+            // Never on top of the hovered cell: below it, else above it, else beside it (whichever side has
+            // room); and never on top of another visible popup: then beside / under / over that one instead.
             const r = cell.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight, gap = 6;
             const clampX = (x) => Math.min(Math.max(8, x), innerWidth - w - 8);
             const clampY = (y) => Math.min(Math.max(8, y), innerHeight - h - 8);
-            if (r.bottom + gap + h <= innerHeight - 8) {
-                el.style.top = `${r.bottom + gap}px`; el.style.left = `${clampX(r.left + r.width / 2 - w / 2)}px`;
-            } else if (r.top - gap - h >= 8) {
-                el.style.top = `${r.top - gap - h}px`; el.style.left = `${clampX(r.left + r.width / 2 - w / 2)}px`;
-            } else {
-                const right = innerWidth - r.right, left = r.left;
-                el.style.top = `${clampY(r.top + r.height / 2 - h / 2)}px`;
-                el.style.left = `${right >= left ? Math.min(r.right + gap, innerWidth - w - 8) : Math.max(8, r.left - gap - w)}px`;
-            }
+            const cx = clampX(r.left + r.width / 2 - w / 2), cy = clampY(r.top + r.height / 2 - h / 2);
+            const spots = [];
+            if (r.bottom + gap + h <= innerHeight - 8) spots.push([cx, r.bottom + gap]);
+            if (r.top - gap - h >= 8) spots.push([cx, r.top - gap - h]);
+            const besideR = [clampX(r.right + gap), cy], besideL = [clampX(r.left - gap - w), cy];
+            spots.push(...(innerWidth - r.right >= r.left ? [besideR, besideL] : [besideL, besideR]));
+            const others = [...formulaPops].filter((p) => p.el !== el && !p.el.hidden).map((p) => p.el.getBoundingClientRect());
+            // Buttons marked data-pop-avoid (the (?) help buttons) must stay clickable, so no popup covers them.
+            const avoid = [...document.querySelectorAll("[data-pop-avoid]")].filter((b) => b !== cell).map((b) => b.getBoundingClientRect());
+            others.forEach((o) => spots.push(
+                [clampX(o.right + gap), clampY(r.top)], [clampX(o.left - gap - w), clampY(r.top)],
+                [cx, clampY(o.bottom + gap)], [cx, clampY(o.top - gap - h)]));
+            avoid.forEach((v) => spots.push([cx, clampY(v.bottom + gap)], [cx, clampY(v.top - gap - h)]));
+            const free = (list) => ([x, y]) => list.every((o) => x + w + 4 <= o.left || x >= o.right + 4 || y + h + 4 <= o.top || y >= o.bottom + 4);
+            // Best: clear of everything; else at least clear of the avoided buttons.
+            const [x, y] = spots.find(free([...others, ...avoid])) || spots.find(free(avoid)) || spots[0];
+            el.style.top = `${y}px`;
+            el.style.left = `${x}px`;
         },
         hide() { el.hidden = true; },
         destroy() { el.remove(); formulaPops.delete(pop); },

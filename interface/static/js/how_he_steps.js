@@ -38,6 +38,51 @@ const TOY = (() => {
     };
 })();
 
+// Step lines of the (?) tip on "s = −pk0 ÷ pk1 (mod q)": what ÷ means mod q, the Euclidean algorithm for the
+// inverse of pk1 (each remainder tracked as x·q + y·pk1), then the multiplication, all from the toy numbers.
+function modDivTipLines(pk0, pk1, q, realS, noisy) {
+    const n = (v) => v.toLocaleString("en-US");
+    const sg = (v) => (v < 0 ? `(−${-v})` : String(v));
+    const lines = [
+        "## What ÷ means here",
+        `s = −${pk0} ÷ ${pk1} (mod ${q}) asks: which whole number s gives ${pk1} × s ≡ −${pk0} (mod ${q})?`,
+        `"mod ${q}" = keep only the remainder after dividing by ${q}. So there are no fractions: a calculator's ${pk0} ÷ ${pk1} = ${(pk0 / pk1).toFixed(2)} is not this.`,
+        `÷ ${pk1} means × i, where i is the inverse of ${pk1}: ${pk1} × i ≡ 1 (mod ${q}).`,
+        `## Step 1: find i with the Euclidean algorithm`,
+        `Divide, keep the remainder, and write each remainder as x×${q} + y×${pk1}.`,
+        `${q} = 1×${q} + 0×${pk1}`,
+        `${pk1} = 0×${q} + 1×${pk1}`,
+    ];
+    let [r0, r1, x0, x1, y0, y1] = [q, pk1, 1, 0, 0, 1];
+    while (r1 !== 1) {
+        const k = Math.floor(r0 / r1), r2 = r0 - k * r1, x2 = x0 - k * x1, y2 = y0 - k * y1;
+        lines.push(`${r0} = ${k}×${r1} + ${r2}  →  ${r2} = ${sg(x2)}×${q} + ${sg(y2)}×${pk1}`);
+        [r0, r1, x0, x1, y0, y1] = [r1, r2, x1, x2, y1, y2];
+    }
+    const i = ((y1 % q) + q) % q, prod = pk1 * i;
+    lines.push(
+        `The remainder is 1: 1 = ${sg(x1)}×${q} + ${sg(y1)}×${pk1}, so ${pk1} × ${sg(y1)} ≡ 1 (mod ${q}).`,
+        `i = ${sg(y1)} mod ${q} = ${i}`,
+        `Check: ${pk1} × ${i} = ${n(prod)} = ${Math.floor(prod / q)}×${q} + ${prod % q}  ✓`,
+        "## Step 2: multiply (this is the part a calculator can do)",
+        `−${pk0} + ${q} = ${q - pk0}   (the same number, made positive)`,
+    );
+    const m = (q - pk0) * i, k = Math.floor(m / q), sFound = m - k * q;
+    lines.push(
+        `${q - pk0} × ${i} = ${n(m)}`,
+        `${n(m)} ÷ ${q} = ${(m / q).toFixed(2)}, whole part ${k}`,
+        `${k} × ${q} = ${n(k * q)}`,
+        `${n(m)} − ${n(k * q)} = ${sFound}`,
+        `s = ${sFound}`,
+        "## Check",
+        `${pk1} × ${sFound} = ${n(pk1 * sFound)}; mod ${q} that is ${(pk1 * sFound) % q}.   −${pk0} mod ${q} = ${q - pk0}.   ${(pk1 * sFound) % q === q - pk0 ? "Equal ✓" : "Not equal"}`,
+        noisy
+            ? `pk0 = ${pk0} has the noise added on top, so s = ${sFound} solves the equation but is not the real secret (${realS}).`
+            : `pk0 = ${pk0} has no noise, so s = ${sFound} is the real secret.`,
+    );
+    return lines;
+}
+
 // One worked calculation: rows of [what, how it is computed, value, variable?]; `head` optionally names the
 // columns. Numbers in "how" and the notes carry their variable underneath (vn tokens, var_label.js); a plain
 // numeric value shows its row's variable (the 4th item, or the row name).
@@ -45,7 +90,7 @@ function renderToyCalc(el, heading, rows, note, head) {
     const val = (v, label) => (/^[−-]?[\d,.]+$/.test(String(v)) ? vnHtml(v, label) : richText(String(v), escapeHtml, true));
     el.innerHTML = `<div class="scene-title">${escapeHtml(heading)}</div>
         <div class="scene-body"><div class="toy-calc">${head ? `<div class="toy-row toy-head">${head.map((h) => `<span>${escapeHtml(h)}</span>`).join("")}</div>` : ""}${rows.map(([what, how, v, sym]) => `
-            <div class="toy-row"><span class="toy-what">${richText(what)}</span><span class="toy-how">${richText(how)}</span><span class="toy-val">${val(v, sym || what)}</span></div>`).join("")}
+            <div class="toy-row"><span class="toy-what">${richText(what)}</span><span class="toy-how">${withHelpTips(richText(how))}</span><span class="toy-val">${val(v, sym || what)}</span></div>`).join("")}
         </div>${note ? `<p class="step-text muted">${richText(note, escapeHtml, true)}</p>` : ""}</div>`;
 }
 
@@ -55,6 +100,8 @@ function buildHowHeSteps() {
     const d1 = T.dec(x1), dSum = T.dec(T.sum), dTimes = T.dec(T.times), dScore = T.dec(T.score), dWrong = T.dec(x1, T.s + 1);
     const wantScore = T.w1 * x1.x + T.w2 * x2.x + T.b;
     const r3 = (v) => Number(v.toFixed(3));
+    HELP_TIPS.set("attack_free", modDivTipLines(T.pk0NoNoise, T.pk1, q, T.s, false));
+    HELP_TIPS.set("attack_real", modDivTipLines(T.pk0, T.pk1, q, T.s, true));
     const expanded = `[ ( ( (−${vn(T.a, "a")} × ${vn(T.s, "s")} + ${vn(T.e, "e")}) mod ${vn(q, "q")} ) × ${vn(x1.u, "u")} + ${vn(x1.e0, "e0")} + ${vn(x1.x, "x₁")} × ${vn(D, "Δ")} ) mod ${vn(q, "q")} ] + [ ( ${vn(T.a, "a")} × ${vn(x1.u, "u")} + (${vn(x1.e1, "e1")}) ) mod ${vn(q, "q")} ] × ${vn(T.s, "s")}`;
     const y1 = T.y1, y2 = T.y2, dB = T.dec(T.scoreB);
     const nA = T.w1 * T.noise(x1) + T.w2 * T.noise(x2), nB = T.w1 * T.noise(y1) + T.w2 * T.noise(y2);
@@ -126,10 +173,12 @@ function buildHowHeSteps() {
             renderVisual: (el) => renderToyCalc(el, "Why the noise matters", [
                 ["pk0 built without noise", `(−${vn(T.pk1, "pk1")} × ${vn(T.s, "s")}) mod ${vn(q, "q")}`, T.pk0NoNoise, "pk0 (no noise)"],
                 ["pk0 built with noise (the real key)", `(−${vn(T.pk1, "pk1")} × ${vn(T.s, "s")} + ${vn(T.e, "e")}) mod ${vn(q, "q")}`, T.pk0, "pk0"],
-                ["attack on a noise-free key", `s = −(${vn(T.pk0NoNoise, "pk0 (no noise)")}) ÷ ${vn(T.pk1, "pk1")} (mod ${vn(q, "q")})`, `${vn(T.crackNoNoise, "s found")}  (found!)`],
-                ["the same attack on the real key", `s = −(${vn(T.pk0, "pk0")}) ÷ ${vn(T.pk1, "pk1")} (mod ${vn(q, "q")})`, `${vn(T.crackNoisy, "s guessed")}  (wrong)`],
+                ["attack on a noise-free key", `s = −(${vn(T.pk0NoNoise, "pk0 (no noise)")}) ÷ ${vn(T.pk1, "pk1")} ⟪?attack_free⟫ (mod ${vn(q, "q")})`, `${vn(T.crackNoNoise, "s found")}  (found!)`],
+                ["the same attack on the real key", `s = −(${vn(T.pk0, "pk0")}) ÷ ${vn(T.pk1, "pk1")} ⟪?attack_real⟫ (mod ${vn(q, "q")})`, `${vn(T.crackNoisy, "s guessed")}  (wrong)`],
                 ["the real s", "kept secret", T.s],
-            ], "\"÷\" here means multiplying by the number that undoes pk1 mod q (the modular inverse)."),
+                ["check: is s found the real s?", `${vn(T.pk1, "pk1")} × ${vn(T.crackNoNoise, "s found")} + ${vn(T.pk0NoNoise, "pk0 (no noise)")} = ${vn(T.pk1 * T.crackNoNoise + T.pk0NoNoise, "sum")} = ${vn((T.pk1 * T.crackNoNoise + T.pk0NoNoise) / q, "k")} × ${vn(q, "q")}`, "a multiple of q: yes", "check"],
+                ["check: the real key, with the real s", `${vn(T.pk1, "pk1")} × ${vn(T.s, "s")} + ${vn(T.pk0, "pk0")} = ${vn(T.pk1 * T.s + T.pk0, "sum")}, remainder ${vn(T.mod(T.pk1 * T.s + T.pk0), "remainder")} after dividing by ${vn(q, "q")}`, `${T.mod(T.pk1 * T.s + T.pk0)} = e, not 0`, "check"],
+            ], "\"÷\" here is division that wraps at q: s is the whole number where pk1 × s + pk0 is a multiple of q. A calculator's 7051 ÷ 4321 = 1.63 ignores the wrap. With noise, the whole number that fits (7796) is not the real s: the real s leaves the remainder e = 2."),
         },
         {
             eli5: {

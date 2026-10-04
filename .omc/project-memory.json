@@ -186,8 +186,14 @@
     },
     {
       "path": "interface/static/js/var_label.js",
-      "accessCount": 7,
-      "lastAccessed": 1791045715973,
+      "accessCount": 8,
+      "lastAccessed": 1791143645087,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/cell_formula.js",
+      "accessCount": 5,
+      "lastAccessed": 1791143756256,
       "type": "file"
     },
     {
@@ -263,6 +269,12 @@
       "type": "file"
     },
     {
+      "path": "interface/static/js/source_links.js",
+      "accessCount": 2,
+      "lastAccessed": 1791143644150,
+      "type": "file"
+    },
+    {
       "path": "interface",
       "accessCount": 1,
       "lastAccessed": 1791002139284,
@@ -296,12 +308,6 @@
       "path": "interface/static/js/grid_controls.js",
       "accessCount": 1,
       "lastAccessed": 1791014718390,
-      "type": "file"
-    },
-    {
-      "path": "interface/static/js/cell_formula.js",
-      "accessCount": 1,
-      "lastAccessed": 1791014834915,
       "type": "file"
     },
     {
@@ -377,12 +383,6 @@
       "type": "file"
     },
     {
-      "path": "interface/static/js/source_links.js",
-      "accessCount": 1,
-      "lastAccessed": 1791037309284,
-      "type": "file"
-    },
-    {
       "path": "interface/static/css/source_links.css",
       "accessCount": 1,
       "lastAccessed": 1791037309948,
@@ -446,6 +446,36 @@
       "path": "docs/LIVE_UI_POLISH.md",
       "accessCount": 1,
       "lastAccessed": 1791133084885,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js",
+      "accessCount": 1,
+      "lastAccessed": 1791143640202,
+      "type": "directory"
+    },
+    {
+      "path": "interface/static/css",
+      "accessCount": 1,
+      "lastAccessed": 1791143645294,
+      "type": "directory"
+    },
+    {
+      "path": "interface/templates",
+      "accessCount": 1,
+      "lastAccessed": 1791143678992,
+      "type": "directory"
+    },
+    {
+      "path": "interface/static/css/components.css",
+      "accessCount": 1,
+      "lastAccessed": 1791143679358,
+      "type": "file"
+    },
+    {
+      "path": "interface/static/js/help_tip.js",
+      "accessCount": 1,
+      "lastAccessed": 1791143750090,
       "type": "file"
     }
   ],

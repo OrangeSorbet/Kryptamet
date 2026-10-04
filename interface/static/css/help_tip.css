@@ -1,0 +1,27 @@
+/* "(?)" help buttons and their step popups (interface/static/js/help_tip.js; the popup itself is the shared
+   .formula-pop of components.css). */
+.help-q {
+    margin: 0 4px;
+    padding: 0 2px;
+    background: none;
+    border: 0;
+    color: var(--color-warning);
+    font: inherit;
+    font-weight: 700;
+    cursor: help;
+}
+.help-q:hover, .help-q:focus-visible { text-decoration: underline; }
+.formula-pop.help-pop {
+    box-sizing: border-box;
+    max-width: min(460px, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    pointer-events: auto;
+}
+/* Smaller screens: a shorter, scrolling tip, so two can stack and a button stays reachable. */
+@media (max-width: 1100px) {
+    .formula-pop.help-pop { max-height: 42vh; }
+}
+.formula-step-head { margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--color-warning); }
+.formula-step-head:first-child { margin-top: 0; }
+.formula-step { font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--color-text); overflow-wrap: break-word; white-space: pre-wrap; }

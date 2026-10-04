@@ -182,6 +182,9 @@ One component per file (`interface/static/js/`, with CSS of the same name where 
       navbar pill `#srcBackBtn` (and Esc) walks the jump stack back.
   - `flowchart.js`, `zoom_transition.js`, `minimap.js`, `intro_card.js` + `chapter_intros.js` (the per-chapter
     theory primers).
+  - `help_tip.js` (+ `help_tip.css`): "(?)" buttons (`⟪?key⟫` in scene text, lines in `HELP_TIPS`) whose step-by-step tip is a
+    shared formula popup: hover shows, click pins, click elsewhere or Esc closes. `createFormulaPop` keeps popups off each
+    other and off `data-pop-avoid` buttons. Used by "How HE works" on the two `s = −pk0 ÷ pk1 (mod q)` rows.
   - `scene_fit.js`: `fitSceneContent` zooms each step's content (`--fit`) to fill ~90% of the free height
     (≤1.6×, scale-up only); called by `chapter_state.js` on every step and again when it settles.
 - **Scrubber**

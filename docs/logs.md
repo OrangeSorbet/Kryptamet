@@ -1006,3 +1006,11 @@
 - Phase 7C follow-up: fully expanded c0 + c1·s (toy values, each labelled) now in step 4 for all levels: ELI1 (new twin), ELI5 and Advanced text, plus the visual row.
 - Phase 7C follow-up: "Why the noise matters" rows now show the numbers with their variables underneath (s = −pk0 ÷ pk1 (mod q) with toy values), like the locking rows.
 - Phase 7C follow-up: "Why the noise matters" gets two rows building pk0 without and with noise ((−pk1·s) mod q = 7051; (−pk1·s + e) mod q = 7053) above the attack rows.
+- Phase 7C follow-up: "Why the noise matters" gets check rows (pk1·s + pk0 is a multiple of q for the found s, not for the guessed one) and a footnote explaining ÷ as division that wraps at q.
+- Phase 7C follow-up: "Why the noise matters" attack rows no longer use ÷: pk1⁻¹ = 1107 shown ((4321 × 1107) mod 10007 = 1) and s = (−pk0 × pk1⁻¹) mod q, so every row is calculator-checkable (×, +, mod only).
+- Phase 7C follow-up: (?) help tips on the two attack rows of "How HE works" ("Why the noise matters"), all three explanation levels (the visual is shared).
+  - New `js/help_tip.js` + `css/help_tip.css`, linked in scenes.html; `cell_formula.js` popups take `lines`, expose `el`, and are placed clear of other popups and of `[data-pop-avoid]` buttons.
+  - `how_he_steps.js`: `modDivTipLines` builds the tip from the toy numbers (what ÷ mod q means, Euclidean algorithm for 1107, the multiply, a check).
+  - Verified in headless Chrome (1440×900): hover shows/hides, click pins past un-hover, click elsewhere closes, two pinned tips do not overlap, no console errors. Found and fixed: a pinned tip covered the other (?) button.
+- Phase 7C follow-up: (?) tips made responsive. Tested 1440×900, 1024×768, 768×1024, 390×844 in headless Chrome: second button always clickable, tips inside the viewport, no overlap, no console errors.
+  - ≤1100px the tip is at most 42vh and scrolls; border-box so it fits a phone; placement also tries spots above/below each (?) button; if two tips cannot fit, the newest replaces the older (help_tip.js `helpOverlaps`).
