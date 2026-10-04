@@ -1001,3 +1001,8 @@
   - `interface/static/js/how_he_steps.js`: `TOY` now also holds run B (`y1`, `y2`, `scoreB`: u/e0/e1 = 3,−1,0 and 2,−1,0); step shows both runs' locks, server outputs, unlocks (353 vs 362) and noise (3 vs 12).
   - Check: node eval of TOY gives locks (1394,2956), (4598,8642), score (9691,226), unlock 362; run A (5596,1588) → 353. Matches the hand calculation.
   - Docs synced: ARCHITECTURE.md, LIVE_UI_TRUTH.md, checklist.md mention the new step; it carries eli1 + eli5 + advanced.
+- Phase 7C follow-up: How HE works step 3 (locking) now says why s is not in the lock formula (already inside pk0; only s cancels the mask), ELI5 + Advanced.
+- Phase 7C follow-up: How HE works step 4 (unlocking) gets a "c0 + c1·s, fully expanded" row under c0 + c1·s: every c0/c1/pk0/m replaced by its toy-value equation, each number labelled with its variable.
+- Phase 7C follow-up: fully expanded c0 + c1·s (toy values, each labelled) now in step 4 for all levels: ELI1 (new twin), ELI5 and Advanced text, plus the visual row.
+- Phase 7C follow-up: "Why the noise matters" rows now show the numbers with their variables underneath (s = −pk0 ÷ pk1 (mod q) with toy values), like the locking rows.
+- Phase 7C follow-up: "Why the noise matters" gets two rows building pk0 without and with noise ((−pk1·s) mod q = 7051; (−pk1·s + e) mod q = 7053) above the attack rows.

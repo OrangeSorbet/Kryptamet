@@ -32,6 +32,7 @@ const TOY = (() => {
         q, delta, s, a, e, pk0, pk1, mod, centre, x1, x2, y1, y2, w1, w2, b, bm, sum, times, score, dec,
         scoreB: scoreOf(y1, y2),
         noise: (c) => e * c.u + c.e0 + c.e1 * s,
+        pk0NoNoise: mod(-a * s),
         crackNoNoise: mod(-mod(-a * s) * inv(a)),  // s recovered from a noiseless public key
         crackNoisy: mod(-pk0 * inv(a)),            // the same attack on the real (noisy) one
     };
@@ -54,6 +55,7 @@ function buildHowHeSteps() {
     const d1 = T.dec(x1), dSum = T.dec(T.sum), dTimes = T.dec(T.times), dScore = T.dec(T.score), dWrong = T.dec(x1, T.s + 1);
     const wantScore = T.w1 * x1.x + T.w2 * x2.x + T.b;
     const r3 = (v) => Number(v.toFixed(3));
+    const expanded = `[ ( ( (−${vn(T.a, "a")} × ${vn(T.s, "s")} + ${vn(T.e, "e")}) mod ${vn(q, "q")} ) × ${vn(x1.u, "u")} + ${vn(x1.e0, "e0")} + ${vn(x1.x, "x₁")} × ${vn(D, "Δ")} ) mod ${vn(q, "q")} ] + [ ( ${vn(T.a, "a")} × ${vn(x1.u, "u")} + (${vn(x1.e1, "e1")}) ) mod ${vn(q, "q")} ] × ${vn(T.s, "s")}`;
     const y1 = T.y1, y2 = T.y2, dB = T.dec(T.scoreB);
     const nA = T.w1 * T.noise(x1) + T.w2 * T.noise(x2), nB = T.w1 * T.noise(y1) + T.w2 * T.noise(y2);
     return [
@@ -122,20 +124,22 @@ function buildHowHeSteps() {
             formal: "LWE: given (a, −a·s + e), find s",
             next: "Next: encryption.",
             renderVisual: (el) => renderToyCalc(el, "Why the noise matters", [
-                ["attack on a noise-free key", "s = −pk0 ÷ pk1 (mod q)", `${vn(T.crackNoNoise, "s found")}  (found!)`],
-                ["the same attack on the real key", "s = −pk0 ÷ pk1 (mod q)", `${vn(T.crackNoisy, "s guessed")}  (wrong)`],
+                ["pk0 built without noise", `(−${vn(T.pk1, "pk1")} × ${vn(T.s, "s")}) mod ${vn(q, "q")}`, T.pk0NoNoise, "pk0 (no noise)"],
+                ["pk0 built with noise (the real key)", `(−${vn(T.pk1, "pk1")} × ${vn(T.s, "s")} + ${vn(T.e, "e")}) mod ${vn(q, "q")}`, T.pk0, "pk0"],
+                ["attack on a noise-free key", `s = −(${vn(T.pk0NoNoise, "pk0 (no noise)")}) ÷ ${vn(T.pk1, "pk1")} (mod ${vn(q, "q")})`, `${vn(T.crackNoNoise, "s found")}  (found!)`],
+                ["the same attack on the real key", `s = −(${vn(T.pk0, "pk0")}) ÷ ${vn(T.pk1, "pk1")} (mod ${vn(q, "q")})`, `${vn(T.crackNoisy, "s guessed")}  (wrong)`],
                 ["the real s", "kept secret", T.s],
             ], "\"÷\" here means multiplying by the number that undoes pk1 mod q (the modular inverse)."),
         },
         {
             eli5: {
                 what: `To lock m₁ = ${vn(x1.m, "m₁")}, pick a fresh random u = ${vn(x1.u, "u")} and two tiny noises e0 = ${vn(x1.e0, "e0")}, e1 = ${vn(x1.e1, "e1")}. Then c0 = pk0·u + e0 + m = ${vn(x1.c0, "c0 of x₁")} and c1 = pk1·u + e1 = ${vn(x1.c1, "c1 of x₁")}. The locked number is the pair (${vn(x1.c0, "c0 of x₁")}, ${vn(x1.c1, "c1 of x₁")}). m₂ = ${vn(x2.m, "m₂")} locks to (${vn(x2.c0, "c0 of x₂")}, ${vn(x2.c1, "c1 of x₂")}).`,
-                why: "u makes every lock different, so locking the same number twice gives different pairs. Nobody can tell equal inputs apart. The noises keep it hard to undo.",
+                why: `Locking never uses s, but s is already inside pk0 (pk0 = −pk1·s + e). So c0 = pk0·u + e0 + m hides m under a mask containing −pk1·u·s, and c1 = pk1·u + e1 hands over pk1·u. Only someone who knows s can turn c1 into pk1·u·s and cancel the mask; that is what the next-but-one step does. u makes every lock different, so locking the same number twice gives different pairs. The noises keep it hard to undo.`,
                 formal: `${vn(x1.m, "m₁")} → (${vn(x1.c0, "c0 of x₁")}, ${vn(x1.c1, "c1 of x₁")}); ${vn(x2.m, "m₂")} → (${vn(x2.c0, "c0 of x₂")}, ${vn(x2.c1, "c1 of x₂")}).`,
                 next: "Next: unlocking with s.",
             },
             what: `Enc: c0 = (pk0·u + e0 + m) mod q, c1 = (pk1·u + e1) mod q. m₁: u = ${vn(x1.u, "u")}, e0 = ${vn(x1.e0, "e0")}, e1 = ${vn(x1.e1, "e1")} → (${vn(x1.c0, "c0 of x₁")}, ${vn(x1.c1, "c1 of x₁")}). m₂: u = ${vn(x2.u, "u")}, e0 = ${vn(x2.e0, "e0")}, e1 = ${vn(x2.e1, "e1")} → (${vn(x2.c0, "c0 of x₂")}, ${vn(x2.c1, "c1 of x₂")}).`,
-            why: "Public-key encryption: anyone with pk can encrypt. The fresh u randomizes each ciphertext (semantic security).",
+            why: "Public-key encryption: anyone with pk can encrypt, and s never appears in the formula because it is already inside pk0: c0 = −a·u·s + e·u + e0 + m. Decryption adds c1·s = a·u·s + e1·s to cancel that mask, which only the holder of s can do. The fresh u randomizes each ciphertext (semantic security).",
             formal: "c = (pk0·u + e0 + m, pk1·u + e1) mod q",
             next: "Next: decryption.",
             renderVisual: (el) => renderToyCalc(el, "Step 3: locking", [
@@ -147,18 +151,25 @@ function buildHowHeSteps() {
         },
         {
             eli5: {
-                what: `To unlock, compute c0 + c1·s: ${vn(x1.c0, "c0 of x₁")} + ${vn(x1.c1, "c1 of x₁")}×${vn(T.s, "s")}, then the remainder after dividing by ${vn(q, "q")}. That gives ${vn(d1, "c0 + c1·s")}, and ${vn(d1, "c0 + c1·s")} ÷ ${vn(D, "Δ")} = ${vn(d1 / D, "x₁ unlocked")}. You locked ${vn(x1.x, "x₁")}.`,
+                what: `To unlock, compute c0 + c1·s: ${vn(x1.c0, "c0 of x₁")} + ${vn(x1.c1, "c1 of x₁")}×${vn(T.s, "s")}, then the remainder after dividing by ${vn(q, "q")}. Spelled out with every number replaced by what made it: ${expanded} = ${vn(x1.c0 + x1.c1 * T.s, "c0 + c1·s")}. That gives ${vn(d1, "c0 + c1·s")}, and ${vn(d1, "c0 + c1·s")} ÷ ${vn(D, "Δ")} = ${vn(d1 / D, "x₁ unlocked")}. You locked ${vn(x1.x, "x₁")}.`,
                 why: `The big random parts cancel exactly; only m plus a tiny leftover noise (${vn(T.noise(x1), "noise")}) remains. Dividing by Δ makes the noise almost vanish: ${vn(T.noise(x1), "noise")} ÷ ${vn(D, "Δ")} = ${vn(T.noise(x1) / D, "noise ÷ Δ")}. That's why CKKS answers are "approximate".`,
                 formal: `${vn(x1.m, "m₁")} + ${vn(T.noise(x1), "noise")} noise = ${vn(d1, "c0 + c1·s")} → ${vn(d1 / D, "x₁ unlocked")}.`,
                 next: "Next: what a wrong key gives.",
             },
-            what: `c0 + c1·s = m + (e·u + e0 + e1·s) = ${vn(x1.m, "m₁")} + (${vn(T.e, "e")}·${vn(x1.u, "u")} + ${vn(x1.e0, "e0")} + ${vn(x1.e1, "e1")}·${vn(T.s, "s")}) = ${vn(d1, "c0 + c1·s")} (mod ${vn(q, "q")}, centred). ${vn(d1, "c0 + c1·s")}/Δ = ${vn(d1 / D, "x₁ unlocked")}.`,
+            what: `c0 + c1·s, fully expanded: ${expanded} = ${vn(x1.c0 + x1.c1 * T.s, "c0 + c1·s")}. Then c0 + c1·s = m + (e·u + e0 + e1·s) = ${vn(x1.m, "m₁")} + (${vn(T.e, "e")}·${vn(x1.u, "u")} + ${vn(x1.e0, "e0")} + ${vn(x1.e1, "e1")}·${vn(T.s, "s")}) = ${vn(d1, "c0 + c1·s")} (mod ${vn(q, "q")}, centred). ${vn(d1, "c0 + c1·s")}/Δ = ${vn(d1 / D, "x₁ unlocked")}.`,
             why: "Substituting pk: (−a·s + e)·u + e0 + m + (a·u + e1)·s. The a·u·s terms cancel, leaving m + small noise. Decoding divides by Δ, shrinking the noise by Δ.",
             formal: "c0 + c1·s = m + e·u + e0 + e1·s ≈ m",
             next: "Next: decrypting with the wrong key.",
+            eli1: {
+                what: `Unlock by hand. Replace c0 and c1 by the sums that made them, down to the toy values: ${expanded} = ${vn(x1.c0, "c0 of x₁")} + ${vn(x1.c1, "c1 of x₁")}×${vn(T.s, "s")} = ${vn(x1.c0 + x1.c1 * T.s, "c0 + c1·s")}. Subtract whole copies of ${vn(q, "q")} (here ${vn(Math.floor((x1.c0 + x1.c1 * T.s) / q), "k")}) to get ${vn(d1, "c0 + c1·s")}, then ${vn(d1, "c0 + c1·s")} ÷ ${vn(D, "Δ")} = ${vn(d1 / D, "x₁ unlocked")}.`,
+                why: `The ${vn(T.a, "a")}·${vn(x1.u, "u")}·${vn(T.s, "s")} parts cancel, so what is left is ${vn(x1.m, "m₁")} plus the small noise ${vn(T.e, "e")}×${vn(x1.u, "u")} + ${vn(x1.e0, "e0")} + (${vn(x1.e1, "e1")})×${vn(T.s, "s")} = ${vn(T.noise(x1), "noise")}.`,
+                formal: `${vn(x1.m, "m₁")} + ${vn(T.noise(x1), "noise")} = ${vn(d1, "c0 + c1·s")} → ${vn(d1 / D, "x₁ unlocked")}.`,
+                next: "Next: what a wrong key gives.",
+            },
             vars: { c0: x1.c0, c1: x1.c1, "c₀": x1.c0, "c₁": x1.c1, u: x1.u, e0: x1.e0, e1: x1.e1, m: x1.m },
             renderVisual: (el) => renderToyCalc(el, "Step 4: unlocking", [
                 ["c0 + c1·s", `${vn(x1.c0, "c0 of x₁")} + ${vn(x1.c1, "c1 of x₁")}×${vn(T.s, "s")} = ${vn(x1.c0 + x1.c1 * T.s, "c0 + c1·s")}`, x1.c0 + x1.c1 * T.s],
+                ["c0 + c1·s, fully expanded", `${expanded}`, x1.c0 + x1.c1 * T.s, "c0 + c1·s"],
                 ["remainder mod q", `${vn(x1.c0 + x1.c1 * T.s, "c0 + c1·s")} mod ${vn(q, "q")} (centred)`, d1],
                 ["noise left over", `e·u + e0 + e1·s = ${vn(T.e, "e")}×${vn(x1.u, "u")} + ${vn(x1.e0, "e0")} + ${vn(x1.e1, "e1")}×${vn(T.s, "s")}`, T.noise(x1)],
                 ["your number", `${vn(d1, "c0 + c1·s")} ÷ ${vn(D, "Δ")}`, d1 / D],
