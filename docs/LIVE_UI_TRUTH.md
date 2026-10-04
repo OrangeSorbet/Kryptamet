@@ -60,7 +60,7 @@ on screen; a check still running is not counted.
 | Transport → server / ← client | **AES-256-GCM, recomputed** (`aes_check.js`): the S-box, the key schedule, every stage of all 14 rounds, counters, keystream, the GHASH steps (GF(2¹²⁸) with BigInt), and the tag. **RSA-OAEP:** c^d mod n, then MGF1 unmasking (lHash, zero padding, 01 separator, key). **WebCrypto:** imports the private key, decrypts the AES key, AES-GCM-decrypts the full payload, and checks its SHA-256 = the ciphertext sent. **Tamper test:** the client's exact flipped ciphertext bit and flipped tag bit are both rejected. **Keys:** the leg-1 key = PBKDF2 output; the leg-2 key ≠ the leg-1 key. |
 | Computation | **Op:** input SHA-256 = the leg-1 unwrap; the server context holds no secret key. **Output:** WebCrypto SHA-256 of the full output ciphertext = the leg-2 payload. **Terms:** each term's x = the encrypted value, product and running sum recomputed; the smaller terms re-summed; zero count; bias sum = the plaintext score ≈ the decrypted HE score (`computation_steps.js`). |
 | Result | The decrypted HE score vs the plaintext score and prediction (computed by the client, shown with the difference). |
-| How HE works | No checks: toy numbers computed live from the toy formulas (q = 10007, Δ = 1000, s = 3), labelled as toy. |
+| How HE works | No checks: toy numbers computed live from the toy formulas (q = 10007, Δ = 1000, s = 3), labelled as toy. Includes a second locking of the same inputs (run B) showing different ciphertexts unlock to nearly the same score. |
 | Benchmarks | Saved measurements from `benchmarks/results.json` (`uv run python -m benchmarks.metrics`), not measured per request. |
 
 ## Explanation text

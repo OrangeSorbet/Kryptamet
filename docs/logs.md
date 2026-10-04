@@ -997,3 +997,7 @@
   - tmp/pv3.py: 27 graph boxes hovered, 0 warnings
   - tmp/pv2.py: 256 popups, 0 errors or warnings
 - Phase 7C complete. Project done; Phase 8 is future scope.
+- Phase 7C follow-up: "How HE works" gets a 12th step, "The same inputs locked twice" (after the model-score step, before toy vs real).
+  - `interface/static/js/how_he_steps.js`: `TOY` now also holds run B (`y1`, `y2`, `scoreB`: u/e0/e1 = 3,−1,0 and 2,−1,0); step shows both runs' locks, server outputs, unlocks (353 vs 362) and noise (3 vs 12).
+  - Check: node eval of TOY gives locks (1394,2956), (4598,8642), score (9691,226), unlock 362; run A (5596,1588) → 353. Matches the hand calculation.
+  - Docs synced: ARCHITECTURE.md, LIVE_UI_TRUTH.md, checklist.md mention the new step; it carries eli1 + eli5 + advanced.

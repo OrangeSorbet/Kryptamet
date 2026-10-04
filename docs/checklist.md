@@ -135,7 +135,7 @@ Standard kept in memory: eli5-course-standard.
     - the S-box comes before the rounds
     - the m(X) grid vs "all 8192 coefficients" mismatch is investigated and fixed
 - [x] 7C.2 **Restructure:**
-    - new chapter 0 "How HE works" (theory with toy numbers: locks, noise, why the same input encrypts differently, how maths survives encryption)
+    - new chapter 0 "How HE works" (theory with toy numbers: locks, noise, why the same input encrypts differently, how maths survives encryption); step 11 "the same inputs locked twice" has ELI1, ELI5 and Advanced text
     - each transport chapter in two halves: the sender seals (AES, then RSA) → wire → the receiver opens (RSA decrypt → AES key, AES-GCM decrypt → CKKS ciphertext)
     - Decryption merged into Result, which starts with the real CKKS decryption
     - must-say facts (from the walkthrough with the user):

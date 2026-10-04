@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1791001487735,
-  "projectRoot": "C:\\Users\\ashvi\\Documents\\VS_Codes\\Apps\\Kryptamet",
+  "lastScanned": 1791132904011,
+  "projectRoot": "C:\\Users\\User\\Documents\\VS_Codes\\Apps\\Kryptamet",
   "techStack": {
     "languages": [
       {
@@ -9,7 +9,8 @@
         "version": null,
         "confidence": "high",
         "markers": [
-          "pyproject.toml"
+          "pyproject.toml",
+          "requirements.txt"
         ]
       }
     ],
@@ -20,7 +21,7 @@
         "category": "backend"
       }
     ],
-    "packageManager": null,
+    "packageManager": "pip",
     "runtime": null
   },
   "build": {
@@ -45,7 +46,10 @@
       "src",
       "tests"
     ],
-    "gitBranches": null
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
   },
   "customNotes": [],
   "directoryMap": {
@@ -53,7 +57,7 @@
       "path": "benchmarks",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1791001487671,
+      "lastAccessed": 1791132903982,
       "keyFiles": [
         "metrics.py",
         "results.json"
@@ -63,14 +67,14 @@
       "path": "data",
       "purpose": "Data files",
       "fileCount": 0,
-      "lastAccessed": 1791001487674,
+      "lastAccessed": 1791132903983,
       "keyFiles": []
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 6,
-      "lastAccessed": 1791001487676,
+      "lastAccessed": 1791132903984,
       "keyFiles": [
         "ARCHITECTURE.md",
         "checklist.md",
@@ -83,7 +87,7 @@
       "path": "hecrypto",
       "purpose": null,
       "fileCount": 13,
-      "lastAccessed": 1791001487677,
+      "lastAccessed": 1791132903984,
       "keyFiles": [
         "aes_trace.py",
         "ckks_context.py",
@@ -96,7 +100,7 @@
       "path": "inference",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1791001487678,
+      "lastAccessed": 1791132903985,
       "keyFiles": [
         "he_cnn_infer.py",
         "he_infer.py",
@@ -108,7 +112,7 @@
       "path": "interface",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1791001487679,
+      "lastAccessed": 1791132903985,
       "keyFiles": [
         "app.py",
         "cli.py"
@@ -118,30 +122,32 @@
       "path": "models",
       "purpose": "Data models",
       "fileCount": 0,
-      "lastAccessed": 1791001487680,
+      "lastAccessed": 1791132903986,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 1,
-      "lastAccessed": 1791001487681,
+      "fileCount": 3,
+      "lastAccessed": 1791132903987,
       "keyFiles": [
-        "download.py"
+        "build_samples.py",
+        "download.py",
+        "vercel_build.py"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 0,
-      "lastAccessed": 1791001487681,
+      "lastAccessed": 1791132903987,
       "keyFiles": []
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
       "fileCount": 10,
-      "lastAccessed": 1791001487682,
+      "lastAccessed": 1791132903988,
       "keyFiles": [
         "test_aes_trace.py",
         "test_ckks_encode_trace.py",
@@ -154,7 +160,7 @@
       "path": "tooldata",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1791001487683,
+      "lastAccessed": 1791132903988,
       "keyFiles": [
         "checklist.json",
         "ignore.json",
@@ -163,24 +169,21 @@
         "rules.md"
       ]
     },
-    "__pycache__": {
-      "path": "__pycache__",
-      "purpose": null,
-      "fileCount": 1,
-      "lastAccessed": 1791001487684,
-      "keyFiles": [
-        "_explore_tmp.cpython-313.pyc"
-      ]
-    },
     "interface\\static": {
       "path": "interface\\static",
       "purpose": "Static files",
       "fileCount": 0,
-      "lastAccessed": 1791001487687,
+      "lastAccessed": 1791132903991,
       "keyFiles": []
     }
   },
   "hotPaths": [
+    {
+      "path": "interface/static/js/how_he_steps.js",
+      "accessCount": 9,
+      "lastAccessed": 1791133209979,
+      "type": "file"
+    },
     {
       "path": "interface/static/js/var_label.js",
       "accessCount": 7,
@@ -225,8 +228,8 @@
     },
     {
       "path": "docs/ARCHITECTURE.md",
-      "accessCount": 2,
-      "lastAccessed": 1791002538696,
+      "accessCount": 3,
+      "lastAccessed": 1791133082120,
       "type": "directory"
     },
     {
@@ -254,9 +257,9 @@
       "type": "file"
     },
     {
-      "path": "interface/static/js/how_he_steps.js",
+      "path": "interface/static/js/explain_level.js",
       "accessCount": 2,
-      "lastAccessed": 1791042360690,
+      "lastAccessed": 1791133200354,
       "type": "file"
     },
     {
@@ -317,12 +320,6 @@
       "path": "interface/static/js/transport_steps.js",
       "accessCount": 1,
       "lastAccessed": 1791015386420,
-      "type": "file"
-    },
-    {
-      "path": "interface/static/js/explain_level.js",
-      "accessCount": 1,
-      "lastAccessed": 1791015697901,
       "type": "file"
     },
     {
@@ -425,6 +422,30 @@
       "path": "interface/static/js/chapter_vars.js",
       "accessCount": 1,
       "lastAccessed": 1791045271240,
+      "type": "file"
+    },
+    {
+      "path": "docs/checklist.md",
+      "accessCount": 1,
+      "lastAccessed": 1791133084011,
+      "type": "file"
+    },
+    {
+      "path": "docs/rules.md",
+      "accessCount": 1,
+      "lastAccessed": 1791133084349,
+      "type": "file"
+    },
+    {
+      "path": "docs/LIVE_UI_TRUTH.md",
+      "accessCount": 1,
+      "lastAccessed": 1791133084694,
+      "type": "file"
+    },
+    {
+      "path": "docs/LIVE_UI_POLISH.md",
+      "accessCount": 1,
+      "lastAccessed": 1791133084885,
       "type": "file"
     }
   ],

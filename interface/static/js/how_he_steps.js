@@ -24,9 +24,13 @@ const TOY = (() => {
     const sum = { c0: mod(x1.c0 + x2.c0), c1: mod(x1.c1 + x2.c1) };
     const times = { c0: mod(w1 * x1.c0), c1: mod(w1 * x1.c1) };
     const bm = Math.round(b * delta);
-    const score = { c0: mod(w1 * x1.c0 + w2 * x2.c0 + bm), c1: mod(w1 * x1.c1 + w2 * x2.c1) };
+    const scoreOf = (p, r) => ({ c0: mod(w1 * p.c0 + w2 * r.c0 + bm), c1: mod(w1 * p.c1 + w2 * r.c1) });
+    const score = scoreOf(x1, x2);
+    // Run B: the same two inputs locked again with different random picks (u, e0, e1).
+    const y1 = enc(0.25, 3, -1, 0), y2 = enc(0.5, 2, -1, 0);
     return {
-        q, delta, s, a, e, pk0, pk1, mod, centre, x1, x2, w1, w2, b, bm, sum, times, score, dec,
+        q, delta, s, a, e, pk0, pk1, mod, centre, x1, x2, y1, y2, w1, w2, b, bm, sum, times, score, dec,
+        scoreB: scoreOf(y1, y2),
         noise: (c) => e * c.u + c.e0 + c.e1 * s,
         crackNoNoise: mod(-mod(-a * s) * inv(a)),  // s recovered from a noiseless public key
         crackNoisy: mod(-pk0 * inv(a)),            // the same attack on the real (noisy) one
@@ -50,6 +54,8 @@ function buildHowHeSteps() {
     const d1 = T.dec(x1), dSum = T.dec(T.sum), dTimes = T.dec(T.times), dScore = T.dec(T.score), dWrong = T.dec(x1, T.s + 1);
     const wantScore = T.w1 * x1.x + T.w2 * x2.x + T.b;
     const r3 = (v) => Number(v.toFixed(3));
+    const y1 = T.y1, y2 = T.y2, dB = T.dec(T.scoreB);
+    const nA = T.w1 * T.noise(x1) + T.w2 * T.noise(x2), nB = T.w1 * T.noise(y1) + T.w2 * T.noise(y2);
     return [
         {
             eli5: {
@@ -231,6 +237,35 @@ function buildHowHeSteps() {
                 ["you unlock", `(${vn(T.score.c0, "c0 of score")} + ${vn(T.score.c1, "c1 of score")}×${vn(T.s, "s")}) mod ${vn(q, "q")} ÷ ${vn(D, "Δ")}`, dScore / D],
                 ["plain maths", `${vn(T.w1, "w₁")}×${vn(x1.x, "x₁")} + (${vn(T.w2, "w₂")})×${vn(x2.x, "x₂")} + ${vn(T.b, "b")}`, r3(wantScore)],
             ], "The server only ever had the pairs. Only you, holding s, can read the score."),
+        },
+        {
+            eli5: {
+                what: `Lock the same ${vn(x1.x, "x₁")} and ${vn(x2.x, "x₂")} a second time with different random picks (run B). The locks look unrelated: ${vn(x1.m, "m₁")} was (${vn(x1.c0, "c0 of x₁")}, ${vn(x1.c1, "c1 of x₁")}) in run A and is (${vn(y1.c0, "c0 of x₁ (B)")}, ${vn(y1.c1, "c1 of x₁ (B)")}) in run B. The server computes the score on each: (${vn(T.score.c0, "c0 of score")}, ${vn(T.score.c1, "c1 of score")}) and (${vn(T.scoreB.c0, "c0 of score (B)")}, ${vn(T.scoreB.c1, "c1 of score (B)")}). Unlocked: ${vn(dScore / D, "score")} and ${vn(dB / D, "score (B)")}. Both are close to the true ${vn(r3(wantScore), "plain score")}.`,
+                why: `Unlocking cancels the big random mask (that is what s is for) and leaves the number plus a small leftover. The server's steps (multiply, add) treat the number and the leftover the same way, so each run ends at ${vn(T.w1 * x1.m + T.w2 * x2.m + T.bm, "true Δ·score")} plus its own small error. The error differs per run (${vn(r3(dScore / D - wantScore), "error A")} vs ${vn(r3(dB / D - wantScore), "error B")}). That is why CKKS is called approximate. The mod only keeps numbers bounded; the key s does the cancelling. A wrong s gives garbage.`,
+                formal: `same inputs, different locks, same answer up to a small error.`,
+                next: "Next: toy vs the real run.",
+            },
+            eli1: {
+                what: `Work m₁ = ${vn(x1.m, "m₁")} by hand, twice. Run A: c0 = ${vn(T.pk0, "pk0")}×${vn(x1.u, "u")} + ${vn(x1.e0, "e0")} + ${vn(x1.m, "m₁")} = ${vn(T.pk0 * x1.u + x1.e0 + x1.m, "c0 before mod")}, minus ${vn(Math.floor((T.pk0 * x1.u + x1.e0 + x1.m) / q), "k")}×${vn(q, "q")} = ${vn(x1.c0, "c0 of x₁")}. Run B (u = ${vn(y1.u, "u")}, e0 = ${vn(y1.e0, "e0")}): c0 = ${vn(T.pk0, "pk0")}×${vn(y1.u, "u")} + ${vn(y1.e0, "e0")} + ${vn(y1.m, "m₁")} = ${vn(T.pk0 * y1.u + y1.e0 + y1.m, "c0 before mod")}, minus ${vn(Math.floor((T.pk0 * y1.u + y1.e0 + y1.m) / q), "k")}×${vn(q, "q")} = ${vn(y1.c0, "c0 of x₁ (B)")}. Two unrelated-looking locks for one number.`,
+                why: `Unlock each: A gives ${vn(x1.m, "m₁")} + noise ${vn(T.noise(x1), "noise A")} = ${vn(T.dec(x1), "c0 + c1·s")}; B gives ${vn(y1.m, "m₁")} + noise ${vn(T.noise(y1), "noise B")} = ${vn(T.dec(y1), "c0 + c1·s (B)")}. The server's score (w₁×lock₁ + w₂×lock₂, plus ${vn(T.bm, "Δ·b")} in c0) then unlocks to ${vn(dScore, "score unlocked")} in A and ${vn(dB, "score unlocked (B)")} in B. True value: ${vn(T.w1 * x1.m + T.w2 * x2.m + T.bm, "true Δ·score")}. The leftovers (A: ${vn(nA, "score noise A")}, B: ${vn(nB, "score noise B")}) are tiny next to ${vn(D, "Δ")}, so both read as about ${vn(r3(wantScore), "plain score")}.`,
+                formal: `two different locks → ${vn(dScore / D, "score")} and ${vn(dB / D, "score (B)")}; true ${vn(r3(wantScore), "plain score")}.`,
+                next: "Next: the same formulas with the real, much bigger numbers.",
+            },
+            what: `Unlock of one lock: c0 + c1·s = u·(pk0 + pk1·s) + e0 + e1·s + m = ${vn(T.e, "e")}·u + e0 + ${vn(T.s, "s")}·e1 + m (mod ${vn(q, "q")}). Noise of m₁: A = ${vn(T.noise(x1), "noise A")}, B = ${vn(T.noise(y1), "noise B")}; of m₂: A = ${vn(T.noise(x2), "noise A")}, B = ${vn(T.noise(y2), "noise B")}. Score noise = w₁·n₁ + w₂·n₂: A = ${vn(nA, "score noise A")}, B = ${vn(nB, "score noise B")}.`,
+            why: "pk0 + pk1·s = e is small, so the large terms pk0·u + pk1·u·s collapse to e·u. Every server operation is linear in (c0, c1), so it maps message and leftovers identically; the leftovers stay small as long as the weights are small. At real sizes the two ciphertexts are computationally indistinguishable (RLWE) even though the plaintexts are equal.",
+            formal: "c0 + c1·s = m + e·u + e0 + e1·s;  noise(score) = Σ wᵢ·noiseᵢ",
+            next: "Next: how the real parameters differ.",
+            renderVisual: (el) => renderToyCalc(el, "The same inputs locked twice", [
+                ["run A: m₁ lock", `u=${vn(x1.u, "u")}, e0=${vn(x1.e0, "e0")}, e1=${vn(x1.e1, "e1")}`, `(${x1.c0}, ${x1.c1})`],
+                ["run B: m₁ lock", `u=${vn(y1.u, "u")}, e0=${vn(y1.e0, "e0")}, e1=${vn(y1.e1, "e1")}`, `(${y1.c0}, ${y1.c1})`],
+                ["run A: m₂ lock", `u=${vn(x2.u, "u")}, e0=${vn(x2.e0, "e0")}, e1=${vn(x2.e1, "e1")}`, `(${x2.c0}, ${x2.c1})`],
+                ["run B: m₂ lock", `u=${vn(y2.u, "u")}, e0=${vn(y2.e0, "e0")}, e1=${vn(y2.e1, "e1")}`, `(${y2.c0}, ${y2.c1})`],
+                ["run A: score lock", "w₁·lock₁ + w₂·lock₂ + Δb in c0", `(${T.score.c0}, ${T.score.c1})`],
+                ["run B: score lock", "the same formula", `(${T.scoreB.c0}, ${T.scoreB.c1})`],
+                ["run A: unlock", `(${vn(T.score.c0, "c0 of score")} + ${vn(T.score.c1, "c1 of score")}×${vn(T.s, "s")}) mod ${vn(q, "q")}, noise ${vn(nA, "score noise A")}`, dScore / D],
+                ["run B: unlock", `(${vn(T.scoreB.c0, "c0 of score (B)")} + ${vn(T.scoreB.c1, "c1 of score (B)")}×${vn(T.s, "s")}) mod ${vn(q, "q")}, noise ${vn(nB, "score noise B")}`, dB / D],
+                ["plain maths", "3·0.25 − 0.5 + 0.1", r3(wantScore)],
+            ], "Different locks, different server outputs, nearly the same answer. Only the small leftover differs."),
         },
         {
             eli5: {

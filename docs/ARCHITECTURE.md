@@ -146,7 +146,7 @@ Vanilla JS, no build step. The interaction model is modelled on the separate Sne
 Each box shows a proof badge: the browser checks that passed while you watched that chapter. Always dark.
 
 **Chapters** (`chapter_registry.js`):
-1. How HE works: the whole scheme on toy numbers (`how_he_steps.js`, `TOY`; q = 10007, Δ = 1000, one
+1. How HE works: the whole scheme on toy numbers, 12 steps incl. "the same inputs locked twice" (`how_he_steps.js`, `TOY`; q = 10007, Δ = 1000, one
    secret coefficient; every value computed live). It needs no run.
 2. Feature Extraction
 3. Key Setup
